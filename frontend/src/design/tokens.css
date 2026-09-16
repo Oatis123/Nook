@@ -1,0 +1,93 @@
+/* Design tokens — spec TECH_SPEC.md §10.3. Light values are the default; dark values
+   apply either when the user explicitly picked "dark" or, for "system", when the OS
+   prefers dark and no explicit choice was made. See src/lib/theme.ts for how
+   data-theme is set on <html>. */
+
+:root {
+  --bg: #faf9f5;
+  --surface: #f3f1ea;
+  --surface-raised: #ffffff;
+  --border: #e5e2d9;
+  --text: #1f1e1b;
+  --text-muted: #6b6860;
+  --accent: #c2663f;
+  --accent-text: #ffffff;
+  --danger: #b5483a;
+  --danger-text: #ffffff;
+
+  /* Priority markers — muted, fixed palette, AA contrast on --surface */
+  --priority-low: #6b8f71;
+  --priority-medium: #c2953f;
+  --priority-high: #b5483a;
+
+  /* List/tag color palette (choose N) — muted, warm-neutral compatible */
+  --palette-1: #c2663f;
+  --palette-2: #6b8f71;
+  --palette-3: #5b7ea3;
+  --palette-4: #a06bb0;
+  --palette-5: #c2953f;
+  --palette-6: #7b9199;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --shadow-popover: 0 4px 16px -4px rgb(0 0 0 / 0.16);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #1c1b19;
+    --surface: #252421;
+    --surface-raised: #2c2b28;
+    --border: #363430;
+    --text: #eceae3;
+    --text-muted: #9c998f;
+    --accent: #d9805a;
+    --accent-text: #1c1b19;
+    --danger: #d0685a;
+    --danger-text: #1c1b19;
+
+    --priority-low: #86ab8c;
+    --priority-medium: #d9ac5a;
+    --priority-high: #d0685a;
+
+    --shadow-popover: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #1c1b19;
+  --surface: #252421;
+  --surface-raised: #2c2b28;
+  --border: #363430;
+  --text: #eceae3;
+  --text-muted: #9c998f;
+  --accent: #d9805a;
+  --accent-text: #1c1b19;
+  --danger: #d0685a;
+  --danger-text: #1c1b19;
+
+  --priority-low: #86ab8c;
+  --priority-medium: #d9ac5a;
+  --priority-high: #d0685a;
+
+  --shadow-popover: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

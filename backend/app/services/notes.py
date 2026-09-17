@@ -8,7 +8,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.isolation import get_owned_or_404
 from app.models.folder import Folder
 from app.models.note import Note
-from app.schemas.note import NoteUpdate
+from app.models.tag import NoteTag, Tag
+from app.schemas.note import NoteDetail, NoteUpdate
+from app.services.note_links import (
+    cascade_rename_links,
+    notes_referencing,
+    resolve_dangling_links_to,
+    sync_note_from_content,
+)
 
 TRASH_RETENTION_DAYS = 30
 
@@ -59,6 +66,30 @@ async def purge_old_trash(session: AsyncSession, user_id: uuid.UUID) -> None:
     await session.commit()
 
 
+async def get_note_tags(session: AsyncSession, note_id: uuid.UUID) -> list[str]:
+    result = await session.scalars(
+        select(Tag.name).join(NoteTag, NoteTag.tag_id == Tag.id).where(NoteTag.note_id == note_id)
+    )
+    return sorted(result)
+
+
+async def build_note_detail(session: AsyncSession, note: Note) -> NoteDetail:
+    tags = await get_note_tags(session, note.id)
+    return NoteDetail(
+        id=note.id,
+        folder_id=note.folder_id,
+        title=note.title,
+        version=note.version,
+        created_at=note.created_at,
+        updated_at=note.updated_at,
+        deleted_at=note.deleted_at,
+        content=note.content,
+        frontmatter=note.frontmatter,
+        tags=tags,
+        aliases=[a.alias for a in note.aliases],
+    )
+
+
 async def create_note(
     session: AsyncSession, user_id: uuid.UUID, title: str, folder_id: uuid.UUID | None, content: str
 ) -> Note:
@@ -67,8 +98,12 @@ async def create_note(
 
     note = Note(user_id=user_id, folder_id=folder_id, title=title, content=content)
     session.add(note)
+    await session.flush()
+    await sync_note_from_content(session, user_id, note)
     await session.commit()
     await session.refresh(note)
+    await resolve_dangling_links_to(session, user_id, note)
+    await session.commit()
     return note
 
 
@@ -78,6 +113,7 @@ async def list_notes(
     folder_id: uuid.UUID | None = None,
     folder_filter: bool = False,
     deleted: bool = False,
+    tag: str | None = None,
 ) -> list[Note]:
     await purge_old_trash(session, user_id)
 
@@ -86,12 +122,26 @@ async def list_notes(
     if folder_filter:
         conditions.append(Note.folder_id == folder_id)
 
-    result = await session.scalars(select(Note).where(and_(*conditions)).order_by(Note.title))
+    query = select(Note).where(and_(*conditions))
+    if tag is not None:
+        query = (
+            query.join(NoteTag, NoteTag.note_id == Note.id)
+            .join(Tag, Tag.id == NoteTag.tag_id)
+            .where(Tag.user_id == user_id, Tag.name == tag)
+        )
+
+    result = await session.scalars(query.order_by(Note.title))
     return list(result)
 
 
 async def get_note(session: AsyncSession, user_id: uuid.UUID, note_id: uuid.UUID) -> Note:
     return await get_owned_or_404(session, Note, note_id, user_id)
+
+
+async def count_rename_impact(session: AsyncSession, user_id: uuid.UUID, note_id: uuid.UUID) -> int:
+    note = await get_owned_or_404(session, Note, note_id, user_id)
+    referencing = await notes_referencing(session, user_id, note.id)
+    return len(referencing)
 
 
 async def update_note(
@@ -107,10 +157,12 @@ async def update_note(
     new_folder_id = None if data.move_to_root else (data.folder_id or note.folder_id)
     folder_changing = data.move_to_root or data.folder_id is not None
     new_title = data.title if data.title is not None else note.title
+    old_title = note.title
+    title_changing = data.title is not None and data.title != note.title
 
     if folder_changing:
         await _validate_folder(session, user_id, new_folder_id)
-    if folder_changing or (data.title is not None and data.title != note.title):
+    if folder_changing or title_changing:
         await _check_title_unique(
             session, user_id, new_folder_id, new_title, exclude_note_id=note.id
         )
@@ -123,8 +175,17 @@ async def update_note(
         note.folder_id = new_folder_id
     note.version += 1
 
+    await sync_note_from_content(session, user_id, note)
     await session.commit()
     await session.refresh(note)
+
+    if title_changing:
+        await resolve_dangling_links_to(session, user_id, note)
+        if data.update_links:
+            await cascade_rename_links(session, user_id, note, old_title, new_title)
+        await session.commit()
+        await session.refresh(note)
+
     return note
 
 

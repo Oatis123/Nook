@@ -19,6 +19,7 @@ dependencies = [
     "python-multipart>=0.0.12",
     "filetype>=1.2",
     "structlog>=24.4",
+    "pyyaml>=6.0",
 ]
 
 [dependency-groups]
@@ -29,6 +30,7 @@ dev = [
     "httpx>=0.27",
     "ruff>=0.7",
     "mypy>=1.13",
+    "types-pyyaml>=6.0",
 ]
 
 [tool.ruff]

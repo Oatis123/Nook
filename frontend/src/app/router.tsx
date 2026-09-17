@@ -10,6 +10,7 @@ import SettingsPage from '@/features/settings/SettingsPage'
 import AdminPage from '@/features/admin/AdminPage'
 import NoteEditorRoute from '@/features/notes/NoteEditorRoute'
 import TrashPage from '@/features/notes/TrashPage'
+import TagNotesPage from '@/features/notes/TagNotesPage'
 
 const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
 
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
             element: <PlaceholderPage icon={FileText} title="Select or create a note" />,
           },
           { path: 'notes/:noteId', element: <NoteEditorRoute /> },
+          { path: 'tags/:name', element: <TagNotesPage /> },
           {
             path: 'tasks',
             element: <PlaceholderPage icon={ListTodo} title="Tasks are coming soon" />,

@@ -1,18 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
+import { autocompletion } from '@codemirror/autocomplete'
 import { Eye, EyeOff, Link2 } from 'lucide-react'
 import { EmptyState } from '@/design/components/EmptyState'
 import { IconButton } from '@/design/components/IconButton'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
-import { getNote } from '@/features/notes/api'
+import { getNote, getRenameImpact } from '@/features/notes/api'
 import { editorTheme } from '@/features/notes/editorTheme'
-import { useNote, useUpdateNote } from '@/features/notes/hooks'
+import { useNote, useNotes, useTags, useUpdateNote } from '@/features/notes/hooks'
+import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
 import { MarkdownPreview } from '@/features/notes/MarkdownPreview'
 import { ConflictDialog } from '@/features/notes/ConflictDialog'
+import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import type { NoteDetail } from '@/lib/types'
 
 const SAVE_DEBOUNCE_MS = 800
@@ -32,8 +35,13 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [conflict, setConflict] = useState<NoteDetail | null>(null)
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
+  const [renamePrompt, setRenamePrompt] = useState<{ affectedNotes: number } | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const draftRef = useRef(draft)
+  const lastSavedTitleRef = useRef<string | null>(null)
+
+  const notesQuery = useNotes()
+  const tagsQuery = useTags()
 
   useEffect(() => {
     draftRef.current = draft
@@ -53,6 +61,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     })
     setStatus('saved')
     setLoadedNoteId(noteId)
+    lastSavedTitleRef.current = noteQuery.data.title
   }
 
   useEffect(() => {
@@ -87,7 +96,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     timerRef.current = setTimeout(() => save(next), SAVE_DEBOUNCE_MS)
   }
 
-  async function save(next: { title: string; content: string }) {
+  async function save(next: { title: string; content: string }, updateLinks = false) {
     const current = draftRef.current
     if (!current) return
     if (!navigator.onLine) {
@@ -100,8 +109,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         version: current.version,
         title: next.title,
         content: next.content,
+        update_links: updateLinks,
       })
       setDraft({ title: result.title, content: result.content, version: result.version })
+      lastSavedTitleRef.current = result.title
       setStatus('saved')
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -121,9 +132,29 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   function handleTitleChange(title: string) {
     if (!draft) return
-    const next = { ...draft, title }
-    setDraft(next)
-    scheduleSave(next)
+    // Title changes are saved explicitly on blur/Enter (see handleTitleBlur), not on
+    // every keystroke like content — renaming needs a settled title to check link
+    // impact against, and debouncing it too raced the impact check against the
+    // autosave in practice (whichever fired first "won", so the cascade dialog was
+    // easy to miss).
+    setDraft({ ...draft, title })
+  }
+
+  async function handleTitleBlur() {
+    if (!draft) return
+    if (draft.title === lastSavedTitleRef.current) return
+    if (timerRef.current) clearTimeout(timerRef.current)
+    const impact = await getRenameImpact(noteId)
+    if (impact.affected_notes > 0) {
+      setRenamePrompt({ affectedNotes: impact.affected_notes })
+    } else {
+      save(draft, false)
+    }
+  }
+
+  function resolveRenamePrompt(updateLinks: boolean) {
+    setRenamePrompt(null)
+    if (draft) save(draft, updateLinks)
   }
 
   function resolveKeepMine() {
@@ -142,6 +173,21 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setStatus('saved')
   }
 
+  const editorExtensions = useMemo(
+    () => [
+      markdown(),
+      EditorView.lineWrapping,
+      editorTheme,
+      autocompletion({
+        override: [
+          createWikilinkCompletion(notesQuery.data ?? []),
+          createTagCompletion(tagsQuery.data ?? []),
+        ],
+      }),
+    ],
+    [notesQuery.data, tagsQuery.data],
+  )
+
   if (noteQuery.isLoading || !draft) return null
 
   if (noteQuery.isError) {
@@ -154,6 +200,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         <input
           value={draft.title}
           onChange={(e) => handleTitleChange(e.target.value)}
+          onBlur={handleTitleBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
           className="min-w-0 flex-1 truncate bg-transparent font-serif text-xl text-text outline-none"
           aria-label="Note title"
         />
@@ -200,7 +250,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           <CodeMirror
             value={draft.content}
             onChange={handleContentChange}
-            extensions={[markdown(), EditorView.lineWrapping, editorTheme]}
+            extensions={editorExtensions}
             basicSetup={{ lineNumbers: false, foldGutter: false }}
             height="100%"
             className="h-full"
@@ -224,6 +274,13 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         serverContent={conflict?.content ?? ''}
         onKeepMine={resolveKeepMine}
         onLoadServer={resolveLoadServer}
+      />
+
+      <RenameLinksDialog
+        open={renamePrompt !== null}
+        affectedNotes={renamePrompt?.affectedNotes ?? 0}
+        onUpdateLinks={() => resolveRenamePrompt(true)}
+        onSkip={() => resolveRenamePrompt(false)}
       />
     </div>
   )

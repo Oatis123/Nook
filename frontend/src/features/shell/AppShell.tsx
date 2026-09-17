@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   FileText,
   ListTodo,
@@ -22,6 +22,8 @@ import { DropdownMenu } from '@/design/components/DropdownMenu'
 import { CommandPalette } from '@/features/shell/CommandPalette'
 import { useCurrentUser, useLogout } from '@/features/auth/hooks'
 import { FolderTree } from '@/features/notes/FolderTree'
+import { TagList } from '@/features/notes/TagList'
+import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
 
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
@@ -38,6 +40,7 @@ export function AppShell() {
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen)
   const location = useLocation()
   const navigate = useNavigate()
+  const { noteId } = useParams<{ noteId: string }>()
   const section = location.pathname.startsWith('/tasks') ? 'tasks' : 'notes'
   const { data: user } = useCurrentUser()
   const logout = useLogout()
@@ -110,7 +113,12 @@ export function AppShell() {
         </div>
 
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-          {section === 'notes' && <FolderTree />}
+          {section === 'notes' && (
+            <>
+              <FolderTree />
+              <TagList />
+            </>
+          )}
         </div>
 
         <nav className="shrink-0 border-t border-border px-2 py-2">
@@ -200,8 +208,14 @@ export function AppShell() {
             <div className="px-3 py-3">
               <span className="text-sm text-text-muted">Context</span>
             </div>
-            <div className="flex-1 px-3 text-sm text-text-muted">
-              Backlinks, linked tasks and the outline will appear here.
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {noteId ? (
+                <NoteContextPanel noteId={noteId} />
+              ) : (
+                <p className="px-3 text-sm text-text-muted">
+                  Backlinks, linked tasks and the outline will appear here.
+                </p>
+              )}
             </div>
           </aside>
         </div>

@@ -39,10 +39,23 @@ export function useDeleteFolder() {
   })
 }
 
-export function useNotes(params: { deleted?: boolean } = {}) {
+export function useNotes(params: { deleted?: boolean; tag?: string } = {}) {
   return useQuery({
-    queryKey: notesKey(params.deleted ?? false),
-    queryFn: () => notesApi.listNotes({ deleted: params.deleted }),
+    queryKey: params.tag
+      ? (['notes', { tag: params.tag }] as const)
+      : notesKey(params.deleted ?? false),
+    queryFn: () => notesApi.listNotes({ deleted: params.deleted, tag: params.tag }),
+  })
+}
+
+export function useTags() {
+  return useQuery({ queryKey: ['tags'], queryFn: notesApi.listTags })
+}
+
+export function useBacklinks(noteId: string) {
+  return useQuery({
+    queryKey: ['notes', noteId, 'backlinks'],
+    queryFn: () => notesApi.getBacklinks(noteId),
   })
 }
 
@@ -55,54 +68,48 @@ export function useNote(id: string | undefined) {
   })
 }
 
-export function useCreateNote() {
+function useInvalidateNotesAndTags() {
   const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: notesApi.createNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
-  })
+  return () => {
+    queryClient.invalidateQueries({ queryKey: ['notes'] })
+    queryClient.invalidateQueries({ queryKey: ['tags'] })
+  }
+}
+
+export function useCreateNote() {
+  const invalidate = useInvalidateNotesAndTags()
+  return useMutation({ mutationFn: notesApi.createNote, onSuccess: invalidate })
 }
 
 export function useUpdateNote(id: string) {
   const queryClient = useQueryClient()
+  const invalidate = useInvalidateNotesAndTags()
   return useMutation({
     mutationFn: (input: Parameters<typeof notesApi.updateNote>[1]) =>
       notesApi.updateNote(id, input),
     onSuccess: (note) => {
       queryClient.setQueryData(noteKey(id), note)
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
+      invalidate()
     },
   })
 }
 
 export function useDeleteNote() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: notesApi.deleteNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
-  })
+  const invalidate = useInvalidateNotesAndTags()
+  return useMutation({ mutationFn: notesApi.deleteNote, onSuccess: invalidate })
 }
 
 export function useRestoreNote() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: notesApi.restoreNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
-  })
+  const invalidate = useInvalidateNotesAndTags()
+  return useMutation({ mutationFn: notesApi.restoreNote, onSuccess: invalidate })
 }
 
 export function usePermanentlyDeleteNote() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: notesApi.permanentlyDeleteNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
-  })
+  const invalidate = useInvalidateNotesAndTags()
+  return useMutation({ mutationFn: notesApi.permanentlyDeleteNote, onSuccess: invalidate })
 }
 
 export function useEmptyTrash() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: notesApi.emptyTrash,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
-  })
+  const invalidate = useInvalidateNotesAndTags()
+  return useMutation({ mutationFn: notesApi.emptyTrash, onSuccess: invalidate })
 }

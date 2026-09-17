@@ -191,3 +191,60 @@
   max-width: 100%;
   border-radius: var(--radius-md);
 }
+
+/* Wikilinks (spec §6.3/§6.5) */
+.markdown-preview a.wikilink {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  cursor: pointer;
+}
+.markdown-preview a.wikilink:hover {
+  border-bottom-color: var(--accent);
+}
+.markdown-preview a.wikilink-dangling {
+  color: var(--text-muted);
+  border-bottom: 1px dashed var(--border);
+}
+.markdown-preview a.wikilink-ambiguous {
+  color: var(--danger);
+  border-bottom: 1px dashed var(--danger);
+  cursor: help;
+}
+.markdown-preview .wikilink-embed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.1em 0.5em;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.9em;
+}
+
+/* Callouts (spec §6.3, Obsidian-style) */
+.markdown-preview blockquote.callout {
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 0.7em 1em;
+  color: var(--text);
+}
+.markdown-preview blockquote.callout::before {
+  content: attr(data-callout-type);
+  display: block;
+  text-transform: capitalize;
+  font-weight: 600;
+  margin-bottom: 0.3em;
+}
+.markdown-preview blockquote.callout[data-callout-type='warning'] {
+  border-left-color: var(--priority-medium);
+}
+.markdown-preview blockquote.callout[data-callout-type='danger'],
+.markdown-preview blockquote.callout[data-callout-type='error'] {
+  border-left-color: var(--danger);
+}
+.markdown-preview blockquote.callout[data-callout-type='tip'],
+.markdown-preview blockquote.callout[data-callout-type='success'] {
+  border-left-color: var(--priority-low);
+}

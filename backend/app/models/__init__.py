@@ -3,7 +3,10 @@ from app.models.base import Base
 from app.models.folder import Folder
 from app.models.invite import Invite
 from app.models.note import Note
+from app.models.note_alias import NoteAlias
+from app.models.note_link import NoteLink
 from app.models.refresh_token import RefreshToken
+from app.models.tag import NoteTag, Tag
 from app.models.user import User
 
 __all__ = [
@@ -15,4 +18,8 @@ __all__ = [
     "RefreshToken",
     "Folder",
     "Note",
+    "Tag",
+    "NoteTag",
+    "NoteAlias",
+    "NoteLink",
 ]

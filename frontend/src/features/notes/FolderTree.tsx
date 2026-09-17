@@ -13,7 +13,12 @@ import { DropdownMenu, type DropdownMenuItem } from '@/design/components/Dropdow
 import { IconButton } from '@/design/components/IconButton'
 import { updateNote as updateNoteApi } from '@/features/notes/api'
 import type { NoteSummary } from '@/lib/types'
-import { buildTree, collectDescendantFolderIds, type FolderNode } from '@/features/notes/tree'
+import {
+  buildTree,
+  collectDescendantFolderIds,
+  uniqueNoteTitle,
+  type FolderNode,
+} from '@/features/notes/tree'
 import {
   useCreateFolder,
   useCreateNote,
@@ -107,7 +112,10 @@ export function FolderTree() {
             label="New note"
             onClick={() =>
               createNote.mutate(
-                { title: 'Untitled', folder_id: null },
+                {
+                  title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], null),
+                  folder_id: null,
+                },
                 { onSuccess: (note) => navigate(`/notes/${note.id}`) },
               )
             }
@@ -187,6 +195,7 @@ function FolderRow({
   const updateFolder = useUpdateFolder()
   const deleteFolder = useDeleteFolder()
   const deleteNoteMutation = useDeleteNote()
+  const notesQuery = useNotes()
   const [dragOver, setDragOver] = useState(false)
 
   const items: DropdownMenuItem[] = [
@@ -194,7 +203,10 @@ function FolderRow({
       label: 'New note',
       onSelect: () =>
         createNote.mutate(
-          { title: 'Untitled', folder_id: node.folder.id },
+          {
+            title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], node.folder.id),
+            folder_id: node.folder.id,
+          },
           { onSuccess: (note) => navigate(`/notes/${note.id}`) },
         ),
     },

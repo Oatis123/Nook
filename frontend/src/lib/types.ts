@@ -80,4 +80,11 @@ export interface NoteSummary {
 export interface NoteDetail extends NoteSummary {
   content: string
   frontmatter: Record<string, unknown>
+  tags: string[]
+  aliases: string[]
+}
+
+export interface Tag {
+  name: string
+  note_count: number
 }

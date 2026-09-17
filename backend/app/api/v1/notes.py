@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, Query, status
 
 from app.core.deps import CurrentUser, DbSession, require_csrf
 from app.schemas.note import NoteCreate, NoteDetail, NoteSummary, NoteUpdate
+from app.schemas.note_link import BacklinkOut, RenameImpact
+from app.services import note_links as note_links_service
 from app.services import notes as notes_service
 
 router = APIRouter(prefix="/notes", tags=["notes"])
@@ -17,6 +19,7 @@ async def list_notes(
     folder_id: uuid.UUID | None = Query(default=None),
     root: bool = Query(default=False),
     deleted: bool = Query(default=False),
+    tag: str | None = Query(default=None),
 ) -> list[NoteSummary]:
     notes = await notes_service.list_notes(
         session,
@@ -24,6 +27,7 @@ async def list_notes(
         folder_id=None if root else folder_id,
         folder_filter=root or folder_id is not None,
         deleted=deleted,
+        tag=tag,
     )
     return [NoteSummary.model_validate(n) for n in notes]
 
@@ -33,13 +37,31 @@ async def create_note(body: NoteCreate, user: CurrentUser, session: DbSession) -
     note = await notes_service.create_note(
         session, user.id, body.title, body.folder_id, body.content
     )
-    return NoteDetail.model_validate(note)
+    return await notes_service.build_note_detail(session, note)
 
 
 @router.get("/{note_id}", response_model=NoteDetail)
 async def get_note(note_id: uuid.UUID, user: CurrentUser, session: DbSession) -> NoteDetail:
     note = await notes_service.get_note(session, user.id, note_id)
-    return NoteDetail.model_validate(note)
+    return await notes_service.build_note_detail(session, note)
+
+
+@router.get("/{note_id}/backlinks", response_model=list[BacklinkOut])
+async def get_backlinks(
+    note_id: uuid.UUID, user: CurrentUser, session: DbSession
+) -> list[BacklinkOut]:
+    await notes_service.get_note(session, user.id, note_id)  # 404s if not owned
+    links = await note_links_service.get_backlinks(session, user.id, note_id)
+    return [
+        BacklinkOut(source_note_id=source.id, source_note_title=source.title, heading=link.heading)
+        for link, source in links
+    ]
+
+
+@router.get("/{note_id}/rename-impact", response_model=RenameImpact)
+async def rename_impact(note_id: uuid.UUID, user: CurrentUser, session: DbSession) -> RenameImpact:
+    count = await notes_service.count_rename_impact(session, user.id, note_id)
+    return RenameImpact(affected_notes=count)
 
 
 @router.patch("/{note_id}", response_model=NoteDetail, dependencies=[Csrf])
@@ -47,7 +69,7 @@ async def update_note(
     note_id: uuid.UUID, body: NoteUpdate, user: CurrentUser, session: DbSession
 ) -> NoteDetail:
     note = await notes_service.update_note(session, user.id, note_id, body)
-    return NoteDetail.model_validate(note)
+    return await notes_service.build_note_detail(session, note)
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Csrf])
@@ -58,7 +80,7 @@ async def delete_note(note_id: uuid.UUID, user: CurrentUser, session: DbSession)
 @router.post("/{note_id}/restore", response_model=NoteDetail, dependencies=[Csrf])
 async def restore_note(note_id: uuid.UUID, user: CurrentUser, session: DbSession) -> NoteDetail:
     note = await notes_service.restore_note(session, user.id, note_id)
-    return NoteDetail.model_validate(note)
+    return await notes_service.build_note_detail(session, note)
 
 
 @router.delete("/{note_id}/permanent", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Csrf])

@@ -15,6 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/lang-markdown": "^6.5.2",
     "@codemirror/state": "^6.7.5",
     "@codemirror/view": "^6.43.12",
@@ -32,6 +33,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^1.46.0",
+    "mdast-util-find-and-replace": "^3.0.2",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -43,6 +45,7 @@
     "remark-rehype": "^11.1.2",
     "shiki": "^4.4.3",
     "unified": "^11.0.5",
+    "unist-util-visit": "^5.1.0",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -51,10 +54,13 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",
+    "@types/hast": "^3.0.5",
+    "@types/mdast": "^4.0.4",
     "@types/node": "^24.13.3",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@types/unist": "^3.0.3",
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",

@@ -16,6 +16,9 @@ class NoteUpdate(BaseModel):
     content: str | None = None
     folder_id: uuid.UUID | None = Field(default=None)
     move_to_root: bool = False
+    # When renaming, also rewrite `[[OldTitle]]` to `[[NewTitle]]` in every note that
+    # links to this one (spec §6.5). Preview the count via GET /notes/{id}/rename-impact.
+    update_links: bool = False
 
 
 class NoteSummary(BaseModel):
@@ -33,3 +36,5 @@ class NoteSummary(BaseModel):
 class NoteDetail(NoteSummary):
     content: str
     frontmatter: dict
+    tags: list[str] = []
+    aliases: list[str] = []

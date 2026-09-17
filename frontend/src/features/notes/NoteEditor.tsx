@@ -3,13 +3,13 @@ import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { autocompletion } from '@codemirror/autocomplete'
-import { Eye, EyeOff, Link2, Paperclip } from 'lucide-react'
+import { Download, Eye, EyeOff, Link2, Paperclip } from 'lucide-react'
 import { EmptyState } from '@/design/components/EmptyState'
 import { IconButton } from '@/design/components/IconButton'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
-import { getNote, getRenameImpact } from '@/features/notes/api'
+import { getNote, getRenameImpact, noteExportUrl } from '@/features/notes/api'
 import { editorTheme } from '@/features/notes/editorTheme'
 import { useNote, useNotes, useTags, useUpdateNote } from '@/features/notes/hooks'
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
@@ -248,6 +248,17 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               e.target.value = ''
             }}
           />
+          <Tooltip label="Export as .md">
+            <a
+              href={noteExportUrl(noteId)}
+              download
+              aria-label="Export as .md"
+              title="Export as .md"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text"
+            >
+              <Download size={16} strokeWidth={1.5} />
+            </a>
+          </Tooltip>
           <Tooltip label="Toggle preview (Ctrl/Cmd+E)">
             <IconButton
               label="Toggle preview"

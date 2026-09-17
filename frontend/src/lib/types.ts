@@ -214,6 +214,23 @@ export interface RecurrenceInput {
   end_count?: number | null
 }
 
+export type ImportJobStatus = 'pending' | 'processing' | 'done' | 'failed'
+
+export interface ImportReport {
+  notes_imported: number
+  attachments_imported: number
+  conflicts: string[]
+  errors: string[]
+}
+
+export interface ImportJob {
+  id: string
+  status: ImportJobStatus
+  report: ImportReport | null
+  created_at: string
+  finished_at: string | null
+}
+
 export interface CalendarEntry {
   task_id: string
   list_id: string

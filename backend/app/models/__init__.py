@@ -2,6 +2,7 @@ from app.models.attachment import Attachment, NoteAttachment
 from app.models.auth_token import AuthToken, AuthTokenKind
 from app.models.base import Base
 from app.models.folder import Folder
+from app.models.import_job import ImportJob, ImportJobStatus
 from app.models.invite import Invite
 from app.models.note import Note
 from app.models.note_alias import NoteAlias
@@ -41,4 +42,6 @@ __all__ = [
     "ScheduledReminder",
     "ReminderKind",
     "ReminderStatus",
+    "ImportJob",
+    "ImportJobStatus",
 ]

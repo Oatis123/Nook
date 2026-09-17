@@ -8,11 +8,13 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from app.core.config import get_settings
 from app.core.db import async_session_factory
 from app.services.reminder_dispatch import ReminderBlocked, dispatch_due_reminders
+from app.services.vault_import import process_pending_import_jobs
 
 settings = get_settings()
 log = structlog.get_logger()
 
 TICK_SECONDS = 30
+IMPORT_POLL_SECONDS = 5
 
 
 def _make_sender(bot: Bot):
@@ -37,6 +39,23 @@ async def tick(bot: Bot | None) -> None:
         log.info("worker.dispatched", count=count)
 
 
+async def _reminder_loop(bot: Bot | None) -> None:
+    while True:
+        await tick(bot)
+        await asyncio.sleep(TICK_SECONDS)
+
+
+async def _import_loop() -> None:
+    """A separate, faster poll than reminders (spec §6.9: import runs in the background) —
+    its own asyncio task so a slow vault import never delays reminder dispatch."""
+    while True:
+        async with async_session_factory() as session:
+            count = await process_pending_import_jobs(session)
+        if count:
+            log.info("worker.import_jobs_processed", count=count)
+        await asyncio.sleep(IMPORT_POLL_SECONDS)
+
+
 async def main() -> None:
     log.info("worker.startup", app_name=settings.app_name)
     if not settings.telegram_bot_token:
@@ -44,9 +63,7 @@ async def main() -> None:
 
     bot = Bot(token=settings.telegram_bot_token) if settings.telegram_bot_token else None
     try:
-        while True:
-            await tick(bot)
-            await asyncio.sleep(TICK_SECONDS)
+        await asyncio.gather(_reminder_loop(bot), _import_loop())
     finally:
         if bot is not None:
             await bot.session.close()

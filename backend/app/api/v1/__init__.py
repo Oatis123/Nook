@@ -6,6 +6,7 @@ from app.api.v1 import (
     auth,
     folders,
     graph,
+    import_jobs,
     me,
     notes,
     search,
@@ -23,6 +24,7 @@ api_router.include_router(notes.router)
 api_router.include_router(tags.router)
 api_router.include_router(search.router)
 api_router.include_router(attachments.router)
+api_router.include_router(import_jobs.router)
 api_router.include_router(graph.router)
 api_router.include_router(task_lists.router)
 api_router.include_router(tasks.router)

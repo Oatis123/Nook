@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     admin_password: str = ""
 
     max_upload_mb: int = 25
+    max_import_mb: int = 500
     web_port: int = 8080
 
     environment: Literal["development", "production", "test"] = "development"
@@ -36,6 +37,13 @@ class Settings(BaseSettings):
     telegram_link_token_ttl_minutes: int = 10
     invite_default_ttl_days: int = 7
     password_reset_ttl_minutes: int = 60
+
+    @property
+    def imports_dir(self) -> str:
+        """A subdirectory of the same shared volume attachments already use (both `api`
+        and `worker` mount it) rather than a new named volume — the `_` prefix keeps it
+        from ever colliding with a real user_id directory."""
+        return f"{self.attachments_dir}/_imports"
 
     @property
     def database_url(self) -> str:

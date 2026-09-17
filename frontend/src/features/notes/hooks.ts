@@ -114,6 +114,22 @@ export function useEmptyTrash() {
   return useMutation({ mutationFn: notesApi.emptyTrash, onSuccess: invalidate })
 }
 
+export function useUploadVaultImport() {
+  return useMutation({ mutationFn: notesApi.uploadVaultImport })
+}
+
+export function useImportJob(jobId: string | null) {
+  return useQuery({
+    queryKey: ['import-jobs', jobId] as const,
+    queryFn: () => notesApi.getImportJob(jobId as string),
+    enabled: jobId !== null,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'pending' || status === 'processing' ? 1000 : false
+    },
+  })
+}
+
 export function useCreateTaskFromNote(noteId: string) {
   const queryClient = useQueryClient()
   return useMutation({

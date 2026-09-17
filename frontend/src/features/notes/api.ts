@@ -1,5 +1,5 @@
-import { apiFetch } from '@/lib/api'
-import type { Folder, NoteDetail, NoteSummary, Tag, Task } from '@/lib/types'
+import { apiFetch, uploadFile } from '@/lib/api'
+import type { Folder, ImportJob, NoteDetail, NoteSummary, Tag, Task } from '@/lib/types'
 
 export const listFolders = () => apiFetch<Folder[]>('/folders')
 
@@ -65,3 +65,11 @@ export const emptyTrash = () =>
 
 export const createTaskFromNote = (noteId: string, title: string) =>
   apiFetch<Task>(`/notes/${noteId}/tasks`, { method: 'POST', body: { title } })
+
+export const vaultExportUrl = () => '/api/v1/notes/export'
+
+export const noteExportUrl = (id: string) => `/api/v1/notes/${id}/export`
+
+export const uploadVaultImport = (file: File) => uploadFile<ImportJob>('/import', file)
+
+export const getImportJob = (jobId: string) => apiFetch<ImportJob>(`/import/${jobId}`)

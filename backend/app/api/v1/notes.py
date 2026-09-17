@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.core.deps import CurrentUser, DbSession, require_csrf
 from app.schemas.note import NoteCreate, NoteDetail, NoteSummary, NoteUpdate
@@ -10,6 +10,7 @@ from app.schemas.task_note_link import NewTaskFromNoteRequest
 from app.services import note_links as note_links_service
 from app.services import notes as notes_service
 from app.services import task_note_links as task_note_links_service
+from app.services import vault_export as vault_export_service
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 Csrf = Depends(require_csrf)
@@ -43,10 +44,32 @@ async def create_note(body: NoteCreate, user: CurrentUser, session: DbSession) -
     return await notes_service.build_note_detail(session, note)
 
 
+@router.get("/export")
+async def export_vault(user: CurrentUser, session: DbSession) -> Response:
+    data = await vault_export_service.build_vault_zip(session, user.id)
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="vault.zip"'},
+    )
+
+
 @router.get("/{note_id}", response_model=NoteDetail)
 async def get_note(note_id: uuid.UUID, user: CurrentUser, session: DbSession) -> NoteDetail:
     note = await notes_service.get_note(session, user.id, note_id)
     return await notes_service.build_note_detail(session, note)
+
+
+@router.get("/{note_id}/export")
+async def export_note(note_id: uuid.UUID, user: CurrentUser, session: DbSession) -> Response:
+    note = await notes_service.get_note(session, user.id, note_id)
+    data = vault_export_service.export_note_markdown(note)
+    filename = vault_export_service.export_note_filename(note)
+    return Response(
+        content=data,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{note_id}/backlinks", response_model=list[BacklinkOut])

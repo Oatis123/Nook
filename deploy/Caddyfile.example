@@ -1,0 +1,20 @@
+# Example Caddyfile for putting Nook behind HTTPS.
+#
+# Caddy issues and renews a Let's Encrypt certificate automatically — you only need a
+# domain's DNS A/AAAA record pointing at this host. Copy this file to Caddyfile next to
+# it, replace the domain, then run Caddy (as a system service, or the official
+# `caddy` Docker image with ports 80 and 443 published and this file mounted at
+# /etc/caddy/Caddyfile).
+#
+# See README.md ("HTTPS with Caddy") for the full walkthrough.
+
+nook.example.com {
+	# If Caddy runs on the same host as `docker compose` (not itself in the compose
+	# network), proxy to the published web port (WEB_PORT in .env, 8080 by default).
+	reverse_proxy localhost:8080
+
+	# If Caddy instead runs as a container on the *same compose network* as Nook,
+	# use the service name and its internal port instead, and drop the port publish
+	# on `web` in docker-compose.yml since Caddy is now the only public entry point:
+	# reverse_proxy web:80
+}

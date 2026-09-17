@@ -178,12 +178,12 @@ export function CommandPalette() {
               className="w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
             />
           </div>
-          <ul className="max-h-80 overflow-y-auto py-1.5">
+          <ul role="listbox" aria-label="Results" className="max-h-80 overflow-y-auto py-1.5">
             {results.length === 0 && (
               <li className="px-4 py-6 text-center text-sm text-text-muted">No matches</li>
             )}
             {results.map((entry, i) => (
-              <li key={entry.key}>
+              <li key={entry.key} role="option" aria-selected={i === activeIndex}>
                 <button
                   type="button"
                   onClick={entry.onSelect}

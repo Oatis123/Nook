@@ -13,7 +13,9 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
       aria-label={label}
       title={label}
       className={clsx(
-        'inline-flex h-9 w-9 items-center justify-center rounded-md text-text-muted',
+        // 44px below md (spec §10.8 touch-target minimum); the tighter 36px desktop
+        // size stays so toolbars with several icon buttons in a row don't bloat.
+        'inline-flex h-11 w-11 items-center justify-center rounded-md text-text-muted md:h-9 md:w-9',
         'transition-colors duration-150 hover:bg-surface hover:text-text',
         'disabled:opacity-50 disabled:pointer-events-none',
         active && 'bg-surface text-text',

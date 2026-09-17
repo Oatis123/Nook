@@ -127,40 +127,42 @@ export function InvitesPanel() {
       )}
 
       {invites.data && invites.data.length > 0 && (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-text-muted">
-              <th className="py-2 font-normal">Comment</th>
-              <th className="py-2 font-normal">Status</th>
-              <th className="py-2 font-normal">Used by</th>
-              <th className="py-2 font-normal">Expires</th>
-              <th className="py-2 font-normal" />
-            </tr>
-          </thead>
-          <tbody>
-            {invites.data.map((invite: Invite) => (
-              <tr key={invite.id} className="border-b border-border last:border-b-0">
-                <td className="py-2.5">{invite.comment || '—'}</td>
-                <td className={clsx('py-2.5 capitalize', STATUS_STYLES[invite.status])}>
-                  {invite.status}
-                </td>
-                <td className="py-2.5">{invite.used_by_username || '—'}</td>
-                <td className="py-2.5 text-text-muted">{formatDate(invite.expires_at)}</td>
-                <td className="py-2.5 text-right">
-                  {invite.status === 'active' && (
-                    <button
-                      type="button"
-                      onClick={() => revokeInvite.mutate(invite.id)}
-                      className="text-text-muted hover:text-danger"
-                    >
-                      Revoke
-                    </button>
-                  )}
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-text-muted">
+                <th className="py-2 font-normal">Comment</th>
+                <th className="py-2 font-normal">Status</th>
+                <th className="py-2 font-normal">Used by</th>
+                <th className="py-2 font-normal">Expires</th>
+                <th className="py-2 font-normal" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {invites.data.map((invite: Invite) => (
+                <tr key={invite.id} className="border-b border-border last:border-b-0">
+                  <td className="py-2.5">{invite.comment || '—'}</td>
+                  <td className={clsx('py-2.5 capitalize', STATUS_STYLES[invite.status])}>
+                    {invite.status}
+                  </td>
+                  <td className="py-2.5">{invite.used_by_username || '—'}</td>
+                  <td className="py-2.5 text-text-muted">{formatDate(invite.expires_at)}</td>
+                  <td className="py-2.5 text-right">
+                    {invite.status === 'active' && (
+                      <button
+                        type="button"
+                        onClick={() => revokeInvite.mutate(invite.id)}
+                        className="text-text-muted hover:text-danger"
+                      >
+                        Revoke
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

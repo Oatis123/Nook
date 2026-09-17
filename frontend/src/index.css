@@ -80,6 +80,20 @@
   }
 }
 
+/* Spec §10.8: prefers-reduced-motion — collapse transitions/animations to
+   near-instant instead of disabling them outright, so state changes (drawer
+   open, tab switch) still resolve visibly without the motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Markdown preview — spec §10.4: serif headings, ~72ch max width, 1.6-1.7 line height. */
 .markdown-preview {
   max-width: 72ch;

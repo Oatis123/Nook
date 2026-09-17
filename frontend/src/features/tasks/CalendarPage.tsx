@@ -15,7 +15,7 @@ import {
   subMonths,
   subWeeks,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react'
 import { Button } from '@/design/components/Button'
 import { useCalendar, useUpdateTask } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR } from '@/features/tasks/priority'
@@ -87,7 +87,11 @@ function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: () => void
 }
 
 export default function CalendarPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>('month')
+  // Mobile defaults to the week agenda (spec §10.8: calendar -> week/agenda below 768px);
+  // desktop keeps the existing month default.
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768 ? 'week' : 'month',
+  )
   const [anchorDate, setAnchorDate] = useState(new Date())
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)
@@ -165,11 +169,42 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div
-        className={clsx(
-          'grid min-h-0 flex-1 grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-border',
-        )}
-      >
+      {/* < 768px: a scrollable day-by-day agenda instead of the 7-column grid, which has
+          no room for readable dates/chips or 44px touch targets below that width. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:hidden">
+        {days.map((day) => {
+          const key = format(day, 'yyyy-MM-dd')
+          const entries = entriesByDate.get(key) ?? []
+          return (
+            <div key={key} className="border-b border-border py-1">
+              <button
+                type="button"
+                onClick={() => handleDayClick(day)}
+                className={clsx(
+                  'flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left',
+                  isToday(day) ? 'text-accent' : 'text-text',
+                )}
+              >
+                <span className="text-sm font-medium">{format(day, 'EEE, MMM d')}</span>
+                <Plus size={15} strokeWidth={1.5} className="shrink-0 text-text-muted" />
+              </button>
+              {entries.length > 0 && (
+                <div className="flex flex-col gap-0.5 px-2 pb-1">
+                  {entries.map((entry) => (
+                    <EntryChip
+                      key={`${entry.task_id}-${entry.date}`}
+                      entry={entry}
+                      onOpen={() => setOpenTaskId(entry.task_id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="hidden min-h-0 flex-1 grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-border md:grid">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
           <div key={label} className="bg-surface px-2 py-1 text-center text-xs text-text-muted">
             {label}

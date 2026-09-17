@@ -63,6 +63,14 @@ export function AppShell() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [navigate, focusSearch])
 
+  // Selecting a note/list on mobile should close the drawer it was picked from, the same
+  // way a native app's nav drawer behaves — without this the destination renders behind
+  // the still-open sidebar.
+  useEffect(() => {
+    if (window.innerWidth < 768 && useUIStore.getState().sidebarOpen) toggleSidebar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on navigation, not on every sidebarOpen/toggleSidebar identity change
+  }, [location.pathname])
+
   const items =
     user?.role === 'admin'
       ? [...navItems, { to: '/admin', label: 'Admin', icon: Shield }]
@@ -241,23 +249,51 @@ export function AppShell() {
               rightPanelOpen ? 'w-72' : 'w-0 overflow-hidden',
             )}
           >
-            <div className="px-3 py-3">
-              <span className="text-sm text-text-muted">Context</span>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {noteId ? (
-                <NoteContextPanel noteId={noteId} />
-              ) : (
-                <p className="px-3 text-sm text-text-muted">
-                  Backlinks, linked tasks and the outline will appear here.
-                </p>
-              )}
-            </div>
+            <ContextPanelContent noteId={noteId} />
           </aside>
         </div>
       </div>
 
+      {rightPanelOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={toggleRightPanel}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={clsx(
+          'fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col rounded-t-xl border-t border-border bg-surface',
+          'transition-transform duration-150 md:hidden',
+          rightPanelOpen ? 'translate-y-0' : 'translate-y-full',
+        )}
+      >
+        <div className="flex justify-center pt-2">
+          <div className="h-1 w-10 rounded-full bg-border" />
+        </div>
+        <ContextPanelContent noteId={noteId} />
+      </div>
+
       <CommandPalette />
     </div>
+  )
+}
+
+function ContextPanelContent({ noteId }: { noteId?: string }) {
+  return (
+    <>
+      <div className="px-3 py-3">
+        <span className="text-sm text-text-muted">Context</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {noteId ? (
+          <NoteContextPanel noteId={noteId} />
+        ) : (
+          <p className="px-3 text-sm text-text-muted">
+            Backlinks, linked tasks and the outline will appear here.
+          </p>
+        )}
+      </div>
+    </>
   )
 }

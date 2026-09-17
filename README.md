@@ -32,10 +32,51 @@ for implementation decisions left to the agent's discretion by the spec.
    ```bash
    docker compose exec api python cli.py create-admin
    ```
-4. Open `http://localhost:${WEB_PORT:-8080}`.
+4. Open `http://localhost:${WEB_PORT:-8080}` and sign in with the admin account from step 3.
+   Every account, including admin, has to link Telegram before it can use the app — see
+   "Setting up the Telegram bot" below.
 
-Further setup (backups, HTTPS via Caddy) is documented as those pieces land — see the stage
-roadmap in `docs/DECISIONS.md` and the project's plan for what's implemented so far.
+## Updating
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+The `api` container runs `alembic upgrade head` on every start, so schema migrations apply
+automatically. Nothing else needs a manual step.
+
+## Backup and restore
+
+```bash
+./deploy/backup.sh
+```
+
+writes `backups/<timestamp>/db.dump` (a `pg_dump --format=custom` archive) and
+`backups/<timestamp>/attachments.tar.gz` (everything in the attachments volume), with the
+stack running. Run it on a schedule (e.g. a cron entry calling it) for regular backups — it
+doesn't manage retention itself, so prune old snapshots under `backups/` however you'd like.
+
+To restore into a stack that's already up:
+
+```bash
+# Database — --clean drops existing objects first, so this replaces current data.
+cat backups/<timestamp>/db.dump | docker compose exec -T db pg_restore \
+  -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists
+
+# Attachments
+cat backups/<timestamp>/attachments.tar.gz | docker compose exec -T api tar xzf - -C /data/attachments
+```
+
+(`$POSTGRES_USER` / `$POSTGRES_DB` are the values from your `.env`.)
+
+## HTTPS with Caddy
+
+The `web` service only speaks plain HTTP. For a real deployment, put a reverse proxy in
+front of it that terminates TLS — [Caddy](https://caddyserver.com/) does this with automatic
+Let's Encrypt certificates and near-zero config. See
+[`deploy/Caddyfile.example`](deploy/Caddyfile.example): copy it to `Caddyfile`, replace the
+domain, and run Caddy (as a host service, or its own container) alongside the stack.
 
 ## Setting up the Telegram bot
 
@@ -94,6 +135,34 @@ pnpm run build
 
 In development, `/styleguide` shows every design token and base component in both themes.
 
+## End-to-end tests
+
+`frontend/e2e/` has Playwright tests for the key user-facing flows (invite → register →
+Telegram gate, wikilink → backlink, quick add → Today). They run against a fully running
+stack, not a mocked one, so start it first:
+
+```bash
+docker compose up -d --build
+```
+
+Then, with `ADMIN_USERNAME` / `ADMIN_PASSWORD` set in `.env` (bootstrapped on first start —
+see "Quick start" above):
+
+```bash
+cd frontend
+pnpm exec playwright install --with-deps chromium   # once
+pnpm run e2e
+```
+
+Real Telegram linking can't be driven from a test (there's no way to script a Telegram
+client), so tests that need a linked account set `telegram_user_id`/`telegram_chat_id`
+directly in the database (`frontend/e2e/db.ts`) rather than skipping that precondition —
+only the onboarding test asserts the gate itself actually appears first.
+
+Point `E2E_BASE_URL` at a different origin (e.g. the Vite dev server) if you're not running
+against the Docker Compose stack, and `E2E_ADMIN_USERNAME`/`E2E_ADMIN_PASSWORD` if the
+admin account's credentials aren't in `.env`.
+
 ## Repository layout
 
 ```
@@ -106,6 +175,7 @@ frontend/src/app/     Routing and providers
 frontend/src/design/  Design tokens and base components
 frontend/src/features/ Feature modules (notes, tasks, auth, graph, search, ...)
 frontend/src/lib/     API client and utilities
+frontend/e2e/          Playwright end-to-end tests
 deploy/               nginx config, Caddy example, backup script
 docs/                 Decisions log and other project docs
 ```

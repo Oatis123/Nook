@@ -33,6 +33,9 @@ frontend/test-results/
 # Data volumes (bind-mounted for local dev)
 data/
 
+# deploy/backup.sh output
+backups/
+
 # Logs
 *.log
 docker-compose.override.yml

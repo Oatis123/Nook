@@ -9,7 +9,18 @@ import type {
 
 export const getMe = () => apiFetch<User>('/me')
 
-export const updateMe = (patch: Partial<Pick<User, 'timezone'>>) =>
+export type MeUpdateInput = Partial<
+  Pick<
+    User,
+    | 'timezone'
+    | 'daily_reminder_time'
+    | 'notifications_enabled'
+    | 'theme'
+    | 'editor_preview_enabled'
+  >
+>
+
+export const updateMe = (patch: MeUpdateInput) =>
   apiFetch<User>('/me', { method: 'PATCH', body: patch })
 
 export const login = (username: string, password: string) =>

@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import { create } from 'zustand'
 
 export type ThemePreference = 'light' | 'dark' | 'system'
@@ -44,3 +45,23 @@ export const useThemeStore = create<ThemeState>((set) => ({
 // Ensure DOM matches store state on module init (covers the case where the inline
 // bootstrap script in index.html and this store could otherwise disagree).
 applyPreferenceToDocument(useThemeStore.getState().preference)
+
+function resolveTheme(preference: ThemePreference): 'light' | 'dark' {
+  if (preference !== 'system') return preference
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+/** The theme actually in effect right now ('system' resolved via the OS setting) —
+ * for code that needs a concrete light/dark choice, like picking a syntax highlighting
+ * theme, rather than the CSS-variable cascade the rest of the UI relies on. */
+export function useResolvedTheme(): 'light' | 'dark' {
+  const preference = useThemeStore((s) => s.preference)
+  const media = window.matchMedia('(prefers-color-scheme: dark)')
+  return useSyncExternalStore(
+    (onChange) => {
+      media.addEventListener('change', onChange)
+      return () => media.removeEventListener('change', onChange)
+    },
+    () => resolveTheme(preference),
+  )
+}

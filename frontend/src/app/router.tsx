@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
-import { FileText, ListTodo, Network, Search, Trash2 } from 'lucide-react'
+import { FileText, ListTodo, Network, Search } from 'lucide-react'
 import { AppShell } from '@/features/shell/AppShell'
 import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'
@@ -8,6 +8,8 @@ import InviteAcceptPage from '@/features/auth/InviteAcceptPage'
 import { RequireAdmin, RequireAuth } from '@/features/auth/RequireAuth'
 import SettingsPage from '@/features/settings/SettingsPage'
 import AdminPage from '@/features/admin/AdminPage'
+import NoteEditorRoute from '@/features/notes/NoteEditorRoute'
+import TrashPage from '@/features/notes/TrashPage'
 
 const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
 
@@ -27,8 +29,9 @@ export const router = createBrowserRouter([
           },
           {
             path: 'notes',
-            element: <PlaceholderPage icon={FileText} title="Notes are coming soon" />,
+            element: <PlaceholderPage icon={FileText} title="Select or create a note" />,
           },
+          { path: 'notes/:noteId', element: <NoteEditorRoute /> },
           {
             path: 'tasks',
             element: <PlaceholderPage icon={ListTodo} title="Tasks are coming soon" />,
@@ -41,7 +44,7 @@ export const router = createBrowserRouter([
             path: 'search',
             element: <PlaceholderPage icon={Search} title="Search is coming soon" />,
           },
-          { path: 'trash', element: <PlaceholderPage icon={Trash2} title="Trash is empty" /> },
+          { path: 'trash', element: <TrashPage /> },
           { path: 'settings', element: <SettingsPage /> },
           {
             element: <RequireAdmin />,

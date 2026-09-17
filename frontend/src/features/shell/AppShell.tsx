@@ -21,6 +21,7 @@ import { Tooltip } from '@/design/components/Tooltip'
 import { DropdownMenu } from '@/design/components/DropdownMenu'
 import { CommandPalette } from '@/features/shell/CommandPalette'
 import { useCurrentUser, useLogout } from '@/features/auth/hooks'
+import { FolderTree } from '@/features/notes/FolderTree'
 
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
@@ -108,7 +109,11 @@ export function AppShell() {
           </div>
         </div>
 
-        <nav className="mt-4 flex-1 overflow-y-auto px-2">
+        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+          {section === 'notes' && <FolderTree />}
+        </div>
+
+        <nav className="shrink-0 border-t border-border px-2 py-2">
           <ul className="flex flex-col gap-0.5">
             {items.map(({ to, label, icon: Icon }) => (
               <li key={to}>

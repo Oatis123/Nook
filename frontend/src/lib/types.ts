@@ -59,3 +59,25 @@ export interface TelegramLoginStatusResult {
   status: TelegramLoginStatus
   user: User | null
 }
+
+export interface Folder {
+  id: string
+  parent_id: string | null
+  name: string
+  position: number
+}
+
+export interface NoteSummary {
+  id: string
+  folder_id: string | null
+  title: string
+  version: number
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export interface NoteDetail extends NoteSummary {
+  content: string
+  frontmatter: Record<string, unknown>
+}

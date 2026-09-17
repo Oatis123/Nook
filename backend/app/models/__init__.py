@@ -8,6 +8,8 @@ from app.models.note_alias import NoteAlias
 from app.models.note_link import NoteLink
 from app.models.refresh_token import RefreshToken
 from app.models.tag import NoteTag, Tag
+from app.models.task import Task, TaskPriority, TaskStatus
+from app.models.task_list import TaskList, TaskListColor, TaskListIcon
 from app.models.user import User
 
 __all__ = [
@@ -25,4 +27,10 @@ __all__ = [
     "NoteLink",
     "Attachment",
     "NoteAttachment",
+    "TaskList",
+    "TaskListColor",
+    "TaskListIcon",
+    "Task",
+    "TaskPriority",
+    "TaskStatus",
 ]

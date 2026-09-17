@@ -2,6 +2,8 @@ import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useState 
 import { useNavigate } from 'react-router-dom'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import {
+  CalendarClock,
+  CalendarRange,
   FileText,
   ListTodo,
   Network,
@@ -15,6 +17,7 @@ import { useUIStore } from '@/lib/ui-store'
 import { fuzzyFilter } from '@/lib/fuzzy'
 import { useCreateNote, useNotes } from '@/features/notes/hooks'
 import { uniqueNoteTitle } from '@/features/notes/tree'
+import { useTasks } from '@/features/tasks/hooks'
 
 interface Entry {
   key: string
@@ -29,6 +32,7 @@ export function CommandPalette() {
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen)
   const navigate = useNavigate()
   const notesQuery = useNotes()
+  const tasksQuery = useTasks({})
   const createNote = useCreateNote()
   const [query, setQuery] = useState('')
   const [lastQuery, setLastQuery] = useState('')
@@ -75,6 +79,18 @@ export function CommandPalette() {
     { key: 'cmd-new-note', label: 'New note', icon: Plus, onSelect: createAndOpenNote },
     { key: 'cmd-notes', label: 'Go to Notes', icon: FileText, onSelect: () => go('/notes') },
     { key: 'cmd-tasks', label: 'Go to Tasks', icon: ListTodo, onSelect: () => go('/tasks') },
+    {
+      key: 'cmd-today',
+      label: 'Go to Today',
+      icon: CalendarClock,
+      onSelect: () => go('/tasks/today'),
+    },
+    {
+      key: 'cmd-upcoming',
+      label: 'Go to Upcoming',
+      icon: CalendarRange,
+      onSelect: () => go('/tasks/upcoming'),
+    },
     { key: 'cmd-graph', label: 'Go to Graph', icon: Network, onSelect: () => go('/graph') },
     { key: 'cmd-search', label: 'Go to Search', icon: Search, onSelect: () => go('/search') },
     {
@@ -100,11 +116,19 @@ export function CommandPalette() {
     onSelect: () => go(`/notes/${note.id}`),
   }))
 
+  const taskEntries: Entry[] = (tasksQuery.data ?? []).map((task) => ({
+    key: task.id,
+    label: task.title,
+    hint: 'Task',
+    icon: ListTodo,
+    onSelect: () => go(`/tasks/list/${task.list_id}`),
+  }))
+
   const results = useMemo(() => {
-    const all = [...noteEntries, ...commands]
+    const all = [...noteEntries, ...taskEntries, ...commands]
     return fuzzyFilter(query, all, (entry) => entry.label).slice(0, 20)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- commands/noteEntries are rebuilt fresh every render from stable inputs; including them would just re-run this every render regardless
-  }, [query, notesQuery.data])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- commands/noteEntries/taskEntries are rebuilt fresh every render from stable inputs; including them would just re-run this every render regardless
+  }, [query, notesQuery.data, tasksQuery.data])
 
   if (query !== lastQuery && open === wasOpen) {
     setLastQuery(query)

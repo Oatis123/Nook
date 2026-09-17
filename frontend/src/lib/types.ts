@@ -124,3 +124,60 @@ export interface GraphData {
   nodes: GraphNode[]
   edges: GraphEdge[]
 }
+
+export type TaskListColor =
+  'palette-1' | 'palette-2' | 'palette-3' | 'palette-4' | 'palette-5' | 'palette-6'
+
+export type TaskListIcon =
+  | 'inbox'
+  | 'briefcase'
+  | 'home'
+  | 'heart'
+  | 'star'
+  | 'book-open'
+  | 'shopping-cart'
+  | 'dumbbell'
+  | 'plane'
+  | 'graduation-cap'
+  | 'music'
+  | 'code'
+  | 'flag'
+  | 'target'
+  | 'coffee'
+  | 'folder'
+
+export interface TaskList {
+  id: string
+  name: string
+  color: TaskListColor
+  icon: TaskListIcon
+  position: number
+  is_inbox: boolean
+  archived_at: string | null
+}
+
+export type TaskPriority = 'none' | 'low' | 'medium' | 'high'
+export type TaskStatus = 'open' | 'done'
+
+export interface Task {
+  id: string
+  list_id: string
+  parent_id: string | null
+  title: string
+  priority: TaskPriority
+  due_date: string | null
+  due_time: string | null
+  status: TaskStatus
+  completed_at: string | null
+  reminders_enabled: boolean
+  position: number
+  subtask_done_count: number
+  subtask_total_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TaskDetail extends Task {
+  description: string | null
+  subtasks: Task[]
+}

@@ -26,6 +26,7 @@ import { useCurrentUser, useLogout } from '@/features/auth/hooks'
 import { FolderTree } from '@/features/notes/FolderTree'
 import { TagList } from '@/features/notes/TagList'
 import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
+import { TaskListSidebar } from '@/features/tasks/TaskListSidebar'
 
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
@@ -129,11 +130,13 @@ export function AppShell() {
         </div>
 
         <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-          {section === 'notes' && (
+          {section === 'notes' ? (
             <>
               <FolderTree />
               <TagList />
             </>
+          ) : (
+            <TaskListSidebar />
           )}
         </div>
 

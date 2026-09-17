@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
-import { FileText, ListTodo } from 'lucide-react'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { FileText } from 'lucide-react'
 import { AppShell } from '@/features/shell/AppShell'
 import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'
@@ -14,6 +14,9 @@ import TagNotesPage from '@/features/notes/TagNotesPage'
 import SearchPage from '@/features/search/SearchPage'
 import AttachmentsPage from '@/features/attachments/AttachmentsPage'
 import GraphPage from '@/features/graph/GraphPage'
+import TodayView from '@/features/tasks/TodayView'
+import UpcomingView from '@/features/tasks/UpcomingView'
+import ListView from '@/features/tasks/ListView'
 
 const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
 
@@ -37,10 +40,10 @@ export const router = createBrowserRouter([
           },
           { path: 'notes/:noteId', element: <NoteEditorRoute /> },
           { path: 'tags/:name', element: <TagNotesPage /> },
-          {
-            path: 'tasks',
-            element: <PlaceholderPage icon={ListTodo} title="Tasks are coming soon" />,
-          },
+          { path: 'tasks', element: <Navigate to="/tasks/today" replace /> },
+          { path: 'tasks/today', element: <TodayView /> },
+          { path: 'tasks/upcoming', element: <UpcomingView /> },
+          { path: 'tasks/list/:listId', element: <ListView /> },
           { path: 'graph', element: <GraphPage /> },
           { path: 'search', element: <SearchPage /> },
           { path: 'attachments', element: <AttachmentsPage /> },

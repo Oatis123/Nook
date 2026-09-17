@@ -104,3 +104,23 @@ export interface Attachment {
   created_at: string
   used_by: string[]
 }
+
+export interface GraphNode {
+  id: string
+  title: string
+  folder_id: string | null
+  tags: string[]
+  link_count: number
+  dangling: boolean
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  heading: string | null
+}
+
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}

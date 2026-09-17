@@ -1,8 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { clsx } from 'clsx'
 import { Link2 } from 'lucide-react'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useBacklinks, useNote } from '@/features/notes/hooks'
+import { useGraph } from '@/features/graph/hooks'
+import { GraphCanvas } from '@/features/graph/GraphCanvas'
 
 interface Heading {
   level: number
@@ -77,6 +80,39 @@ function BacklinksSection({ noteId }: { noteId: string }) {
   )
 }
 
+function LocalGraphSection({ noteId }: { noteId: string }) {
+  const [depth, setDepth] = useState<1 | 2>(1)
+  const graphQuery = useGraph({ noteId, depth })
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-medium uppercase tracking-wide text-text-muted">Local graph</h3>
+        <div className="inline-flex rounded-md border border-border bg-bg p-0.5 text-xs">
+          {([1, 2] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setDepth(d)}
+              className={clsx(
+                'rounded px-1.5 py-0.5 transition-colors duration-150',
+                depth === d ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text',
+              )}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+      </div>
+      {graphQuery.data && graphQuery.data.nodes.length > 1 ? (
+        <GraphCanvas data={graphQuery.data} colorBy="folder" height={220} />
+      ) : (
+        <p className="text-sm text-text-muted">No connections yet.</p>
+      )}
+    </div>
+  )
+}
+
 export function NoteContextPanel({ noteId }: { noteId: string }) {
   const note = useNote(noteId)
 
@@ -88,6 +124,7 @@ export function NoteContextPanel({ noteId }: { noteId: string }) {
     <div className="flex flex-col gap-6 px-3">
       <OutlineSection content={note.data.content} />
       <BacklinksSection noteId={noteId} />
+      <LocalGraphSection noteId={noteId} />
     </div>
   )
 }

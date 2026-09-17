@@ -10,12 +10,14 @@ from app.models.folder import Folder
 from app.models.note import Note
 from app.models.tag import NoteTag, Tag
 from app.schemas.note import NoteDetail, NoteUpdate
+from app.schemas.task_note_link import LinkedTaskOut
 from app.services.note_links import (
     cascade_rename_links,
     notes_referencing,
     resolve_dangling_links_to,
     sync_note_from_content,
 )
+from app.services.task_note_links import get_linked_tasks
 
 TRASH_RETENTION_DAYS = 30
 
@@ -75,6 +77,7 @@ async def get_note_tags(session: AsyncSession, note_id: uuid.UUID) -> list[str]:
 
 async def build_note_detail(session: AsyncSession, note: Note) -> NoteDetail:
     tags = await get_note_tags(session, note.id)
+    linked_tasks = await get_linked_tasks(session, note.id)
     return NoteDetail(
         id=note.id,
         folder_id=note.folder_id,
@@ -87,6 +90,10 @@ async def build_note_detail(session: AsyncSession, note: Note) -> NoteDetail:
         frontmatter=note.frontmatter,
         tags=tags,
         aliases=[a.alias for a in note.aliases],
+        linked_tasks=[
+            LinkedTaskOut(id=t.id, title=t.title, status=t.status, list_id=t.list_id)
+            for t in linked_tasks
+        ],
     )
 
 

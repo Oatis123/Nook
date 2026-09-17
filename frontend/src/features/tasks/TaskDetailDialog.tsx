@@ -1,25 +1,30 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { Repeat, SkipForward, Trash2 } from 'lucide-react'
+import { FileText, Repeat, SkipForward, Trash2, X } from 'lucide-react'
 import { Dialog } from '@/design/components/Dialog'
 import { Switch } from '@/design/components/Switch'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
+import { fuzzyFilter } from '@/lib/fuzzy'
 import {
   useCompleteTask,
   useDeleteTask,
+  useLinkNote,
   useReopenTask,
   useSkipTask,
   useTask,
   useTaskLists,
+  useUnlinkNote,
   useUpdateTask,
 } from '@/features/tasks/hooks'
+import { useNotes } from '@/features/notes/hooks'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
 import { CompleteSubtasksDialog } from '@/features/tasks/CompleteSubtasksDialog'
 import { QuickAdd } from '@/features/tasks/QuickAdd'
 import { RecurrencePicker } from '@/features/tasks/RecurrencePicker'
 import { describeRrule } from '@/features/tasks/recurrenceLabel'
-import type { RecurrenceInput, Task, TaskPriority } from '@/lib/types'
+import type { RecurrenceInput, Task, TaskDetail, TaskPriority } from '@/lib/types'
 
 const selectClass =
   'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
@@ -59,6 +64,91 @@ function SubtaskRow({ subtask }: { subtask: Task }) {
       >
         <Trash2 size={13} strokeWidth={1.5} />
       </button>
+    </div>
+  )
+}
+
+function LinkedNotesSection({ task }: { task: TaskDetail }) {
+  const navigate = useNavigate()
+  const notesQuery = useNotes()
+  const linkNote = useLinkNote(task.id)
+  const unlinkNote = useUnlinkNote(task.id)
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const linkedIds = useMemo(() => new Set(task.linked_notes.map((n) => n.id)), [task.linked_notes])
+  const candidates = useMemo(
+    () => (notesQuery.data ?? []).filter((n) => !linkedIds.has(n.id)),
+    [notesQuery.data, linkedIds],
+  )
+  const results = fuzzyFilter(query, candidates, (n) => n.title).slice(0, 8)
+
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
+        Linked notes
+      </h3>
+      {task.linked_notes.length > 0 && (
+        <div className="mb-1.5 flex flex-col gap-0.5">
+          {task.linked_notes.map((note) => (
+            <div
+              key={note.id}
+              className="group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface"
+            >
+              <button
+                type="button"
+                onClick={() => navigate(`/notes/${note.id}`)}
+                className="flex flex-1 items-center gap-1.5 truncate text-left text-sm text-text"
+              >
+                <FileText size={13} strokeWidth={1.5} className="shrink-0 text-text-muted" />
+                <span className="truncate">{note.title}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => unlinkNote.mutate(note.id)}
+                aria-label={`Unlink ${note.title}`}
+                className="shrink-0 text-text-muted opacity-0 hover:text-danger group-hover:opacity-100"
+              >
+                <X size={13} strokeWidth={1.5} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="relative">
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          placeholder="Link a note…"
+          className="w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+        />
+        {open && results.length > 0 && (
+          <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-surface-raised py-1 shadow-(--shadow-popover)">
+            {results.map((note) => (
+              <li key={note.id}>
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    linkNote.mutate(note.id)
+                    setQuery('')
+                    setOpen(false)
+                  }}
+                  className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left text-sm text-text hover:bg-surface"
+                >
+                  <FileText size={13} strokeWidth={1.5} className="shrink-0 text-text-muted" />
+                  <span className="truncate">{note.title}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -271,6 +361,8 @@ export function TaskDetailDialog({
             </div>
           </div>
         )}
+
+        <LinkedNotesSection task={task} />
 
         <div className="flex justify-end border-t border-border pt-3">
           <button

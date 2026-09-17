@@ -3,6 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.task_note_link import LinkedTaskOut
+
 
 class NoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
@@ -38,3 +40,4 @@ class NoteDetail(NoteSummary):
     frontmatter: dict
     tags: list[str] = []
     aliases: list[str] = []
+    linked_tasks: list[LinkedTaskOut] = []

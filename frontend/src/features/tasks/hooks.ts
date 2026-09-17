@@ -106,3 +106,25 @@ export function useCalendar(start: string, end: string) {
     queryFn: () => tasksApi.getCalendar(start, end),
   })
 }
+
+export function useLinkNote(taskId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (noteId: string) => tasksApi.linkNote(taskId, noteId),
+    onSuccess: (_data, noteId) => {
+      queryClient.invalidateQueries({ queryKey: taskKey(taskId) })
+      queryClient.invalidateQueries({ queryKey: ['notes', noteId] })
+    },
+  })
+}
+
+export function useUnlinkNote(taskId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (noteId: string) => tasksApi.unlinkNote(taskId, noteId),
+    onSuccess: (_data, noteId) => {
+      queryClient.invalidateQueries({ queryKey: taskKey(taskId) })
+      queryClient.invalidateQueries({ queryKey: ['notes', noteId] })
+    },
+  })
+}

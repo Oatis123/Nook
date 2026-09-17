@@ -11,6 +11,7 @@ from app.models.tag import NoteTag, Tag
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.task_completion import TaskCompletion
 from app.models.task_list import TaskList, TaskListColor, TaskListIcon
+from app.models.task_note_link import TaskNoteLink
 from app.models.user import User
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "TaskPriority",
     "TaskStatus",
     "TaskCompletion",
+    "TaskNoteLink",
 ]

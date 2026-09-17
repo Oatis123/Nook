@@ -4,6 +4,7 @@ from datetime import date, datetime, time
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.task import TaskPriority, TaskStatus
+from app.schemas.task_note_link import LinkedNoteOut
 from app.services.recurrence import RecurrenceInput
 
 
@@ -64,6 +65,7 @@ class TaskOut(BaseModel):
 class TaskDetailOut(TaskOut):
     description: str | None
     subtasks: list[TaskOut]
+    linked_notes: list[LinkedNoteOut]
 
 
 class CalendarEntryOut(BaseModel):

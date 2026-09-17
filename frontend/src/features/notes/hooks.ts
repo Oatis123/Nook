@@ -113,3 +113,14 @@ export function useEmptyTrash() {
   const invalidate = useInvalidateNotesAndTags()
   return useMutation({ mutationFn: notesApi.emptyTrash, onSuccess: invalidate })
 }
+
+export function useCreateTaskFromNote(noteId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (title: string) => notesApi.createTaskFromNote(noteId, title),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: noteKey(noteId) })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    },
+  })
+}

@@ -13,6 +13,8 @@ from app.schemas.task import (
     TaskOut,
     TaskUpdate,
 )
+from app.schemas.task_note_link import LinkedNoteOut, LinkNoteRequest
+from app.services import task_note_links as task_note_links_service
 from app.services import tasks as tasks_service
 from app.services.tasks import SubtaskCounts, TaskWithCounts
 
@@ -45,11 +47,17 @@ def _to_out(item: TaskWithCounts) -> TaskOut:
 
 
 def _to_detail_out(
-    task: Task, counts: SubtaskCounts, subtasks: list[TaskWithCounts]
+    task: Task,
+    counts: SubtaskCounts,
+    subtasks: list[TaskWithCounts],
+    linked_notes: list[LinkedNoteOut],
 ) -> TaskDetailOut:
     base = _to_out(TaskWithCounts(task=task, counts=counts))
     return TaskDetailOut(
-        **base.model_dump(), description=task.description, subtasks=[_to_out(s) for s in subtasks]
+        **base.model_dump(),
+        description=task.description,
+        subtasks=[_to_out(s) for s in subtasks],
+        linked_notes=linked_notes,
     )
 
 
@@ -90,7 +98,13 @@ async def get_calendar(
 @router.get("/{task_id}", response_model=TaskDetailOut)
 async def get_task(task_id: uuid.UUID, user: CurrentUser, session: DbSession) -> TaskDetailOut:
     task, counts, subtasks = await tasks_service.get_task_detail(session, user.id, task_id)
-    return _to_detail_out(task, counts, subtasks)
+    linked_notes = await task_note_links_service.get_linked_notes(session, task_id)
+    return _to_detail_out(
+        task,
+        counts,
+        subtasks,
+        [LinkedNoteOut(id=n.id, title=n.title, folder_id=n.folder_id) for n in linked_notes],
+    )
 
 
 @router.patch("/{task_id}", response_model=TaskOut, dependencies=[Csrf])
@@ -127,3 +141,17 @@ async def reopen_task(task_id: uuid.UUID, user: CurrentUser, session: DbSession)
 @router.delete("/{task_id}", status_code=204, dependencies=[Csrf])
 async def delete_task(task_id: uuid.UUID, user: CurrentUser, session: DbSession) -> None:
     await tasks_service.delete_task(session, user.id, task_id)
+
+
+@router.post("/{task_id}/notes", status_code=204, dependencies=[Csrf])
+async def link_note(
+    task_id: uuid.UUID, body: LinkNoteRequest, user: CurrentUser, session: DbSession
+) -> None:
+    await task_note_links_service.link_note_to_task(session, user.id, task_id, body.note_id)
+
+
+@router.delete("/{task_id}/notes/{note_id}", status_code=204, dependencies=[Csrf])
+async def unlink_note(
+    task_id: uuid.UUID, note_id: uuid.UUID, user: CurrentUser, session: DbSession
+) -> None:
+    await task_note_links_service.unlink_note_from_task(session, user.id, task_id, note_id)

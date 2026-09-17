@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api'
-import type { Folder, NoteDetail, NoteSummary, Tag } from '@/lib/types'
+import type { Folder, NoteDetail, NoteSummary, Tag, Task } from '@/lib/types'
 
 export const listFolders = () => apiFetch<Folder[]>('/folders')
 
@@ -62,3 +62,6 @@ export const permanentlyDeleteNote = (id: string) =>
 
 export const emptyTrash = () =>
   apiFetch<{ deleted: number }>('/notes/trash/empty', { method: 'POST' })
+
+export const createTaskFromNote = (noteId: string, title: string) =>
+  apiFetch<Task>(`/notes/${noteId}/tasks`, { method: 'POST', body: { title } })

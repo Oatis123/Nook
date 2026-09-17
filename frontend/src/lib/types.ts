@@ -82,6 +82,20 @@ export interface NoteDetail extends NoteSummary {
   frontmatter: Record<string, unknown>
   tags: string[]
   aliases: string[]
+  linked_tasks: LinkedTask[]
+}
+
+export interface LinkedTask {
+  id: string
+  title: string
+  status: TaskStatus
+  list_id: string
+}
+
+export interface LinkedNote {
+  id: string
+  title: string
+  folder_id: string | null
 }
 
 export interface Tag {
@@ -183,6 +197,7 @@ export interface Task {
 export interface TaskDetail extends Task {
   description: string | null
   subtasks: Task[]
+  linked_notes: LinkedNote[]
 }
 
 export type RecurrenceFreq = 'daily' | 'weekly' | 'monthly' | 'yearly'

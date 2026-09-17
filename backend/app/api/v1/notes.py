@@ -5,8 +5,11 @@ from fastapi import APIRouter, Depends, Query, status
 from app.core.deps import CurrentUser, DbSession, require_csrf
 from app.schemas.note import NoteCreate, NoteDetail, NoteSummary, NoteUpdate
 from app.schemas.note_link import BacklinkOut, RenameImpact
+from app.schemas.task import TaskOut
+from app.schemas.task_note_link import NewTaskFromNoteRequest
 from app.services import note_links as note_links_service
 from app.services import notes as notes_service
+from app.services import task_note_links as task_note_links_service
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 Csrf = Depends(require_csrf)
@@ -92,3 +95,32 @@ async def hard_delete_note(note_id: uuid.UUID, user: CurrentUser, session: DbSes
 async def empty_trash(user: CurrentUser, session: DbSession) -> dict[str, int]:
     count = await notes_service.empty_trash(session, user.id)
     return {"deleted": count}
+
+
+@router.post("/{note_id}/tasks", response_model=TaskOut, dependencies=[Csrf])
+async def create_task_from_note(
+    note_id: uuid.UUID, body: NewTaskFromNoteRequest, user: CurrentUser, session: DbSession
+) -> TaskOut:
+    task = await task_note_links_service.create_task_from_note(
+        session, user.id, note_id, body.title
+    )
+    return TaskOut(
+        id=task.id,
+        list_id=task.list_id,
+        parent_id=task.parent_id,
+        title=task.title,
+        priority=task.priority,
+        due_date=task.due_date,
+        due_time=task.due_time,
+        status=task.status,
+        completed_at=task.completed_at,
+        reminders_enabled=task.reminders_enabled,
+        position=task.position,
+        subtask_done_count=0,
+        subtask_total_count=0,
+        is_recurring=task.is_recurring,
+        rrule=task.rrule,
+        recurrence_end=task.recurrence_end,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+    )

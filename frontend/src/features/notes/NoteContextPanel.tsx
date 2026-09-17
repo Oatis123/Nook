@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { Link2 } from 'lucide-react'
+import { Link2, Plus } from 'lucide-react'
 import { EmptyState } from '@/design/components/EmptyState'
-import { useBacklinks, useNote } from '@/features/notes/hooks'
+import { useBacklinks, useCreateTaskFromNote, useNote } from '@/features/notes/hooks'
+import { useCompleteTask, useReopenTask } from '@/features/tasks/hooks'
 import { useGraph } from '@/features/graph/hooks'
 import { GraphCanvas } from '@/features/graph/GraphCanvas'
+import type { LinkedTask } from '@/lib/types'
 
 interface Heading {
   level: number
@@ -80,6 +82,86 @@ function BacklinksSection({ noteId }: { noteId: string }) {
   )
 }
 
+function LinkedTaskRow({ task }: { task: LinkedTask }) {
+  const navigate = useNavigate()
+  const completeTask = useCompleteTask()
+  const reopenTask = useReopenTask()
+  const done = task.status === 'done'
+
+  return (
+    <div className="group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-raised">
+      <button
+        type="button"
+        onClick={() => (done ? reopenTask.mutate(task.id) : completeTask.mutate({ id: task.id }))}
+        aria-label={done ? 'Mark as not done' : 'Mark as done'}
+        className={clsx(
+          'h-3.5 w-3.5 shrink-0 rounded-full border transition-colors duration-150',
+          done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
+        )}
+      />
+      <button
+        type="button"
+        onClick={() => navigate(`/tasks/list/${task.list_id}`)}
+        className={clsx(
+          'flex-1 truncate text-left text-sm',
+          done ? 'text-text-muted line-through' : 'text-text',
+        )}
+      >
+        {task.title}
+      </button>
+    </div>
+  )
+}
+
+function LinkedTasksSection({ noteId, tasks }: { noteId: string; tasks: LinkedTask[] }) {
+  const createTaskFromNote = useCreateTaskFromNote(noteId)
+  const [title, setTitle] = useState('')
+
+  function submit() {
+    const trimmed = title.trim()
+    if (!trimmed) return
+    createTaskFromNote.mutate(trimmed)
+    setTitle('')
+  }
+
+  return (
+    <div>
+      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
+        Linked tasks
+      </h3>
+      {tasks.length > 0 && (
+        <div className="mb-1.5 flex flex-col gap-0.5">
+          {tasks.map((task) => (
+            <LinkedTaskRow key={task.id} task={task} />
+          ))}
+        </div>
+      )}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+        className="flex items-center gap-1.5"
+      >
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="New task from this note…"
+          className="w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+        />
+        <button
+          type="submit"
+          aria-label="Create task"
+          disabled={!title.trim()}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-text-muted hover:text-text disabled:opacity-50"
+        >
+          <Plus size={14} strokeWidth={1.5} />
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function LocalGraphSection({ noteId }: { noteId: string }) {
   const [depth, setDepth] = useState<1 | 2>(1)
   const graphQuery = useGraph({ noteId, depth })
@@ -124,6 +206,7 @@ export function NoteContextPanel({ noteId }: { noteId: string }) {
     <div className="flex flex-col gap-6 px-3">
       <OutlineSection content={note.data.content} />
       <BacklinksSection noteId={noteId} />
+      <LinkedTasksSection noteId={noteId} tasks={note.data.linked_tasks} />
       <LocalGraphSection noteId={noteId} />
     </div>
   )

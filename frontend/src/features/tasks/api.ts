@@ -95,3 +95,9 @@ export const deleteTask = (id: string) => apiFetch<void>(`/tasks/${id}`, { metho
 
 export const getCalendar = (start: string, end: string) =>
   apiFetch<CalendarEntry[]>(`/tasks/calendar?start=${start}&end=${end}`)
+
+export const linkNote = (taskId: string, noteId: string) =>
+  apiFetch<void>(`/tasks/${taskId}/notes`, { method: 'POST', body: { note_id: noteId } })
+
+export const unlinkNote = (taskId: string, noteId: string) =>
+  apiFetch<void>(`/tasks/${taskId}/notes/${noteId}`, { method: 'DELETE' })

@@ -1,6 +1,7 @@
 import * as chrono from 'chrono-node'
 import { format } from 'date-fns'
-import type { TaskPriority } from '@/lib/types'
+import { parseRecurrencePhrase } from '@/features/tasks/recurrencePhrase'
+import type { RecurrenceInput, TaskPriority } from '@/lib/types'
 
 export interface ParsedQuickAdd {
   title: string
@@ -8,6 +9,7 @@ export interface ParsedQuickAdd {
   dueTime: string | null
   priority: TaskPriority | null
   listName: string | null
+  recurrence: RecurrenceInput | null
 }
 
 const PRIORITY_RE = /(?:^|\s)!(low|medium|high)\b/i
@@ -19,8 +21,9 @@ function removeMatch(text: string, match: RegExpExecArray): string {
 
 /** `Call mom tomorrow 18:00 !high #Personal` → date/time (chrono-node, English), priority
  * (`!low`/`!medium`/`!high`), list (`#ListName`, no spaces — same convention Todoist/TickTick
- * use for quick add). Recurrence ("every monday 9am") is deferred to Stage 9 alongside the
- * rest of the recurring-task machinery it depends on (see DECISIONS.md). */
+ * use for quick add), and recurrence (`every monday`, `every 3 days`, `weekly`, ...). The
+ * recurrence phrase is pulled out before chrono runs so a bare weekday name in it (e.g.
+ * "every monday") isn't also parsed as a one-off date. */
 export function parseQuickAdd(raw: string): ParsedQuickAdd {
   let text = raw
 
@@ -38,6 +41,9 @@ export function parseQuickAdd(raw: string): ParsedQuickAdd {
     text = removeMatch(text, listMatch)
   }
 
+  const { recurrence, remaining } = parseRecurrencePhrase(text)
+  text = remaining
+
   let dueDate: string | null = null
   let dueTime: string | null = null
   const [result] = chrono.parse(text, new Date(), { forwardDate: true })
@@ -51,5 +57,5 @@ export function parseQuickAdd(raw: string): ParsedQuickAdd {
   }
 
   const title = text.replace(/\s+/g, ' ').trim()
-  return { title, dueDate, dueTime, priority, listName }
+  return { title, dueDate, dueTime, priority, listName, recurrence }
 }

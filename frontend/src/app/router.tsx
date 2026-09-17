@@ -17,6 +17,7 @@ import GraphPage from '@/features/graph/GraphPage'
 import TodayView from '@/features/tasks/TodayView'
 import UpcomingView from '@/features/tasks/UpcomingView'
 import ListView from '@/features/tasks/ListView'
+import CalendarPage from '@/features/tasks/CalendarPage'
 
 const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
 
@@ -44,6 +45,7 @@ export const router = createBrowserRouter([
           { path: 'tasks/today', element: <TodayView /> },
           { path: 'tasks/upcoming', element: <UpcomingView /> },
           { path: 'tasks/list/:listId', element: <ListView /> },
+          { path: 'tasks/calendar', element: <CalendarPage /> },
           { path: 'graph', element: <GraphPage /> },
           { path: 'search', element: <SearchPage /> },
           { path: 'attachments', element: <AttachmentsPage /> },

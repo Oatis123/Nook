@@ -1,8 +1,10 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Repeat } from 'lucide-react'
 import { formatDate } from '@/lib/format'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { parseQuickAdd } from '@/features/tasks/quickAddParser'
+import { computeDefaultRecurrenceStartDate } from '@/features/tasks/recurrencePhrase'
+import { describeRecurrenceInput } from '@/features/tasks/recurrenceLabel'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
 
 function isTypingInField(target: EventTarget | null): boolean {
@@ -40,23 +42,33 @@ export function QuickAdd({ listId, parentId }: { listId?: string; parentId?: str
   const finalTitle =
     parsed?.listName && !matchedList ? `${parsed.title} #${parsed.listName}`.trim() : parsed?.title
 
+  // A recurring task needs a time for its first occurrence (spec §7.4) — quick add can
+  // infer a start date on its own (today, or the next matching weekday) but can't guess a
+  // time, so submission is blocked until the user adds one.
+  const needsTimeForRecurrence =
+    parsed?.recurrence !== null && parsed?.recurrence !== undefined && !parsed.dueTime
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!finalTitle) return
+    if (!finalTitle || needsTimeForRecurrence) return
     createTask.mutate(
       {
         title: finalTitle,
         list_id: parentId ? undefined : (matchedList?.id ?? listId),
         parent_id: parentId,
         priority: parsed?.priority ?? undefined,
-        due_date: parsed?.dueDate ?? undefined,
+        due_date:
+          parsed?.dueDate ??
+          (parsed?.recurrence ? computeDefaultRecurrenceStartDate(parsed.recurrence) : undefined),
         due_time: parsed?.dueTime ?? undefined,
+        recurrence: parsed?.recurrence ?? undefined,
       },
       { onSuccess: () => setText('') },
     )
   }
 
-  const showChips = parsed && (parsed.dueDate || parsed.priority || parsed.listName)
+  const showChips =
+    parsed && (parsed.dueDate || parsed.priority || parsed.listName || parsed.recurrence)
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
@@ -89,6 +101,17 @@ export function QuickAdd({ listId, parentId }: { listId?: string; parentId?: str
           {parsed.listName && matchedList && (
             <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
               {matchedList.name}
+            </span>
+          )}
+          {parsed.recurrence && (
+            <span className="flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
+              <Repeat size={11} strokeWidth={1.5} />
+              {describeRecurrenceInput(parsed.recurrence)}
+            </span>
+          )}
+          {needsTimeForRecurrence && (
+            <span className="rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-xs text-danger">
+              Add a time, e.g. “9am”
             </span>
           )}
         </div>

@@ -173,6 +173,9 @@ export interface Task {
   position: number
   subtask_done_count: number
   subtask_total_count: number
+  is_recurring: boolean
+  rrule: string | null
+  recurrence_end: string | null
   created_at: string
   updated_at: string
 }
@@ -180,4 +183,28 @@ export interface Task {
 export interface TaskDetail extends Task {
   description: string | null
   subtasks: Task[]
+}
+
+export type RecurrenceFreq = 'daily' | 'weekly' | 'monthly' | 'yearly'
+export type RecurrenceEndType = 'never' | 'on_date' | 'after_count'
+
+export interface RecurrenceInput {
+  freq: RecurrenceFreq
+  interval?: number
+  by_weekday?: number[] | null
+  by_month_day?: number | null
+  on_last_day?: boolean
+  end_type?: RecurrenceEndType
+  end_date?: string | null
+  end_count?: number | null
+}
+
+export interface CalendarEntry {
+  task_id: string
+  list_id: string
+  title: string
+  priority: TaskPriority
+  date: string
+  time: string | null
+  virtual: boolean
 }

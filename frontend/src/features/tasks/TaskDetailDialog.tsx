@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { Trash2 } from 'lucide-react'
+import { Repeat, SkipForward, Trash2 } from 'lucide-react'
 import { Dialog } from '@/design/components/Dialog'
 import { Switch } from '@/design/components/Switch'
+import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
 import {
   useCompleteTask,
   useDeleteTask,
   useReopenTask,
+  useSkipTask,
   useTask,
   useTaskLists,
   useUpdateTask,
@@ -15,7 +17,9 @@ import {
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
 import { CompleteSubtasksDialog } from '@/features/tasks/CompleteSubtasksDialog'
 import { QuickAdd } from '@/features/tasks/QuickAdd'
-import type { Task, TaskPriority } from '@/lib/types'
+import { RecurrencePicker } from '@/features/tasks/RecurrencePicker'
+import { describeRrule } from '@/features/tasks/recurrenceLabel'
+import type { RecurrenceInput, Task, TaskPriority } from '@/lib/types'
 
 const selectClass =
   'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
@@ -70,9 +74,11 @@ export function TaskDetailDialog({
   const updateTask = useUpdateTask()
   const completeTask = useCompleteTask()
   const reopenTask = useReopenTask()
+  const skipTask = useSkipTask()
   const deleteTask = useDeleteTask()
   const taskListsQuery = useTaskLists()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [recurrenceOpen, setRecurrenceOpen] = useState(false)
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -206,6 +212,37 @@ export function TaskDetailDialog({
               ))}
             </select>
           )}
+
+          {task.due_date && task.due_time && (
+            <Tooltip label={task.is_recurring ? 'Change repeat' : 'Repeat this task'}>
+              <button
+                type="button"
+                onClick={() => setRecurrenceOpen(true)}
+                className={clsx(
+                  'flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm transition-colors duration-150',
+                  task.is_recurring
+                    ? 'border-accent text-accent'
+                    : 'border-border text-text-muted hover:text-text',
+                )}
+              >
+                <Repeat size={13} strokeWidth={1.5} />
+                {task.is_recurring && task.rrule ? describeRrule(task.rrule) : 'Repeat'}
+              </button>
+            </Tooltip>
+          )}
+
+          {task.is_recurring && task.status === 'open' && (
+            <Tooltip label="Skip this occurrence">
+              <button
+                type="button"
+                onClick={() => skipTask.mutate(task.id)}
+                className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-text-muted hover:text-text"
+              >
+                <SkipForward size={13} strokeWidth={1.5} />
+                Skip
+              </button>
+            </Tooltip>
+          )}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-text-muted">
@@ -256,6 +293,14 @@ export function TaskDetailDialog({
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         onConfirm={() => completeTask.mutate({ id: task.id, completeSubtasks: true })}
+      />
+
+      <RecurrencePicker
+        open={recurrenceOpen}
+        onOpenChange={setRecurrenceOpen}
+        hasExisting={task.is_recurring}
+        onSave={(recurrence: RecurrenceInput) => updateTask.mutate({ id: task.id, recurrence })}
+        onRemove={() => updateTask.mutate({ id: task.id, clear_recurrence: true })}
       />
     </Dialog>
   )

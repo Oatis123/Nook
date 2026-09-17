@@ -1,7 +1,7 @@
 import { type DragEvent, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { CalendarClock, CalendarRange, MoreHorizontal, Plus } from 'lucide-react'
+import { Calendar, CalendarClock, CalendarRange, MoreHorizontal, Plus } from 'lucide-react'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { useDeleteTaskList, useTaskLists, useUpdateTaskList } from '@/features/tasks/hooks'
@@ -63,6 +63,10 @@ export function TaskListSidebar() {
         <NavLink to="/tasks/upcoming" className={fixedNavClass}>
           <CalendarRange size={15} strokeWidth={1.5} />
           Upcoming
+        </NavLink>
+        <NavLink to="/tasks/calendar" className={fixedNavClass}>
+          <Calendar size={15} strokeWidth={1.5} />
+          Calendar
         </NavLink>
       </nav>
 

@@ -2,6 +2,7 @@ import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useState 
 import { useNavigate } from 'react-router-dom'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import {
+  Calendar,
   CalendarClock,
   CalendarRange,
   FileText,
@@ -90,6 +91,12 @@ export function CommandPalette() {
       label: 'Go to Upcoming',
       icon: CalendarRange,
       onSelect: () => go('/tasks/upcoming'),
+    },
+    {
+      key: 'cmd-calendar',
+      label: 'Go to Calendar',
+      icon: Calendar,
+      onSelect: () => go('/tasks/calendar'),
     },
     { key: 'cmd-graph', label: 'Go to Graph', icon: Network, onSelect: () => go('/graph') },
     { key: 'cmd-search', label: 'Go to Search', icon: Search, onSelect: () => go('/search') },

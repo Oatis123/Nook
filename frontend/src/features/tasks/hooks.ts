@@ -90,7 +90,19 @@ export function useReopenTask() {
   return useMutation({ mutationFn: tasksApi.reopenTask, onSuccess: invalidate })
 }
 
+export function useSkipTask() {
+  const invalidate = useInvalidateTasks()
+  return useMutation({ mutationFn: tasksApi.skipTask, onSuccess: invalidate })
+}
+
 export function useDeleteTask() {
   const invalidate = useInvalidateTasks()
   return useMutation({ mutationFn: tasksApi.deleteTask, onSuccess: invalidate })
+}
+
+export function useCalendar(start: string, end: string) {
+  return useQuery({
+    queryKey: ['tasks', 'calendar', start, end] as const,
+    queryFn: () => tasksApi.getCalendar(start, end),
+  })
 }

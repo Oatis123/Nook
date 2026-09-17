@@ -4,6 +4,7 @@ from datetime import date, datetime, time
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.task import TaskPriority, TaskStatus
+from app.services.recurrence import RecurrenceInput
 
 
 class TaskCreate(BaseModel):
@@ -15,6 +16,7 @@ class TaskCreate(BaseModel):
     due_date: date | None = None
     due_time: time | None = None
     reminders_enabled: bool = True
+    recurrence: RecurrenceInput | None = None
 
 
 class TaskUpdate(BaseModel):
@@ -28,6 +30,8 @@ class TaskUpdate(BaseModel):
     clear_due_time: bool = False
     reminders_enabled: bool | None = None
     position: int | None = None
+    recurrence: RecurrenceInput | None = None
+    clear_recurrence: bool = False
 
 
 class TaskCompleteRequest(BaseModel):
@@ -50,6 +54,9 @@ class TaskOut(BaseModel):
     position: int
     subtask_done_count: int
     subtask_total_count: int
+    is_recurring: bool
+    rrule: str | None
+    recurrence_end: date | None
     created_at: datetime
     updated_at: datetime
 
@@ -57,3 +64,13 @@ class TaskOut(BaseModel):
 class TaskDetailOut(TaskOut):
     description: str | None
     subtasks: list[TaskOut]
+
+
+class CalendarEntryOut(BaseModel):
+    task_id: uuid.UUID
+    list_id: uuid.UUID
+    title: str
+    priority: TaskPriority
+    date: date
+    time: time | None
+    virtual: bool

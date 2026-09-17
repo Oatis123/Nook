@@ -1,5 +1,7 @@
 import { apiFetch } from '@/lib/api'
 import type {
+  CalendarEntry,
+  RecurrenceInput,
   Task,
   TaskDetail,
   TaskList,
@@ -58,6 +60,7 @@ export const createTask = (input: {
   due_date?: string | null
   due_time?: string | null
   reminders_enabled?: boolean
+  recurrence?: RecurrenceInput | null
 }) => apiFetch<Task>('/tasks', { method: 'POST', body: input })
 
 export const updateTask = (
@@ -73,6 +76,8 @@ export const updateTask = (
     clear_due_time?: boolean
     reminders_enabled?: boolean
     position?: number
+    recurrence?: RecurrenceInput | null
+    clear_recurrence?: boolean
   },
 ) => apiFetch<Task>(`/tasks/${id}`, { method: 'PATCH', body: input })
 
@@ -84,4 +89,9 @@ export const completeTask = (id: string, completeSubtasks = false) =>
 
 export const reopenTask = (id: string) => apiFetch<Task>(`/tasks/${id}/reopen`, { method: 'POST' })
 
+export const skipTask = (id: string) => apiFetch<Task>(`/tasks/${id}/skip`, { method: 'POST' })
+
 export const deleteTask = (id: string) => apiFetch<void>(`/tasks/${id}`, { method: 'DELETE' })
+
+export const getCalendar = (start: string, end: string) =>
+  apiFetch<CalendarEntry[]>(`/tasks/calendar?start=${start}&end=${end}`)

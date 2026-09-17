@@ -9,6 +9,7 @@ from app.models.note_link import NoteLink
 from app.models.refresh_token import RefreshToken
 from app.models.tag import NoteTag, Tag
 from app.models.task import Task, TaskPriority, TaskStatus
+from app.models.task_completion import TaskCompletion
 from app.models.task_list import TaskList, TaskListColor, TaskListIcon
 from app.models.user import User
 
@@ -33,4 +34,5 @@ __all__ = [
     "Task",
     "TaskPriority",
     "TaskStatus",
+    "TaskCompletion",
 ]

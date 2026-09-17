@@ -53,3 +53,28 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 
   return payload as T
 }
+
+/** Multipart upload — apiFetch always JSON-encodes its body, which doesn't fit a File;
+ * this skips the content-type header entirely so the browser sets the multipart boundary. */
+export async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const csrf = readCookie('csrf_token')
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch(`/api/v1${path}`, {
+    method: 'POST',
+    headers: csrf ? { 'x-csrf-token': csrf } : {},
+    credentials: 'include',
+    body: formData,
+  })
+
+  const isJson = response.headers.get('content-type')?.includes('application/json')
+  const payload = isJson ? await response.json() : undefined
+
+  if (!response.ok) {
+    const error = payload?.error ?? { code: 'error', message: response.statusText }
+    throw new ApiError(response.status, error.code, error.message, error.details)
+  }
+
+  return payload as T
+}

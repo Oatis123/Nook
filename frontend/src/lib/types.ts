@@ -88,3 +88,19 @@ export interface Tag {
   name: string
   note_count: number
 }
+
+export interface SearchResult {
+  id: string
+  title: string
+  folder_id: string | null
+  snippet: string
+}
+
+export interface Attachment {
+  id: string
+  filename: string
+  mime: string
+  size: number
+  created_at: string
+  used_by: string[]
+}

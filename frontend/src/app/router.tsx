@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
-import { FileText, ListTodo, Network, Search } from 'lucide-react'
+import { FileText, ListTodo, Network } from 'lucide-react'
 import { AppShell } from '@/features/shell/AppShell'
 import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'
@@ -11,6 +11,8 @@ import AdminPage from '@/features/admin/AdminPage'
 import NoteEditorRoute from '@/features/notes/NoteEditorRoute'
 import TrashPage from '@/features/notes/TrashPage'
 import TagNotesPage from '@/features/notes/TagNotesPage'
+import SearchPage from '@/features/search/SearchPage'
+import AttachmentsPage from '@/features/attachments/AttachmentsPage'
 
 const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
 
@@ -42,10 +44,8 @@ export const router = createBrowserRouter([
             path: 'graph',
             element: <PlaceholderPage icon={Network} title="The graph is coming soon" />,
           },
-          {
-            path: 'search',
-            element: <PlaceholderPage icon={Search} title="Search is coming soon" />,
-          },
+          { path: 'search', element: <SearchPage /> },
+          { path: 'attachments', element: <AttachmentsPage /> },
           { path: 'trash', element: <TrashPage /> },
           { path: 'settings', element: <SettingsPage /> },
           {

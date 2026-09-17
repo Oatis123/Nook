@@ -5,6 +5,7 @@ from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.attachment import Attachment, NoteAttachment
 from app.models.folder import Folder
 from app.models.note import Note
 from app.models.note_alias import NoteAlias
@@ -12,6 +13,7 @@ from app.models.note_link import NoteLink
 from app.models.tag import NoteTag, Tag
 from app.services.note_parsing import (
     Wikilink,
+    extract_embeds,
     extract_frontmatter,
     extract_inline_tags,
     extract_wikilinks,
@@ -115,6 +117,20 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
                 heading=link.heading,
             )
         )
+
+    embed_filenames = extract_embeds(body)
+    await session.execute(delete(NoteAttachment).where(NoteAttachment.note_id == note.id))
+    if embed_filenames:
+        attachments = await session.scalars(select(Attachment).where(Attachment.user_id == user_id))
+        by_filename: dict[str, list[uuid.UUID]] = {}
+        for att in attachments:
+            by_filename.setdefault(att.filename, []).append(att.id)
+        for filename in embed_filenames:
+            matches = by_filename.get(filename, [])
+            if len(matches) == 1:
+                await session.execute(
+                    insert(NoteAttachment).values(note_id=note.id, attachment_id=matches[0])
+                )
 
 
 async def resolve_dangling_links_to(session: AsyncSession, user_id: uuid.UUID, note: Note) -> None:

@@ -9,7 +9,8 @@ _INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 _MARKDOWN_LINK_URL_RE = re.compile(r"\]\((https?://[^)]*|[^)]*)\)")
 _BARE_URL_RE = re.compile(r"https?://\S+")
 _TAG_RE = re.compile(r"(?<![\w#/])#([A-Za-z][\w-]*(?:/[A-Za-z][\w-]*)*)")
-_WIKILINK_RE = re.compile(r"\[\[([^\[\]]+)\]\]")
+_WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\[\]]+)\]\]")
+_EMBED_RE = re.compile(r"!\[\[([^\[\]]+)\]\]")
 
 
 def extract_frontmatter(content: str) -> tuple[dict, str]:
@@ -88,3 +89,11 @@ def extract_wikilinks(body: str) -> list[Wikilink]:
             )
         )
     return links
+
+
+def extract_embeds(body: str) -> set[str]:
+    """`![[filename]]` — image/file embeds (spec §6.3), tracked separately from regular
+    wikilinks so an embedded attachment doesn't also show up as a dangling note link."""
+    prose = _FENCED_CODE_RE.sub(" ", body)
+    prose = _INLINE_CODE_RE.sub(" ", prose)
+    return {match.group(1).strip() for match in _EMBED_RE.finditer(prose) if match.group(1).strip()}

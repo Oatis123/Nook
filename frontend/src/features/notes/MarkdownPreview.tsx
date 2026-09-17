@@ -15,6 +15,8 @@ import { remarkWikilinks } from '@/features/notes/remarkWikilinks'
 import { remarkCallouts } from '@/features/notes/remarkCallouts'
 import { useFolders, useCreateNote, useNotes } from '@/features/notes/hooks'
 import { buildWikilinkIndex } from '@/features/notes/wikilinkIndex'
+import { buildAttachmentIndex } from '@/features/notes/attachmentIndex'
+import { useAttachments } from '@/features/attachments/hooks'
 
 type AttrEntry = string | [string, ...unknown[]]
 
@@ -47,10 +49,13 @@ const sanitizeSchema = {
       ...allowAnyClassName(defaultSchema.attributes?.a),
       'className',
       'title',
+      'target',
+      'rel',
       'data-wikilink',
       'data-wikilink-target',
       'data-wikilink-heading',
     ],
+    img: [...allowAnyClassName(defaultSchema.attributes?.img), 'className', 'src', 'alt'],
   },
 }
 
@@ -58,11 +63,12 @@ function buildProcessor(
   highlighter: HighlighterCore,
   theme: 'light' | 'dark',
   wikilinkIndex: ReturnType<typeof buildWikilinkIndex>,
+  attachmentIndex: ReturnType<typeof buildAttachmentIndex>,
 ) {
   return unified()
     .use(remarkParse)
     .use(remarkGfm)
-    .use(remarkWikilinks, wikilinkIndex)
+    .use(remarkWikilinks, wikilinkIndex, attachmentIndex)
     .use(remarkCallouts)
     .use(remarkRehype)
     .use(rehypeShikiFromHighlighter, highlighter, {
@@ -78,6 +84,7 @@ export function MarkdownPreview({ content }: { content: string }) {
   const navigate = useNavigate()
   const notesQuery = useNotes()
   const foldersQuery = useFolders()
+  const attachmentsQuery = useAttachments()
   const createNote = useCreateNote()
   const [highlighter, setHighlighter] = useState<HighlighterCore | null>(null)
   const [tree, setTree] = useState<ReactNode>(null)
@@ -97,9 +104,17 @@ export function MarkdownPreview({ content }: { content: string }) {
     [notesQuery.data, foldersQuery.data],
   )
 
+  const attachmentIndex = useMemo(
+    () => buildAttachmentIndex(attachmentsQuery.data ?? []),
+    [attachmentsQuery.data],
+  )
+
   const processor = useMemo(
-    () => (highlighter ? buildProcessor(highlighter, resolvedTheme, wikilinkIndex) : null),
-    [highlighter, resolvedTheme, wikilinkIndex],
+    () =>
+      highlighter
+        ? buildProcessor(highlighter, resolvedTheme, wikilinkIndex, attachmentIndex)
+        : null,
+    [highlighter, resolvedTheme, wikilinkIndex, attachmentIndex],
   )
 
   useEffect(() => {

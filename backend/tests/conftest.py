@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 import asyncpg
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 # Imported for side effects: registers all mapped models on Base.metadata.
@@ -58,6 +59,9 @@ async def db_engine() -> AsyncIterator[object]:
     settings = get_settings()
     engine = create_async_engine(settings.test_database_url)
     async with engine.begin() as conn:
+        # notes.ix_notes_title_trgm uses gin_trgm_ops (see migration b0537c5876c8) —
+        # create_all doesn't run extension DDL, so it must be created explicitly here.
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     async with engine.begin() as conn:

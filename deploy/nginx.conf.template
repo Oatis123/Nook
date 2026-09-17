@@ -16,7 +16,12 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
 
     location /api/ {
-        proxy_pass http://api:8000/;
+        # No trailing slash on the proxy_pass URL (and no URI part) — this forwards the
+        # original request path unchanged (e.g. /api/v1/auth/login), matching the
+        # backend's actual mount point (api_router = APIRouter(prefix="/api/v1")).
+        # A trailing slash here would strip the /api/ location prefix before forwarding,
+        # sending the backend /v1/auth/login instead, which matches no route (404).
+        proxy_pass http://api:8000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

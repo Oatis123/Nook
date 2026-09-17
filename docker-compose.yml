@@ -78,7 +78,11 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      # 127.0.0.1, not localhost: this image's musl libc resolves "localhost" to ::1
+      # first, and nginx here only binds 0.0.0.0:80 — wget would get "connection
+      # refused" over IPv6 and never fall back, failing the healthcheck even though
+      # the app is up and serving fine over IPv4.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80"]
       interval: 5s
       timeout: 5s
       retries: 10

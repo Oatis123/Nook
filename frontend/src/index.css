@@ -221,6 +221,11 @@
   color: var(--text-muted);
   font-size: 0.9em;
 }
+.markdown-preview .wikilink-embed-image {
+  display: block;
+  margin: 0.5em 0;
+  border: 1px solid var(--border);
+}
 
 /* Callouts (spec §6.3, Obsidian-style) */
 .markdown-preview blockquote.callout {

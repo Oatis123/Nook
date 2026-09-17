@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CodeMirror from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { autocompletion } from '@codemirror/autocomplete'
-import { Eye, EyeOff, Link2 } from 'lucide-react'
+import { Eye, EyeOff, Link2, Paperclip } from 'lucide-react'
 import { EmptyState } from '@/design/components/EmptyState'
 import { IconButton } from '@/design/components/IconButton'
 import { Tooltip } from '@/design/components/Tooltip'
@@ -13,9 +13,11 @@ import { getNote, getRenameImpact } from '@/features/notes/api'
 import { editorTheme } from '@/features/notes/editorTheme'
 import { useNote, useNotes, useTags, useUpdateNote } from '@/features/notes/hooks'
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
+import { createAttachmentDropHandler } from '@/features/notes/attachmentDrop'
 import { MarkdownPreview } from '@/features/notes/MarkdownPreview'
 import { ConflictDialog } from '@/features/notes/ConflictDialog'
 import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
+import { useUploadAttachment } from '@/features/attachments/hooks'
 import type { NoteDetail } from '@/lib/types'
 
 const SAVE_DEBOUNCE_MS = 800
@@ -27,6 +29,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const updateNote = useUpdateNote(noteId)
   const { data: user } = useCurrentUser()
   const updateProfile = useUpdateProfile()
+  const uploadAttachment = useUploadAttachment()
+  const viewRef = useRef<EditorView | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [draft, setDraft] = useState<{ title: string; content: string; version: number } | null>(
     null,
@@ -173,11 +178,28 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     setStatus('saved')
   }
 
+  const uploadAndInsert = useCallback(
+    async (files: File[], pos: number | 'cursor') => {
+      const uploaded = await Promise.all(files.map((f) => uploadAttachment.mutateAsync(f)))
+      const view = viewRef.current
+      if (!view) return
+      const insertPos = pos === 'cursor' ? view.state.selection.main.from : pos
+      const embedText = uploaded.map((a) => `![[${a.filename}]]`).join(' ')
+      view.dispatch({
+        changes: { from: insertPos, to: insertPos, insert: embedText },
+        selection: { anchor: insertPos + embedText.length },
+      })
+      view.focus()
+    },
+    [uploadAttachment],
+  )
+
   const editorExtensions = useMemo(
     () => [
       markdown(),
       EditorView.lineWrapping,
       editorTheme,
+      createAttachmentDropHandler(uploadAndInsert),
       autocompletion({
         override: [
           createWikilinkCompletion(notesQuery.data ?? []),
@@ -185,7 +207,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         ],
       }),
     ],
-    [notesQuery.data, tagsQuery.data],
+    [notesQuery.data, tagsQuery.data, uploadAndInsert],
   )
 
   if (noteQuery.isLoading || !draft) return null
@@ -209,6 +231,23 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         />
         <div className="flex shrink-0 items-center gap-3">
           <SaveIndicator status={status} />
+          <Tooltip label="Attach a file">
+            <IconButton label="Attach a file" onClick={() => fileInputRef.current?.click()}>
+              <Paperclip size={16} strokeWidth={1.5} />
+            </IconButton>
+          </Tooltip>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            aria-label="Attach a file"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length > 0) uploadAndInsert(files, 'cursor')
+              e.target.value = ''
+            }}
+          />
           <Tooltip label="Toggle preview (Ctrl/Cmd+E)">
             <IconButton
               label="Toggle preview"
@@ -250,6 +289,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           <CodeMirror
             value={draft.content}
             onChange={handleContentChange}
+            onCreateEditor={(view) => {
+              viewRef.current = view
+            }}
             extensions={editorExtensions}
             basicSetup={{ lineNumbers: false, foldGutter: false }}
             height="100%"

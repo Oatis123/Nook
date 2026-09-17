@@ -1,3 +1,4 @@
+from app.models.attachment import Attachment, NoteAttachment
 from app.models.auth_token import AuthToken, AuthTokenKind
 from app.models.base import Base
 from app.models.folder import Folder
@@ -22,4 +23,6 @@ __all__ = [
     "NoteTag",
     "NoteAlias",
     "NoteLink",
+    "Attachment",
+    "NoteAttachment",
 ]

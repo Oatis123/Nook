@@ -1,8 +1,10 @@
+import { useEffect } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   FileText,
   ListTodo,
   Network,
+  Paperclip,
   Search,
   Trash2,
   Settings,
@@ -28,6 +30,7 @@ import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
   { to: '/search', label: 'Search', icon: Search },
+  { to: '/attachments', label: 'Attachments', icon: Paperclip },
   { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
@@ -38,12 +41,25 @@ export function AppShell() {
   const rightPanelOpen = useUIStore((s) => s.rightPanelOpen)
   const toggleRightPanel = useUIStore((s) => s.toggleRightPanel)
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen)
+  const focusSearch = useUIStore((s) => s.focusSearch)
   const location = useLocation()
   const navigate = useNavigate()
   const { noteId } = useParams<{ noteId: string }>()
   const section = location.pathname.startsWith('/tasks') ? 'tasks' : 'notes'
   const { data: user } = useCurrentUser()
   const logout = useLogout()
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        navigate('/search')
+        focusSearch()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [navigate, focusSearch])
 
   const items =
     user?.role === 'admin'

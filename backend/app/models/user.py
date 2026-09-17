@@ -37,7 +37,9 @@ class User(UUIDPKMixin, Base):
     )
     editor_preview_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    telegram_user_id: Mapped[int | None] = mapped_column(BIGINT, unique=True, nullable=True)
+    telegram_user_id: Mapped[int | None] = mapped_column(
+        BIGINT, unique=True, nullable=True, index=True
+    )
     telegram_chat_id: Mapped[int | None] = mapped_column(BIGINT, nullable=True)
     telegram_blocked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 

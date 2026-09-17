@@ -35,3 +35,4 @@ data/
 
 # Logs
 *.log
+docker-compose.override.yml

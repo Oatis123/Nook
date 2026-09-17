@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   FileText,
   ListTodo,
@@ -6,9 +6,11 @@ import {
   Search,
   Trash2,
   Settings,
+  Shield,
   PanelLeft,
   PanelRight,
   Menu,
+  ChevronsUpDown,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { APP_NAME } from '@/lib/env'
@@ -16,7 +18,9 @@ import { useUIStore } from '@/lib/ui-store'
 import { IconButton } from '@/design/components/IconButton'
 import { ThemeToggle } from '@/design/components/ThemeToggle'
 import { Tooltip } from '@/design/components/Tooltip'
+import { DropdownMenu } from '@/design/components/DropdownMenu'
 import { CommandPalette } from '@/features/shell/CommandPalette'
+import { useCurrentUser, useLogout } from '@/features/auth/hooks'
 
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
@@ -32,7 +36,15 @@ export function AppShell() {
   const toggleRightPanel = useUIStore((s) => s.toggleRightPanel)
   const setCommandPaletteOpen = useUIStore((s) => s.setCommandPaletteOpen)
   const location = useLocation()
+  const navigate = useNavigate()
   const section = location.pathname.startsWith('/tasks') ? 'tasks' : 'notes'
+  const { data: user } = useCurrentUser()
+  const logout = useLogout()
+
+  const items =
+    user?.role === 'admin'
+      ? [...navItems, { to: '/admin', label: 'Admin', icon: Shield }]
+      : navItems
 
   return (
     <div className="flex h-dvh w-full overflow-hidden bg-bg text-text">
@@ -98,7 +110,7 @@ export function AppShell() {
 
         <nav className="mt-4 flex-1 overflow-y-auto px-2">
           <ul className="flex flex-col gap-0.5">
-            {navItems.map(({ to, label, icon: Icon }) => (
+            {items.map(({ to, label, icon: Icon }) => (
               <li key={to}>
                 <NavLink
                   to={to}
@@ -118,6 +130,26 @@ export function AppShell() {
             ))}
           </ul>
         </nav>
+
+        {user && (
+          <div className="border-t border-border px-2 py-2">
+            <DropdownMenu
+              trigger={
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-text hover:bg-surface-raised"
+                >
+                  <span className="truncate">{user.username}</span>
+                  <ChevronsUpDown size={14} strokeWidth={1.5} className="text-text-muted" />
+                </button>
+              }
+              items={[
+                { label: 'Settings', onSelect: () => navigate('/settings') },
+                { label: 'Log out', onSelect: () => logout.mutate() },
+              ]}
+            />
+          </div>
+        )}
 
         <div className="flex items-center justify-between border-t border-border px-3 py-3">
           <ThemeToggle />

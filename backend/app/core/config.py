@@ -9,7 +9,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Nook"
     public_url: str = "http://localhost:8080"
-    secret_key: str = "dev-secret-key-change-me"
+    secret_key: str = "dev-secret-key-change-me-0000000000"
 
     postgres_user: str = "nook"
     postgres_password: str = "nook"
@@ -35,12 +35,22 @@ class Settings(BaseSettings):
     refresh_token_ttl_days: int = 30
     telegram_link_token_ttl_minutes: int = 10
     invite_default_ttl_days: int = 7
+    password_reset_ttl_minutes: int = 60
 
     @property
     def database_url(self) -> str:
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+        )
+
+    @property
+    def test_database_url(self) -> str:
+        """A separate database from the one used for `docker compose up` / manual runs,
+        so the test suite's create_all/drop_all cycles never touch real dev data."""
+        return (
+            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}_test"
         )
 
 

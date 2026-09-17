@@ -1,11 +1,14 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
 
+from app.api.v1 import api_router
 from app.core.config import get_settings
+from app.core.cookies import CSRF_COOKIE, ensure_csrf_cookie
 from app.core.db import async_session_factory
+from app.core.errors import register_exception_handlers
 from app.services.admin import bootstrap_admin_if_empty
 
 settings = get_settings()
@@ -27,6 +30,21 @@ app = FastAPI(
     openapi_url="/api/openapi.json" if settings.environment != "production" else None,
     lifespan=lifespan,
 )
+
+register_exception_handlers(app)
+app.include_router(api_router)
+
+
+@app.middleware("http")
+async def csrf_cookie_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """Issues a readable CSRF cookie on any response that doesn't already have one, so
+    the frontend always has a double-submit token available before its first mutating
+    request (spec §5.4)."""
+    response = await call_next(request)
+    ensure_csrf_cookie(request.cookies.get(CSRF_COOKIE), response)
+    return response
 
 
 @app.get("/health")

@@ -3,7 +3,8 @@ import * as RadixDialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 
 interface DialogProps {
-  trigger: ReactNode
+  /** Omit for a fully controlled dialog (opened programmatically via `open`/`onOpenChange`). */
+  trigger?: ReactNode
   title: string
   description?: string
   children?: ReactNode
@@ -14,7 +15,7 @@ interface DialogProps {
 export function Dialog({ trigger, title, description, children, open, onOpenChange }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
-      <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>
+      {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/30 animate-fade-in" />
         <RadixDialog.Content

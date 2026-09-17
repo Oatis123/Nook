@@ -1,3 +1,6 @@
+import uuid
+
+from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,3 +36,62 @@ async def bootstrap_admin_if_empty(session: AsyncSession, username: str, passwor
         await create_admin(session, username, password)
     except ValidationError:
         return
+
+
+async def list_users(session: AsyncSession) -> list[User]:
+    result = await session.scalars(select(User).order_by(User.created_at))
+    return list(result)
+
+
+async def _get_user_or_404(session: AsyncSession, user_id: uuid.UUID) -> User:
+    user = await session.get(User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
+    return user
+
+
+async def set_user_active(session: AsyncSession, user_id: uuid.UUID, active: bool) -> User:
+    user = await _get_user_or_404(session, user_id)
+    if not active and user.role == UserRole.admin:
+        remaining = await _count_active_admins(session, exclude_user_id=user.id)
+        if remaining == 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Cannot deactivate the last admin")
+    user.is_active = active
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def unlink_telegram(session: AsyncSession, user_id: uuid.UUID) -> User:
+    user = await _get_user_or_404(session, user_id)
+    user.telegram_user_id = None
+    user.telegram_chat_id = None
+    user.telegram_blocked = False
+    await session.commit()
+    await session.refresh(user)
+    return user
+
+
+async def _count_active_admins(
+    session: AsyncSession, exclude_user_id: uuid.UUID | None = None
+) -> int:
+    query = (
+        select(func.count())
+        .select_from(User)
+        .where(User.role == UserRole.admin, User.is_active.is_(True))
+    )
+    if exclude_user_id is not None:
+        query = query.where(User.id != exclude_user_id)
+    return await session.scalar(query) or 0
+
+
+async def set_user_role(session: AsyncSession, user_id: uuid.UUID, role: UserRole) -> User:
+    user = await _get_user_or_404(session, user_id)
+    if user.role == UserRole.admin and role == UserRole.user:
+        remaining = await _count_active_admins(session, exclude_user_id=user.id)
+        if remaining == 0:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Cannot remove the last admin")
+    user.role = role
+    await session.commit()
+    await session.refresh(user)
+    return user

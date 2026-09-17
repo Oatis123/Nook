@@ -13,6 +13,7 @@ import {
   PanelRight,
   Menu,
   ChevronsUpDown,
+  TriangleAlert,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { APP_NAME } from '@/lib/env'
@@ -212,6 +213,22 @@ export function AppShell() {
             <PanelRight size={16} strokeWidth={1.5} />
           </IconButton>
         </header>
+
+        {user?.telegram_blocked && (
+          <div className="flex shrink-0 items-center gap-2.5 border-b border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+            <TriangleAlert size={15} strokeWidth={1.5} className="shrink-0" />
+            <span className="flex-1">
+              Nook can't send Telegram reminders — you've blocked the bot.
+            </span>
+            <button
+              type="button"
+              onClick={() => navigate('/settings')}
+              className="shrink-0 underline underline-offset-2 hover:opacity-80"
+            >
+              Unblock in Telegram
+            </button>
+          </div>
+        )}
 
         <div className="flex min-h-0 flex-1">
           <main className="min-w-0 flex-1 overflow-y-auto">

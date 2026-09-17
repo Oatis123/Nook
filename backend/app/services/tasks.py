@@ -13,6 +13,7 @@ from app.models.task_completion import TaskCompletion
 from app.models.task_list import TaskList
 from app.schemas.task import CalendarEntryOut, TaskCreate, TaskUpdate
 from app.services import recurrence as recurrence_service
+from app.services import reminders as reminders_service
 from app.services.recurrence import RecurrenceInput
 from app.services.task_lists import get_or_create_inbox
 
@@ -113,6 +114,8 @@ async def create_task(session: AsyncSession, user_id: uuid.UUID, data: TaskCreat
     if data.recurrence is not None:
         _apply_recurrence(task, data.recurrence)
     session.add(task)
+    await session.flush()
+    await reminders_service.recompute_reminders_for_task(session, task)
     await session.commit()
     await session.refresh(task)
     return task
@@ -238,6 +241,7 @@ async def update_task(
     elif data.recurrence is not None:
         _apply_recurrence(task, data.recurrence)
 
+    await reminders_service.recompute_reminders_for_task(session, task)
     await session.commit()
     await session.refresh(task)
     return task
@@ -266,6 +270,7 @@ async def complete_task(
     for subtask in open_subtasks:
         subtask.status = TaskStatus.done
         subtask.completed_at = now
+        await reminders_service.recompute_reminders_for_task(session, subtask, now=now)
 
     if task.is_recurring and task.rrule and task.dtstart_local:
         _advance_recurring_task(session, task, now, skipped=False)
@@ -273,6 +278,7 @@ async def complete_task(
         task.status = TaskStatus.done
         task.completed_at = now
 
+    await reminders_service.recompute_reminders_for_task(session, task, now=now)
     await session.commit()
     await session.refresh(task)
     return task
@@ -310,6 +316,7 @@ async def skip_task_occurrence(
     now = datetime.now(UTC)
     _advance_recurring_task(session, task, now, skipped=True)
 
+    await reminders_service.recompute_reminders_for_task(session, task, now=now)
     await session.commit()
     await session.refresh(task)
     return task
@@ -321,6 +328,7 @@ async def reopen_task(session: AsyncSession, user_id: uuid.UUID, task_id: uuid.U
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
     task.status = TaskStatus.open
     task.completed_at = None
+    await reminders_service.recompute_reminders_for_task(session, task)
     await session.commit()
     await session.refresh(task)
     return task
@@ -330,12 +338,14 @@ async def delete_task(session: AsyncSession, user_id: uuid.UUID, task_id: uuid.U
     task = await get_owned_or_404(session, Task, task_id, user_id)
     now = datetime.now(UTC)
     task.deleted_at = now
+    await reminders_service.recompute_reminders_for_task(session, task, now=now)
 
     subtasks_result = await session.scalars(
         select(Task).where(Task.parent_id == task_id, Task.deleted_at.is_(None))
     )
     for subtask in subtasks_result:
         subtask.deleted_at = now
+        await reminders_service.recompute_reminders_for_task(session, subtask, now=now)
 
     await session.commit()
 

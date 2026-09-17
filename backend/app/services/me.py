@@ -6,6 +6,7 @@ from app.core.tokens import hash_token
 from app.core.validation import ValidationError, validate_password
 from app.models.user import User
 from app.schemas.user import MeUpdate
+from app.services import reminders as reminders_service
 from app.services.auth import revoke_all_sessions
 
 
@@ -13,6 +14,12 @@ async def update_profile(session: AsyncSession, user: User, data: MeUpdate) -> U
     updates = data.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(user, field, value)
+
+    # spec §8.2: a timezone or daily reminder time change recomputes every affected task's
+    # reminders — the other profile fields here don't influence reminder scheduling.
+    if "timezone" in updates or "daily_reminder_time" in updates:
+        await reminders_service.recompute_reminders_for_user(session, user)
+
     await session.commit()
     await session.refresh(user)
     return user

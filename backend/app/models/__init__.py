@@ -7,6 +7,7 @@ from app.models.note import Note
 from app.models.note_alias import NoteAlias
 from app.models.note_link import NoteLink
 from app.models.refresh_token import RefreshToken
+from app.models.scheduled_reminder import ReminderKind, ReminderStatus, ScheduledReminder
 from app.models.tag import NoteTag, Tag
 from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.task_completion import TaskCompletion
@@ -37,4 +38,7 @@ __all__ = [
     "TaskStatus",
     "TaskCompletion",
     "TaskNoteLink",
+    "ScheduledReminder",
+    "ReminderKind",
+    "ReminderStatus",
 ]

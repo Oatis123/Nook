@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { Button } from '@/design/components/Button'
+import { Dialog } from '@/design/components/Dialog'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import {
@@ -8,6 +9,7 @@ import {
   useRevokeAllSessions,
   useRevokeSession,
   useSessions,
+  useUnlinkTelegram,
   useUpdateProfile,
 } from '@/features/auth/hooks'
 
@@ -44,6 +46,45 @@ function ProfileSection() {
             </option>
           ))}
         </select>
+      </div>
+    </section>
+  )
+}
+
+function TelegramSection() {
+  const { data: user } = useCurrentUser()
+  const unlink = useUnlinkTelegram()
+  const [open, setOpen] = useState(false)
+
+  if (!user) return null
+
+  return (
+    <section className="border-b border-border py-8">
+      <h2 className="mb-4 font-serif text-lg text-text">Telegram</h2>
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-text-muted">
+          {user.telegram_linked ? 'Connected.' : 'Not connected.'}
+        </p>
+        <Dialog
+          open={open}
+          onOpenChange={setOpen}
+          trigger={<Button variant="secondary">Disconnect</Button>}
+          title="Disconnect Telegram"
+          description="You'll be asked to reconnect before you can use the app again."
+        >
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              disabled={unlink.isPending}
+              onClick={() => unlink.mutate(undefined, { onSuccess: () => setOpen(false) })}
+            >
+              Disconnect
+            </Button>
+          </div>
+        </Dialog>
       </div>
     </section>
   )
@@ -173,6 +214,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-xl px-6 py-8">
       <h1 className="mb-2 font-serif text-2xl text-text">Settings</h1>
       <ProfileSection />
+      <TelegramSection />
       <PasswordSection />
       <SessionsSection />
     </div>

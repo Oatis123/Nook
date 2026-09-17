@@ -1,5 +1,11 @@
 import { apiFetch } from '@/lib/api'
-import type { InvitePreview, Session, User } from '@/lib/types'
+import type {
+  InvitePreview,
+  Session,
+  TelegramLoginStatusResult,
+  TelegramToken,
+  User,
+} from '@/lib/types'
 
 export const getMe = () => apiFetch<User>('/me')
 
@@ -38,4 +44,18 @@ export const consumePasswordReset = (token: string, newPassword: string) =>
   apiFetch<void>(`/auth/password-reset/${encodeURIComponent(token)}`, {
     method: 'POST',
     body: { new_password: newPassword },
+  })
+
+export const createTelegramLinkToken = () =>
+  apiFetch<TelegramToken>('/me/telegram/link-token', { method: 'POST' })
+
+export const unlinkTelegram = () => apiFetch<User>('/me/telegram/unlink', { method: 'POST' })
+
+export const createTelegramLoginToken = () =>
+  apiFetch<TelegramToken>('/auth/telegram/login-token', { method: 'POST' })
+
+export const checkTelegramLoginStatus = (token: string) =>
+  apiFetch<TelegramLoginStatusResult>('/auth/telegram/login-status', {
+    method: 'POST',
+    body: { token },
   })

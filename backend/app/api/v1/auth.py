@@ -17,10 +17,12 @@ from app.core.tokens import hash_token
 from app.models.refresh_token import RefreshToken
 from app.schemas.auth import LoginRequest, SessionOut
 from app.schemas.invite import InviteAcceptRequest, InvitePreview
+from app.schemas.telegram import TelegramLoginStatusIn, TelegramLoginStatusOut, TelegramTokenOut
 from app.schemas.user import UserPublic
 from app.services import auth as auth_service
 from app.services import invites as invites_service
 from app.services import password_reset as password_reset_service
+from app.services import telegram_link as telegram_link_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -102,6 +104,33 @@ async def consume_password_reset(
     token: str, body: PasswordResetConsume, session: DbSession
 ) -> None:
     await password_reset_service.consume_reset_token(session, token, body.new_password)
+
+
+@router.post(
+    "/telegram/login-token", response_model=TelegramTokenOut, dependencies=[Depends(require_csrf)]
+)
+async def create_telegram_login_token(request: Request, session: DbSession) -> TelegramTokenOut:
+    plain, expires_at = await telegram_link_service.create_login_token(
+        session, request.headers.get("user-agent"), _client_ip(request)
+    )
+    return TelegramTokenOut(
+        deep_link_url=telegram_link_service.deep_link_url("login", plain), expires_at=expires_at
+    )
+
+
+@router.post(
+    "/telegram/login-status",
+    response_model=TelegramLoginStatusOut,
+    dependencies=[Depends(require_csrf)],
+)
+async def telegram_login_status(
+    body: TelegramLoginStatusIn, request: Request, response: Response, session: DbSession
+) -> TelegramLoginStatusOut:
+    poll_status, user = await telegram_link_service.claim_login_token(session, body.token)
+    if poll_status == "confirmed" and user is not None:
+        await _start_session(session, response, user.id, user.role.value, request)
+        return TelegramLoginStatusOut(status="confirmed", user=UserPublic.from_user(user))
+    return TelegramLoginStatusOut(status=poll_status)
 
 
 @router.get("/sessions", response_model=list[SessionOut])

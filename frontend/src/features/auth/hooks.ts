@@ -4,12 +4,13 @@ import { ApiError } from '@/lib/api'
 
 export const meQueryKey = ['me'] as const
 
-export function useCurrentUser() {
+export function useCurrentUser(options: { poll?: boolean } = {}) {
   return useQuery({
     queryKey: meQueryKey,
     queryFn: authApi.getMe,
     retry: false,
     staleTime: 60_000,
+    refetchInterval: options.poll ? 2000 : false,
     throwOnError: (error) => !(error instanceof ApiError && error.status === 401),
   })
 }
@@ -77,6 +78,35 @@ export function useRevokeAllSessions() {
       queryClient.setQueryData(meQueryKey, null)
       queryClient.invalidateQueries()
     },
+  })
+}
+
+export function useCreateTelegramLinkToken() {
+  return useMutation({ mutationFn: authApi.createTelegramLinkToken })
+}
+
+export function useUnlinkTelegram() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: authApi.unlinkTelegram,
+    onSuccess: (user) => queryClient.setQueryData(meQueryKey, user),
+  })
+}
+
+export function useCreateTelegramLoginToken() {
+  return useMutation({ mutationFn: authApi.createTelegramLoginToken })
+}
+
+export function useTelegramLoginStatus(token: string | null) {
+  return useQuery({
+    queryKey: ['telegram-login-status', token],
+    queryFn: () => authApi.checkTelegramLoginStatus(token as string),
+    enabled: token !== null,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status
+      return status === 'pending' || status === undefined ? 2000 : false
+    },
+    retry: false,
   })
 }
 

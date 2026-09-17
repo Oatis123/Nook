@@ -47,3 +47,15 @@ export interface InvitePreview {
   comment: string | null
   expires_at: string
 }
+
+export interface TelegramToken {
+  deep_link_url: string
+  expires_at: string
+}
+
+export type TelegramLoginStatus = 'pending' | 'confirmed' | 'denied' | 'expired'
+
+export interface TelegramLoginStatusResult {
+  status: TelegramLoginStatus
+  user: User | null
+}

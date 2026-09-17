@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, Request, status
 
 from app.core.cookies import REFRESH_COOKIE
 from app.core.deps import CurrentUser, DbSession, require_csrf
+from app.schemas.telegram import TelegramTokenOut
 from app.schemas.user import MeUpdate, PasswordChange, UserPublic
+from app.services import admin as admin_service
 from app.services import me as me_service
+from app.services import telegram_link as telegram_link_service
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -29,3 +32,19 @@ async def change_password(
     await me_service.change_password(
         session, user, body.current_password, body.new_password, current_refresh_token
     )
+
+
+@router.post(
+    "/telegram/link-token", response_model=TelegramTokenOut, dependencies=[Depends(require_csrf)]
+)
+async def create_telegram_link_token(user: CurrentUser, session: DbSession) -> TelegramTokenOut:
+    plain, expires_at = await telegram_link_service.create_link_token(session, user.id)
+    return TelegramTokenOut(
+        deep_link_url=telegram_link_service.deep_link_url("link", plain), expires_at=expires_at
+    )
+
+
+@router.post("/telegram/unlink", response_model=UserPublic, dependencies=[Depends(require_csrf)])
+async def unlink_telegram(user: CurrentUser, session: DbSession) -> UserPublic:
+    updated = await admin_service.unlink_telegram(session, user.id)
+    return UserPublic.from_user(updated)

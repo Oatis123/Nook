@@ -2,21 +2,15 @@ import asyncio
 
 import structlog
 from aiogram import Bot, Dispatcher
-from aiogram.filters import CommandStart
-from aiogram.types import Message
 
 from app.core.config import get_settings
+from bot.handlers import router
 
 settings = get_settings()
 log = structlog.get_logger()
 
 dp = Dispatcher()
-
-
-@dp.message(CommandStart())
-async def handle_start(message: Message) -> None:
-    """Placeholder handler. Account linking/login is added in a later stage (spec §5.2/§5.3)."""
-    await message.answer(f"Welcome to {settings.app_name}. This bot is not fully set up yet.")
+dp.include_router(router)
 
 
 async def main() -> None:

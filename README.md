@@ -34,8 +34,25 @@ for implementation decisions left to the agent's discretion by the spec.
    ```
 4. Open `http://localhost:${WEB_PORT:-8080}`.
 
-Further setup (bot linking, backups, HTTPS via Caddy) is documented as those pieces land —
-see the stage roadmap in `docs/DECISIONS.md` and the project's plan for what's implemented so far.
+Further setup (backups, HTTPS via Caddy) is documented as those pieces land — see the stage
+roadmap in `docs/DECISIONS.md` and the project's plan for what's implemented so far.
+
+## Setting up the Telegram bot
+
+Linking Telegram is mandatory (spec §5.1) — no part of the app is usable until it's connected,
+including for the admin account. To test this locally:
+
+1. Message [@BotFather](https://t.me/BotFather) on Telegram, send `/newbot`, and follow the
+   prompts to get a bot token and username.
+2. Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME` (without the `@`) in `.env`.
+3. Restart the `bot` service (`docker compose up -d bot`, or the local `uv run python bot/main.py`
+   process). It runs in long-polling mode by default (`BOT_MODE=polling`), so no public domain
+   or webhook is needed.
+4. Log in to the web app; the onboarding gate shows a QR code / deep link to `t.me/<your bot>`
+   that finishes the link.
+
+Without a token set, the bot process stays up but idle (logs a warning and does nothing), and the
+web app's onboarding gate will show a QR code that doesn't go anywhere useful yet.
 
 ## Local development (without Docker)
 

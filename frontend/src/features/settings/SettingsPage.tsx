@@ -1,14 +1,17 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Download, Upload } from 'lucide-react'
+import { Copy, Download, Plus, Upload } from 'lucide-react'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import {
+  useApiTokens,
   useChangePassword,
+  useCreateApiToken,
   useCurrentUser,
   useRevokeAllSessions,
+  useRevokeApiToken,
   useRevokeSession,
   useSessions,
   useUnlinkTelegram,
@@ -90,6 +93,130 @@ function TelegramSection() {
           </div>
         </Dialog>
       </div>
+    </section>
+  )
+}
+
+function NewApiTokenDialog() {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [createdToken, setCreatedToken] = useState<string | null>(null)
+  const createToken = useCreateApiToken()
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    createToken.mutate(trimmed, { onSuccess: (token) => setCreatedToken(token.token) })
+  }
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      setName('')
+      setCreatedToken(null)
+      createToken.reset()
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      trigger={
+        <Button variant="primary">
+          <Plus size={16} strokeWidth={1.5} />
+          New token
+        </Button>
+      }
+      title="New API token"
+      description="Used to connect an MCP client, such as Claude, to your account."
+    >
+      {createdToken ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-text-muted">Copy this token now — it won't be shown again.</p>
+          <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+            <span className="flex-1 truncate text-sm">{createdToken}</span>
+            <button
+              type="button"
+              aria-label="Copy token"
+              onClick={() => navigator.clipboard.writeText(createdToken)}
+              className="text-text-muted hover:text-text"
+            >
+              <Copy size={15} strokeWidth={1.5} />
+            </button>
+          </div>
+          <Button variant="secondary" onClick={() => handleOpenChange(false)}>
+            Done
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="token-name" className="text-sm text-text-muted">
+              Name
+            </label>
+            <input
+              id="token-name"
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Claude Desktop"
+              className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+            />
+          </div>
+          <Button type="submit" variant="primary" disabled={!name.trim() || createToken.isPending}>
+            {createToken.isPending ? 'Creating…' : 'Create token'}
+          </Button>
+        </form>
+      )}
+    </Dialog>
+  )
+}
+
+function ApiTokensSection() {
+  const tokens = useApiTokens()
+  const revokeToken = useRevokeApiToken()
+  const mcpUrl = `${window.location.origin}/mcp`
+
+  return (
+    <section className="border-b border-border py-8">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-serif text-lg text-text">API tokens</h2>
+        <NewApiTokenDialog />
+      </div>
+      <p className="mb-4 text-sm text-text-muted">
+        Connect an MCP client (Claude Desktop, Claude Code, ...) to your notes and tasks. Point it
+        at <code className="rounded bg-surface px-1 py-0.5 text-xs text-text">{mcpUrl}</code> with
+        one of the tokens below as a bearer token.
+      </p>
+      {(tokens.data?.length ?? 0) === 0 ? (
+        <p className="text-sm text-text-muted">No tokens yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {tokens.data?.map((token) => (
+            <li
+              key={token.id}
+              className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            >
+              <div>
+                <div className="text-text">{token.name}</div>
+                <div className="text-xs text-text-muted">
+                  Created {formatDateTime(token.created_at)}
+                  {token.last_used_at && <> · last used {formatDateTime(token.last_used_at)}</>}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => revokeToken.mutate(token.id)}
+                className="text-text-muted hover:text-danger"
+              >
+                Revoke
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   )
 }
@@ -319,6 +446,7 @@ export default function SettingsPage() {
       <h1 className="mb-2 font-serif text-2xl text-text">Settings</h1>
       <ProfileSection />
       <TelegramSection />
+      <ApiTokensSection />
       <VaultSection />
       <PasswordSection />
       <SessionsSection />

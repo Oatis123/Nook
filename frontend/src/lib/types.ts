@@ -26,6 +26,18 @@ export interface Session {
   is_current: boolean
 }
 
+export interface ApiToken {
+  id: string
+  name: string
+  created_at: string
+  last_used_at: string | null
+}
+
+export interface ApiTokenCreated extends ApiToken {
+  /** Only present in the create response — never retrievable again afterward. */
+  token: string
+}
+
 export type InviteStatus = 'active' | 'used' | 'expired' | 'revoked'
 
 export interface Invite {

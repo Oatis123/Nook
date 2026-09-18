@@ -81,6 +81,29 @@ export function useRevokeAllSessions() {
   })
 }
 
+export function useApiTokens() {
+  return useQuery({
+    queryKey: ['api-tokens'],
+    queryFn: authApi.getApiTokens,
+  })
+}
+
+export function useCreateApiToken() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: authApi.createApiToken,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
+  })
+}
+
+export function useRevokeApiToken() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: authApi.revokeApiToken,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['api-tokens'] }),
+  })
+}
+
 export function useCreateTelegramLinkToken() {
   return useMutation({ mutationFn: authApi.createTelegramLinkToken })
 }

@@ -1,5 +1,7 @@
 import { apiFetch } from '@/lib/api'
 import type {
+  ApiToken,
+  ApiTokenCreated,
   InvitePreview,
   Session,
   TelegramLoginStatusResult,
@@ -44,6 +46,14 @@ export const revokeSession = (id: string) =>
   apiFetch<void>(`/auth/sessions/${id}`, { method: 'DELETE' })
 
 export const revokeAllSessions = () => apiFetch<void>('/auth/sessions', { method: 'DELETE' })
+
+export const getApiTokens = () => apiFetch<ApiToken[]>('/me/api-tokens')
+
+export const createApiToken = (name: string) =>
+  apiFetch<ApiTokenCreated>('/me/api-tokens', { method: 'POST', body: { name } })
+
+export const revokeApiToken = (id: string) =>
+  apiFetch<void>(`/me/api-tokens/${id}`, { method: 'DELETE' })
 
 export const changePassword = (currentPassword: string, newPassword: string) =>
   apiFetch<void>('/me/password', {

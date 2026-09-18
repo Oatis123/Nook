@@ -20,6 +20,7 @@ dependencies = [
     "filetype>=1.2",
     "structlog>=24.4",
     "pyyaml>=6.0",
+    "mcp>=2.2.0",
 ]
 
 [dependency-groups]

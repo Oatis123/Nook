@@ -1,3 +1,4 @@
+from app.models.api_token import ApiToken
 from app.models.attachment import Attachment, NoteAttachment
 from app.models.auth_token import AuthToken, AuthTokenKind
 from app.models.base import Base
@@ -19,6 +20,7 @@ from app.models.user import User
 __all__ = [
     "Base",
     "User",
+    "ApiToken",
     "Invite",
     "AuthToken",
     "AuthTokenKind",

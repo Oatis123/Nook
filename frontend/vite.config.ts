@@ -32,5 +32,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // Scoped to src/ so vitest's default *.spec.ts glob doesn't also try (and fail) to
+    // run the Playwright specs under e2e/ — a different test runner, own config file.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 })

@@ -95,6 +95,21 @@ including for the admin account. To test this locally:
 Without a token set, the bot process stays up but idle (logs a warning and does nothing), and the
 web app's onboarding gate will show a QR code that doesn't go anywhere useful yet.
 
+## Connecting an MCP client (Claude, ...)
+
+Nook runs its own [MCP](https://modelcontextprotocol.io/) server (`app/mcp/` in the backend),
+so an MCP client like Claude Desktop or Claude Code can read and write your notes and tasks
+directly — list/search/create/edit notes, list/create/update/complete tasks, and so on.
+
+1. In the web app, go to **Settings → API tokens → New token**, name it (e.g. "Claude
+   Desktop"), and copy the token shown — it's only displayed once.
+2. Add a remote MCP connector in your client pointing at `<your Nook URL>/mcp` (e.g.
+   `http://localhost:8080/mcp`), authenticating with that token as a bearer token.
+
+Each token is a personal access token scoped to your account only — a client using it can
+only ever see and change your own notes and tasks, the same isolation the web app itself
+enforces. Revoke a token from the same Settings page at any time; nothing else is affected.
+
 ## Local development (without Docker)
 
 **Backend** (requires [uv](https://docs.astral.sh/uv/) and a local PostgreSQL 16):
@@ -167,6 +182,7 @@ admin account's credentials aren't in `.env`.
 
 ```
 backend/app/        FastAPI app: api/v1 routers, core (config/db/security), models, schemas, services
+backend/app/mcp/     MCP server (notes/tasks tools for an MCP client, mounted at /mcp)
 backend/worker/      Reminder delivery worker (asyncio loop, no Redis/Celery)
 backend/bot/         Telegram bot (aiogram 3)
 backend/alembic/     Database migrations

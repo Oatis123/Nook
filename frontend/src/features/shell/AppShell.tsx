@@ -90,7 +90,7 @@ export function AppShell() {
           'fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface',
           'transition-transform duration-150 md:relative md:inset-auto md:transition-[width]',
           sidebarOpen
-            ? 'translate-x-0'
+            ? 'translate-x-0 md:m-4 md:rounded-xl md:border md:shadow-md'
             : '-translate-x-full md:w-0 md:translate-x-0 md:overflow-hidden md:border-r-0',
         )}
       >

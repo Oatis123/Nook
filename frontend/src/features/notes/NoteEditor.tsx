@@ -304,7 +304,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               viewRef.current = view
             }}
             extensions={editorExtensions}
-            basicSetup={{ lineNumbers: false, foldGutter: false }}
+            basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
+            theme="none"
             height="100%"
             className="h-full"
           />

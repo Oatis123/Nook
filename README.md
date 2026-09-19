@@ -46,38 +46,6 @@ docker compose up -d --build
 The `api` container runs `alembic upgrade head` on every start, so schema migrations apply
 automatically. Nothing else needs a manual step.
 
-## Backup and restore
-
-```bash
-./deploy/backup.sh
-```
-
-writes `backups/<timestamp>/db.dump` (a `pg_dump --format=custom` archive) and
-`backups/<timestamp>/attachments.tar.gz` (everything in the attachments volume), with the
-stack running. Run it on a schedule (e.g. a cron entry calling it) for regular backups — it
-doesn't manage retention itself, so prune old snapshots under `backups/` however you'd like.
-
-To restore into a stack that's already up:
-
-```bash
-# Database — --clean drops existing objects first, so this replaces current data.
-cat backups/<timestamp>/db.dump | docker compose exec -T db pg_restore \
-  -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists
-
-# Attachments
-cat backups/<timestamp>/attachments.tar.gz | docker compose exec -T api tar xzf - -C /data/attachments
-```
-
-(`$POSTGRES_USER` / `$POSTGRES_DB` are the values from your `.env`.)
-
-## HTTPS with Caddy
-
-The `web` service only speaks plain HTTP. For a real deployment, put a reverse proxy in
-front of it that terminates TLS — [Caddy](https://caddyserver.com/) does this with automatic
-Let's Encrypt certificates and near-zero config. See
-[`deploy/Caddyfile.example`](deploy/Caddyfile.example): copy it to `Caddyfile`, replace the
-domain, and run Caddy (as a host service, or its own container) alongside the stack.
-
 ## Setting up the Telegram bot
 
 Linking Telegram is mandatory (spec §5.1) — no part of the app is usable until it's connected,
@@ -192,6 +160,6 @@ frontend/src/design/  Design tokens and base components
 frontend/src/features/ Feature modules (notes, tasks, auth, graph, search, ...)
 frontend/src/lib/     API client and utilities
 frontend/e2e/          Playwright end-to-end tests
-deploy/               nginx config, Caddy example, backup script
+deploy/               nginx config used by the web container
 docs/                 Decisions log and other project docs
 ```

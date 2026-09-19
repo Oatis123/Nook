@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 # Imported for side effects: registers all mapped models on Base.metadata.
 import app.models  # noqa: F401
+import app.services.attachments as attachments_service
+import app.services.vault_import as vault_import_service
 from app.core import rate_limit
 from app.core.config import get_settings
 from app.core.db import Base, get_db
@@ -17,6 +19,21 @@ from app.main import app
 from app.models.user import User, UserRole
 
 DEFAULT_PASSWORD = "correct-password"
+
+
+@pytest.fixture(autouse=True)
+def _isolated_attachments_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    """Redirects ATTACHMENTS_DIR-derived storage (attachments, vault import zips) to a
+    throwaway tmp_path per test rather than the real ATTACHMENTS_DIR (`/data/attachments`
+    by default) — that path only exists inside the Docker containers/volumes; on a bare
+    CI runner or local `pytest` outside Docker, nothing has created or can create it.
+    `attachments` and `vault_import` each bind their own `get_settings` reference, so both
+    need patching; `vault_export` never calls `get_settings` itself, it just reads
+    `Attachment.storage_path`, which is already under `tmp_path` once attachments does."""
+    patched = get_settings().model_copy(update={"attachments_dir": str(tmp_path)})
+    monkeypatch.setattr(attachments_service, "get_settings", lambda: patched)
+    monkeypatch.setattr(vault_import_service, "get_settings", lambda: patched)
+    return patched
 
 
 @pytest.fixture(autouse=True)

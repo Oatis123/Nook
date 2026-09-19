@@ -9,15 +9,6 @@ from tests.conftest import csrf_token, login, make_user
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 
-@pytest.fixture(autouse=True)
-def _isolated_attachments_dir(tmp_path, monkeypatch: pytest.MonkeyPatch):
-    """Redirects attachment storage to a throwaway tmp_path per test instead of the real
-    ATTACHMENTS_DIR, so the test suite doesn't litter local dev's data/attachments folder."""
-    patched = get_settings().model_copy(update={"attachments_dir": str(tmp_path)})
-    monkeypatch.setattr(attachments_service, "get_settings", lambda: patched)
-    return patched
-
-
 async def _upload(client: AsyncClient, filename: str, data: bytes) -> dict:
     csrf = await csrf_token(client)
     response = await client.post(

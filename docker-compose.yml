@@ -1,3 +1,5 @@
+name: nook
+
 services:
   db:
     image: postgres:16
@@ -88,5 +90,10 @@ services:
       retries: 10
 
 volumes:
+  # Named explicitly so the project keeps using its existing data volumes
+  # (created back when this repo was still called "taskian") regardless of
+  # what the checkout directory is named.
   pgdata:
+    name: taskian_pgdata
   attachments:
+    name: taskian_attachments

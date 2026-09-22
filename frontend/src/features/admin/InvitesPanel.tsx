@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { Copy, Mail, Plus } from 'lucide-react'
+import { Check, Copy, Mail, Plus } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
@@ -20,7 +20,15 @@ function NewInviteDialog() {
   const [comment, setComment] = useState('')
   const [expiresInDays, setExpiresInDays] = useState('7')
   const [createdUrl, setCreatedUrl] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const createInvite = useCreateInvite()
+
+  function handleCopy() {
+    if (!createdUrl) return
+    navigator.clipboard.writeText(createdUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -39,6 +47,7 @@ function NewInviteDialog() {
       setComment('')
       setExpiresInDays('7')
       setCreatedUrl(null)
+      setCopied(false)
       createInvite.reset()
     }
   }
@@ -66,10 +75,17 @@ function NewInviteDialog() {
             <button
               type="button"
               aria-label="Copy invite link"
-              onClick={() => navigator.clipboard.writeText(createdUrl)}
-              className="text-text-muted hover:text-text"
+              onClick={handleCopy}
+              className={clsx(
+                'transition-colors duration-150',
+                copied ? 'text-priority-low' : 'text-text-muted hover:text-text',
+              )}
             >
-              <Copy size={15} strokeWidth={1.5} />
+              {copied ? (
+                <Check key="check" size={15} strokeWidth={1.5} className="animate-fade-in" />
+              ) : (
+                <Copy key="copy" size={15} strokeWidth={1.5} />
+              )}
             </button>
           </div>
           <Button variant="secondary" onClick={() => handleOpenChange(false)}>

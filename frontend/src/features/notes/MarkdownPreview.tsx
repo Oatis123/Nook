@@ -87,13 +87,18 @@ export function MarkdownPreview({ content }: { content: string }) {
   const attachmentsQuery = useAttachments()
   const createNote = useCreateNote()
   const [highlighter, setHighlighter] = useState<HighlighterCore | null>(null)
+  const [highlighterError, setHighlighterError] = useState(false)
   const [tree, setTree] = useState<ReactNode>(null)
 
   useEffect(() => {
     let cancelled = false
-    getHighlighter().then((h) => {
-      if (!cancelled) setHighlighter(h)
-    })
+    getHighlighter()
+      .then((h) => {
+        if (!cancelled) setHighlighter(h)
+      })
+      .catch(() => {
+        if (!cancelled) setHighlighterError(true)
+      })
     return () => {
       cancelled = true
     }
@@ -150,6 +155,14 @@ export function MarkdownPreview({ content }: { content: string }) {
     if (link.getAttribute('href')) {
       navigate(link.getAttribute('href')!)
     }
+  }
+
+  if (highlighterError) {
+    return (
+      <div className="markdown-preview" onClick={handleClick}>
+        <p className="text-danger">Couldn't load the syntax highlighter. Preview unavailable.</p>
+      </div>
+    )
   }
 
   return (

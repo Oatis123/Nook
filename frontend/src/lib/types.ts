@@ -152,7 +152,18 @@ export interface GraphData {
 }
 
 export type TaskListColor =
-  'palette-1' | 'palette-2' | 'palette-3' | 'palette-4' | 'palette-5' | 'palette-6'
+  | 'palette-1'
+  | 'palette-2'
+  | 'palette-3'
+  | 'palette-4'
+  | 'palette-5'
+  | 'palette-6'
+  | 'palette-7'
+  | 'palette-8'
+  | 'palette-9'
+  | 'palette-10'
+  | 'palette-11'
+  | 'palette-12'
 
 export type TaskListIcon =
   | 'inbox'
@@ -171,6 +182,20 @@ export type TaskListIcon =
   | 'target'
   | 'coffee'
   | 'folder'
+  | 'gift'
+  | 'wallet'
+  | 'utensils'
+  | 'car'
+  | 'gamepad-2'
+  | 'palette'
+  | 'camera'
+  | 'wrench'
+  | 'paw-print'
+  | 'baby'
+  | 'bike'
+  | 'sparkles'
+  | 'users'
+  | 'lightbulb'
 
 export interface TaskList {
   id: string

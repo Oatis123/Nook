@@ -20,6 +20,12 @@ class TaskListColor(enum.StrEnum):
     palette_4 = "palette-4"
     palette_5 = "palette-5"
     palette_6 = "palette-6"
+    palette_7 = "palette-7"
+    palette_8 = "palette-8"
+    palette_9 = "palette-9"
+    palette_10 = "palette-10"
+    palette_11 = "palette-11"
+    palette_12 = "palette-12"
 
 
 class TaskListIcon(enum.StrEnum):
@@ -42,6 +48,20 @@ class TaskListIcon(enum.StrEnum):
     target = "target"
     coffee = "coffee"
     folder = "folder"
+    gift = "gift"
+    wallet = "wallet"
+    utensils = "utensils"
+    car = "car"
+    gamepad_2 = "gamepad-2"
+    palette = "palette"
+    camera = "camera"
+    wrench = "wrench"
+    paw_print = "paw-print"
+    baby = "baby"
+    bike = "bike"
+    sparkles = "sparkles"
+    users = "users"
+    lightbulb = "lightbulb"
 
 
 class TaskList(UUIDPKMixin, Base):

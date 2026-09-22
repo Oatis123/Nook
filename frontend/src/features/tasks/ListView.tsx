@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Switch } from '@/design/components/Switch'
 import { useTaskLists, useTasks } from '@/features/tasks/hooks'
-import { QuickAdd } from '@/features/tasks/QuickAdd'
+import { AddTaskButton } from '@/features/tasks/AddTaskButton'
 import { TaskGroupedList } from '@/features/tasks/TaskGroupedList'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import { groupByDate, groupByPriority, noGrouping } from '@/features/tasks/groupTasks'
@@ -42,7 +42,7 @@ export default function ListView() {
       </div>
 
       <div className="mb-4">
-        <QuickAdd listId={listId} />
+        <AddTaskButton listId={listId} />
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-4">

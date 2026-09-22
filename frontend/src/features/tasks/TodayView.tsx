@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { CalendarClock } from 'lucide-react'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
-import { QuickAdd } from '@/features/tasks/QuickAdd'
+import { AddTaskButton } from '@/features/tasks/AddTaskButton'
 import { TaskGroupedList } from '@/features/tasks/TaskGroupedList'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import type { TaskGroup } from '@/features/tasks/groupTasks'
@@ -27,7 +27,7 @@ export default function TodayView() {
       <h1 className="mb-6 font-serif text-2xl text-text">Today</h1>
 
       <div className="mb-4">
-        <QuickAdd />
+        <AddTaskButton />
       </div>
 
       {tasksQuery.data.length === 0 ? (

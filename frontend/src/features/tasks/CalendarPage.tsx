@@ -20,7 +20,7 @@ import { Button } from '@/design/components/Button'
 import { useCalendar, useUpdateTask } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR } from '@/features/tasks/priority'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
-import { QuickCreateOnDateDialog } from '@/features/tasks/QuickCreateOnDateDialog'
+import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
 import type { CalendarEntry } from '@/lib/types'
 
 type ViewMode = 'month' | 'week'
@@ -260,9 +260,11 @@ export default function CalendarPage() {
       </p>
 
       <TaskDetailDialog taskId={openTaskId} onOpenChange={(open) => !open && setOpenTaskId(null)} />
-      <QuickCreateOnDateDialog
-        date={quickCreateDate}
+      <TaskCreateDialog
+        open={quickCreateDate !== null}
         onOpenChange={(open) => !open && setQuickCreateDate(null)}
+        title={quickCreateDate ? `New task on ${format(quickCreateDate, 'MMM d, yyyy')}` : 'New task'}
+        defaultDate={quickCreateDate ? format(quickCreateDate, 'yyyy-MM-dd') : null}
       />
     </div>
   )

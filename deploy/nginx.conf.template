@@ -10,6 +10,10 @@ server {
     gzip_types text/css application/javascript application/json image/svg+xml font/woff2;
     gzip_min_length 1024;
 
+    # nginx quirk: a location block that declares its own add_header stops inheriting
+    # ALL add_header directives from this server block (all-or-nothing per level, not
+    # merged) — so /assets/ and / below, which each set their own Cache-Control, must
+    # repeat these security headers themselves rather than relying on inheritance.
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header X-Frame-Options "DENY" always;
@@ -52,9 +56,23 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
     }
 
     location / {
+        # Without this, browsers may cache index.html indefinitely on the default
+        # heuristic (no Cache-Control, only Last-Modified/ETag) and keep serving a
+        # stale document — including its Content-Security-Policy header — after a
+        # new deploy, until the user does a hard refresh. no-cache forces a
+        # revalidation request every load; ETag still lets that be a cheap 304.
+        add_header Cache-Control "no-cache" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
         try_files $uri /index.html;
     }
 }

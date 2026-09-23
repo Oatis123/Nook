@@ -1,17 +1,17 @@
 import { type FormEvent, useState } from 'react'
-import { Repeat } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
 import { Switch } from '@/design/components/Switch'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
-import { RecurrencePicker } from '@/features/tasks/RecurrencePicker'
-import { describeRecurrenceInput } from '@/features/tasks/recurrenceLabel'
+import { DEFAULT_RECURRENCE, RecurrenceFields } from '@/features/tasks/RecurrenceFields'
 import type { RecurrenceInput, TaskPriority } from '@/lib/types'
 
 const selectClass =
   'h-9 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
+
+type TaskMode = 'once' | 'recurring'
 
 export function TaskCreateDialog({
   open,
@@ -30,7 +30,6 @@ export function TaskCreateDialog({
 }) {
   const createTask = useCreateTask()
   const taskListsQuery = useTaskLists()
-  const [recurrenceOpen, setRecurrenceOpen] = useState(false)
   const [wasOpen, setWasOpen] = useState(open)
 
   const [title, setTitle] = useState('')
@@ -40,7 +39,8 @@ export function TaskCreateDialog({
   const [dueTime, setDueTime] = useState('')
   const [selectedListId, setSelectedListId] = useState<string | undefined>(listId)
   const [remindersEnabled, setRemindersEnabled] = useState(true)
-  const [recurrence, setRecurrence] = useState<RecurrenceInput | null>(null)
+  const [mode, setMode] = useState<TaskMode>('once')
+  const [recurrence, setRecurrence] = useState<RecurrenceInput>(DEFAULT_RECURRENCE)
 
   // Reset (and re-seed from props) whenever the dialog transitions to open — adjusted
   // during render, matching the pattern RecurrencePicker/TaskListEditDialog already use
@@ -57,13 +57,20 @@ export function TaskCreateDialog({
         listId ?? taskListsQuery.data?.find((l) => l.is_inbox)?.id ?? taskListsQuery.data?.[0]?.id,
       )
       setRemindersEnabled(true)
-      setRecurrence(null)
+      setMode('once')
+      setRecurrence(DEFAULT_RECURRENCE)
     }
   }
 
   // A recurring task needs a time for its first occurrence (spec §7.4) — see QuickAdd's
   // needsTimeForRecurrence for the same rule on the old text-entry path.
   const canRepeat = dueDate !== '' && dueTime !== ''
+
+  // Fall back to "one-time" the moment the due date/time that recurring mode depends on
+  // gets cleared, rather than leaving the form in a state it can't submit.
+  if (mode === 'recurring' && !canRepeat) {
+    setMode('once')
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -78,7 +85,7 @@ export function TaskCreateDialog({
         due_date: dueDate || undefined,
         due_time: dueTime || undefined,
         reminders_enabled: remindersEnabled,
-        recurrence: canRepeat ? recurrence : undefined,
+        recurrence: mode === 'recurring' && canRepeat ? recurrence : undefined,
       },
       { onSuccess: () => onOpenChange(false) },
     )
@@ -148,23 +155,43 @@ export function TaskCreateDialog({
               ))}
             </select>
           )}
-
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={!canRepeat}
-            onClick={() => setRecurrenceOpen(true)}
-            className={clsx('gap-1.5', recurrence && 'border-accent text-accent')}
-          >
-            <Repeat size={13} strokeWidth={1.5} />
-            {recurrence ? describeRecurrenceInput(recurrence) : 'Repeat'}
-          </Button>
         </div>
 
-        {!canRepeat && (
-          <p className="text-xs text-text-muted">Set a due date and time to make this repeat.</p>
-        )}
+        <div className="flex flex-col gap-3">
+          <div className="inline-flex w-fit rounded-md border border-border bg-surface-raised p-0.5">
+            {(
+              [
+                { value: 'once', label: 'One-time' },
+                { value: 'recurring', label: 'Recurring' },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                disabled={option.value === 'recurring' && !canRepeat}
+                onClick={() => setMode(option.value)}
+                className={clsx(
+                  'h-8 rounded-[5px] px-3 text-sm transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none',
+                  mode === option.value
+                    ? 'bg-accent text-accent-text'
+                    : 'text-text-muted hover:text-text',
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          {!canRepeat && (
+            <p className="text-xs text-text-muted">Set a due date and time to make this repeat.</p>
+          )}
+
+          {mode === 'recurring' && canRepeat && (
+            <div className="rounded-md border border-border bg-surface p-3">
+              <RecurrenceFields value={recurrence} onChange={setRecurrence} />
+            </div>
+          )}
+        </div>
 
         <label className="flex items-center gap-2 text-sm text-text-muted">
           <Switch
@@ -184,14 +211,6 @@ export function TaskCreateDialog({
           </Button>
         </div>
       </form>
-
-      <RecurrencePicker
-        open={recurrenceOpen}
-        onOpenChange={setRecurrenceOpen}
-        hasExisting={recurrence !== null}
-        onSave={setRecurrence}
-        onRemove={() => setRecurrence(null)}
-      />
     </Dialog>
   )
 }

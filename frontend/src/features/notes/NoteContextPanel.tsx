@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { Link2, Plus } from 'lucide-react'
+import { Link2, Plus } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useBacklinks, useCreateTaskFromNote, useNote } from '@/features/notes/hooks'
 import { useCompleteTask, useReopenTask } from '@/features/tasks/hooks'

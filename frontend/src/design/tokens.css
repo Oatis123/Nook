@@ -1,26 +1,45 @@
-/* Design tokens — spec TECH_SPEC.md §10.3. Light values are the default; dark values
-   apply either when the user explicitly picked "dark" or, for "system", when the OS
-   prefers dark and no explicit choice was made. See src/lib/theme.ts for how
-   data-theme is set on <html>. */
+/* Design tokens — spec TECH_SPEC.md §10.3. See src/lib/theme.ts for how data-theme
+   (light/dark mode) and data-theme-skin (visual theme) are set on <html>.
+
+   Mode: every color token is written as light-dark(<light>, <dark>), resolved against
+   the root's color-scheme — "system" (no data-theme) follows the OS, an explicit choice
+   pins it. That keeps each skin to a single block instead of three near-identical
+   copies (light / OS-dark media query / explicit dark).
+
+   Skin: the values below are the default Anthropic skin; design/skins/*.css override
+   tokens (colors, fonts, shapes, motion) and restyle widgets per skin. Components hang
+   those overrides off stable `ui-*` hook classes. */
 
 :root {
-  --bg: #faf9f5;
-  --surface: #f3f1ea;
-  --surface-raised: #ffffff;
-  --border: #e5e2d9;
-  --text: #1f1e1b;
-  --text-muted: #6b6860;
-  --accent: #c2663f;
-  --accent-text: #ffffff;
-  --danger: #b5483a;
-  --danger-text: #ffffff;
+  color-scheme: light dark;
+}
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root {
+  /* Anthropic (default skin) */
+  --bg: light-dark(#faf9f5, #1c1b19);
+  --surface: light-dark(#f3f1ea, #252421);
+  --surface-raised: light-dark(#ffffff, #2c2b28);
+  --border: light-dark(#e5e2d9, #363430);
+  --text: light-dark(#1f1e1b, #eceae3);
+  --text-muted: light-dark(#6b6860, #9c998f);
+  --accent: light-dark(#c2663f, #d9805a);
+  --accent-text: light-dark(#ffffff, #1c1b19);
+  --danger: light-dark(#b5483a, #d0685a);
+  --danger-text: light-dark(#ffffff, #1c1b19);
 
   /* Priority markers — muted, fixed palette, AA contrast on --surface */
-  --priority-low: #6b8f71;
-  --priority-medium: #c2953f;
-  --priority-high: #b5483a;
+  --priority-low: light-dark(#6b8f71, #86ab8c);
+  --priority-medium: light-dark(#c2953f, #d9ac5a);
+  --priority-high: light-dark(#b5483a, #d0685a);
 
-  /* List/tag color palette (choose N) — muted, warm-neutral compatible */
+  /* List/tag color palette (choose N) — muted, warm-neutral compatible. Shared by all
+     skins: users pick these per list, so they must mean the same color everywhere. */
   --palette-1: #c2663f;
   --palette-2: #6b8f71;
   --palette-3: #5b7ea3;
@@ -34,57 +53,38 @@
   --palette-11: #b8709c;
   --palette-12: #8a6c4f;
 
+  /* Widget-level color roles — default to the base palette, skins may split them out
+     (GitHub's green primary button, orange tab underline, …). */
+  --btn-primary-bg: var(--accent);
+  --btn-primary-text: var(--accent-text);
+  --tab-indicator: var(--accent);
+  --overlay: rgb(0 0 0 / 0.3);
+
+  /* Typography. "display" is the heading face (the `font-serif` utility) — a serif
+     only in this skin, so skins also get to pick its weight and tracking. */
+  --font-ui: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Literata', ui-serif, Georgia, serif;
+  --font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-display-weight: 400;
+  --font-display-tracking: normal;
+  --font-size-body: 15px;
+
+  /* Shape */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --radius-button: var(--radius-md);
+  --radius-dialog: var(--radius-lg);
 
-  --shadow-popover: 0 4px 16px -4px rgb(0 0 0 / 0.16);
+  --shadow-popover: 0 4px 16px -4px light-dark(rgb(0 0 0 / 0.16), rgb(0 0 0 / 0.5));
+  --shadow-dialog: var(--shadow-popover);
 
-  color-scheme: light;
-}
+  /* Check-mark glyph for CSS-drawn checkboxes (used as a mask, so it takes any color). */
+  --mask-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #1c1b19;
-    --surface: #252421;
-    --surface-raised: #2c2b28;
-    --border: #363430;
-    --text: #eceae3;
-    --text-muted: #9c998f;
-    --accent: #d9805a;
-    --accent-text: #1c1b19;
-    --danger: #d0685a;
-    --danger-text: #1c1b19;
-
-    --priority-low: #86ab8c;
-    --priority-medium: #d9ac5a;
-    --priority-high: #d0685a;
-
-    --shadow-popover: 0 4px 16px -4px rgb(0 0 0 / 0.5);
-
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme='dark'] {
-  --bg: #1c1b19;
-  --surface: #252421;
-  --surface-raised: #2c2b28;
-  --border: #363430;
-  --text: #eceae3;
-  --text-muted: #9c998f;
-  --accent: #d9805a;
-  --accent-text: #1c1b19;
-  --danger: #d0685a;
-  --danger-text: #1c1b19;
-
-  --priority-low: #86ab8c;
-  --priority-medium: #d9ac5a;
-  --priority-high: #d0685a;
-
-  --shadow-popover: 0 4px 16px -4px rgb(0 0 0 / 0.5);
-
-  color-scheme: dark;
+  /* Motion */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

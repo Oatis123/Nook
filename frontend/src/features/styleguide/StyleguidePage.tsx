@@ -1,7 +1,8 @@
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from '@/design/icons'
 import { useState } from 'react'
 import { Button } from '@/design/components/Button'
 import { IconButton } from '@/design/components/IconButton'
+import { ThemeSkinPicker } from '@/design/components/ThemeSkinPicker'
 import { ThemeToggle } from '@/design/components/ThemeToggle'
 import { Tooltip } from '@/design/components/Tooltip'
 import { Switch } from '@/design/components/Switch'
@@ -77,6 +78,10 @@ export default function StyleguidePage() {
         </div>
         <ThemeToggle />
       </header>
+
+      <Section title="Theme">
+        <ThemeSkinPicker />
+      </Section>
 
       <Section title="Color">
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { Trash2 } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { formatDateTime } from '@/lib/format'
 import {

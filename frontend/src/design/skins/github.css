@@ -1,0 +1,321 @@
+/* GitHub skin — Primer: system UI font at 14px with Mona Sans headings, crisp 6px
+   corners, bordered buttons with the green primary, orange UnderlineNav indicator,
+   NavList selection bar, Octicons (design/icons.tsx).
+   Token contract: design/tokens.css. Widget hooks: the `ui-*` classes on components. */
+
+:root[data-theme-skin='github'] {
+  --bg: light-dark(#ffffff, #0d1117);
+  --surface: light-dark(#f6f8fa, #151b23);
+  --surface-raised: light-dark(#ffffff, #212830);
+  --border: light-dark(#d1d9e0, #3d444d);
+  --text: light-dark(#1f2328, #f0f6fc);
+  --text-muted: light-dark(#59636e, #9198a1);
+  --accent: light-dark(#0969da, #4493f8);
+  --accent-text: light-dark(#ffffff, #0d1117);
+  --danger: light-dark(#d1242f, #f85149);
+  --danger-text: #ffffff;
+
+  --priority-low: light-dark(#1a7f37, #3fb950);
+  --priority-medium: light-dark(#9a6700, #d29922);
+  --priority-high: light-dark(#d1242f, #f85149);
+
+  --btn-primary-bg: light-dark(#1f883d, #238636);
+  --btn-primary-text: #ffffff;
+  --gh-btn-primary-hover: light-dark(#1c8139, #29903b);
+  --gh-btn-bg: light-dark(#f6f8fa, #212830);
+  --gh-btn-hover: light-dark(#eff2f5, #262c36);
+  --gh-btn-border: light-dark(rgb(31 35 40 / 0.15), #3d444d);
+  --gh-btn-danger-hover: light-dark(#cf222e, #b62324);
+  --gh-neutral-muted: light-dark(rgb(129 139 152 / 0.15), rgb(101 108 118 / 0.2));
+  --tab-indicator: light-dark(#fd8c73, #f78166);
+  --overlay: light-dark(rgb(31 35 40 / 0.5), rgb(1 4 9 / 0.8));
+
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-display: 'Mona Sans Variable', var(--font-ui);
+  --font-code:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-display-weight: 600;
+  --font-display-tracking: -0.01em;
+  --font-size-body: 14px;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 12px;
+  --radius-button: 6px;
+  --radius-dialog: 12px;
+
+  --shadow-popover:
+    0 0 0 1px light-dark(rgb(209 217 224 / 0.5), #3d444d),
+    0 6px 12px -3px light-dark(rgb(37 41 46 / 0.04), rgb(1 4 9 / 0.4)),
+    0 6px 18px 0 light-dark(rgb(37 41 46 / 0.12), rgb(1 4 9 / 0.4));
+  --shadow-dialog:
+    0 0 0 1px light-dark(rgb(209 217 224 / 0.5), #3d444d),
+    0 40px 80px 0 light-dark(rgb(37 41 46 / 0.24), rgb(1 4 9 / 0.85));
+
+  --ease-standard: cubic-bezier(0.3, 0.1, 0.5, 1);
+}
+
+/* Buttons: Primer Button — bordered, 32px on desktop, green primary, danger that
+   only turns red on hover. */
+:root[data-theme-skin='github'] .ui-button {
+  border: 1px solid var(--gh-btn-border);
+  box-shadow: 0 1px 0 0 light-dark(rgb(31 35 40 / 0.04), transparent);
+  font-weight: 500;
+  transition-duration: 80ms;
+}
+@media (min-width: 48rem) {
+  :root[data-theme-skin='github'] .ui-button[data-size='md'] {
+    height: 2rem;
+    padding-inline: 0.75rem;
+  }
+  :root[data-theme-skin='github'] .ui-button[data-size='sm'] {
+    height: 1.75rem;
+    padding-inline: 0.5rem;
+    font-size: 0.8125rem;
+  }
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='primary'] {
+  border-color: light-dark(rgb(31 35 40 / 0.15), rgb(240 246 252 / 0.1));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='primary']:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--gh-btn-primary-hover);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='secondary'] {
+  background: var(--gh-btn-bg);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='secondary']:hover:not(:disabled) {
+  background: var(--gh-btn-hover);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='ghost'] {
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--accent);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='ghost']:hover:not(:disabled) {
+  background: var(--gh-neutral-muted);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='danger'] {
+  background: var(--gh-btn-bg);
+  color: var(--danger);
+}
+:root[data-theme-skin='github'] .ui-button[data-variant='danger']:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--gh-btn-danger-hover);
+  border-color: light-dark(rgb(31 35 40 / 0.15), rgb(240 246 252 / 0.1));
+  color: #ffffff;
+}
+
+:root[data-theme-skin='github'] .ui-icon-button:hover,
+:root[data-theme-skin='github'] .ui-icon-button[data-active],
+:root[data-theme-skin='github'] .ui-dialog-close:hover {
+  background: var(--gh-neutral-muted);
+}
+
+/* Switch: Primer ToggleSwitch — squared track, bordered square knob. */
+:root[data-theme-skin='github'] .ui-switch {
+  width: 40px;
+  height: 22px;
+  border-radius: 6px;
+  border-color: light-dark(#d1d9e0, #3d444d);
+  background: light-dark(#e6eaef, #2a313c);
+}
+:root[data-theme-skin='github'] .ui-switch[data-state='checked'] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+:root[data-theme-skin='github'] .ui-switch-thumb {
+  position: absolute;
+  top: -1px;
+  left: -1px;
+  width: 22px;
+  height: 22px;
+  translate: 0 0;
+  border-radius: 6px;
+  border: 1px solid light-dark(#818b98, #656c76);
+  background: light-dark(#ffffff, #f0f6fc);
+  box-shadow: 0 1px 0 light-dark(rgb(31 35 40 / 0.04), transparent);
+  transition: translate 80ms var(--ease-standard);
+}
+:root[data-theme-skin='github'] .ui-switch-thumb[data-state='checked'] {
+  translate: 18px 0;
+  border-color: var(--accent);
+}
+
+/* Tabs: UnderlineNav — default-color labels, semibold + orange bar when selected,
+   hover as a rounded wash inside the item. */
+:root[data-theme-skin='github'] .ui-tabs-list {
+  gap: 0.5rem;
+}
+:root[data-theme-skin='github'] .ui-tab {
+  position: relative;
+  padding: 0.75rem 0.5rem;
+  isolation: isolate;
+  color: var(--text);
+  border-bottom-color: transparent;
+}
+:root[data-theme-skin='github'] .ui-tab::before {
+  content: '';
+  position: absolute;
+  inset: 0.375rem 0;
+  z-index: -1;
+  border-radius: 6px;
+  transition: background-color 80ms;
+}
+:root[data-theme-skin='github'] .ui-tab:hover::before {
+  background: var(--gh-neutral-muted);
+}
+:root[data-theme-skin='github'] .ui-tab[data-state='active'] {
+  font-weight: 600;
+  border-bottom-color: var(--tab-indicator);
+}
+
+/* Dialogs: Primer Dialog — header strip with a bottom divider, 14px semibold title. */
+:root[data-theme-skin='github'] .ui-dialog,
+:root[data-theme-skin='github'] .ui-palette {
+  border-color: transparent;
+}
+:root[data-theme-skin='github'] .ui-dialog-header {
+  margin: -1.25rem -1.25rem 1rem;
+  padding: 0.75rem 0.75rem 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+:root[data-theme-skin='github'] .ui-dialog-title {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+:root[data-theme-skin='github'] .ui-dialog-close {
+  padding: 0.5rem;
+}
+
+:root[data-theme-skin='github'] .ui-menu {
+  border-color: transparent;
+  border-radius: 12px;
+  padding: 0.5rem;
+}
+:root[data-theme-skin='github'] .ui-menu-item {
+  border-radius: 6px;
+  padding: 0.375rem 0.5rem;
+}
+:root[data-theme-skin='github'] .ui-menu-item[data-highlighted] {
+  background: var(--gh-neutral-muted);
+}
+:root[data-theme-skin='github'] .ui-menu-item[data-danger][data-highlighted] {
+  background: light-dark(#ffebe9, rgb(248 81 73 / 0.1));
+}
+:root[data-theme-skin='github'] .ui-tooltip {
+  border: 0;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  background: light-dark(#25292e, #3d444d);
+  color: light-dark(#ffffff, #f0f6fc);
+  box-shadow: none;
+}
+:root[data-theme-skin='github'] .ui-tooltip-arrow {
+  fill: light-dark(#25292e, #3d444d);
+}
+
+/* Navigation: NavList — default-color labels, neutral wash + 4px accent bar on the
+   current item. */
+:root[data-theme-skin='github'] .ui-nav-item {
+  position: relative;
+  color: var(--text);
+}
+:root[data-theme-skin='github'] .ui-nav-item:hover {
+  background: var(--gh-neutral-muted);
+}
+:root[data-theme-skin='github']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page'])) {
+  background: var(--gh-neutral-muted);
+  font-weight: 600;
+}
+:root[data-theme-skin='github']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page']))
+  a {
+  color: var(--text);
+}
+:root[data-theme-skin='github']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page']))::after {
+  content: '';
+  position: absolute;
+  top: calc(50% - 12px);
+  left: -0.5rem;
+  width: 4px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--accent);
+}
+:root[data-theme-skin='github'] .ui-segmented {
+  background: light-dark(#eff2f5, #212830);
+  border-color: light-dark(#d1d9e0, #3d444d);
+  border-radius: 6px;
+}
+:root[data-theme-skin='github'] .ui-segment {
+  border-radius: 6px;
+}
+:root[data-theme-skin='github'] .ui-segment[data-active='true'] {
+  font-weight: 600;
+  background: light-dark(#ffffff, #0d1117);
+  box-shadow: 0 0 0 1px light-dark(#d1d9e0, #3d444d);
+}
+:root[data-theme-skin='github'] [aria-selected='true'] > .ui-palette-item {
+  background: var(--gh-neutral-muted);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Shell: flat panes separated by borders; header on the muted canvas. */
+@media (min-width: 48rem) {
+  :root[data-theme-skin='github'] .ui-sidebar[data-open] {
+    margin: 0;
+    border-width: 0 1px 0 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--bg);
+  }
+}
+:root[data-theme-skin='github'] .ui-topbar {
+  background: light-dark(#f6f8fa, #010409);
+}
+
+/* Task checkbox: square Primer checkbox. */
+:root[data-theme-skin='github'] .ui-check {
+  position: relative;
+  border-radius: 3px;
+  border-color: light-dark(#818b98, #656c76);
+  background: var(--bg);
+}
+:root[data-theme-skin='github'] .ui-check[data-checked] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+:root[data-theme-skin='github'] .ui-check[data-checked]::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  background: var(--accent-text);
+  mask: var(--mask-check) center / contain no-repeat;
+}
+
+:root[data-theme-skin='github'] :is(input, select, textarea).border {
+  background: var(--bg);
+}
+:root[data-theme-skin='github'] :is(input, select, textarea).border:focus-visible {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+@media (min-width: 48rem) {
+  :root[data-theme-skin='github'] :is(input, select).border.h-9 {
+    height: 2rem;
+  }
+}
+:root[data-theme-skin='github'] .markdown-preview h1,
+:root[data-theme-skin='github'] .markdown-preview h2 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border);
+}

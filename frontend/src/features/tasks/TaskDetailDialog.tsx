@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { FileText, Repeat, SkipForward, Trash2, X } from 'lucide-react'
+import { FileText, Repeat, SkipForward, Trash2, X } from '@/design/icons'
 import { Dialog } from '@/design/components/Dialog'
 import { Switch } from '@/design/components/Switch'
 import { Tooltip } from '@/design/components/Tooltip'

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Send } from 'lucide-react'
+import { Send } from '@/design/icons'
 import { APP_NAME } from '@/lib/env'
 import { Button } from '@/design/components/Button'
 import { QrCode } from '@/design/components/QrCode'

@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { FileText, Hash } from 'lucide-react'
+import { FileText, Hash } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useNotes } from '@/features/notes/hooks'
 

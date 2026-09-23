@@ -4,7 +4,7 @@ import { APP_NAME } from '@/lib/env'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/design/components/Button'
 import { EmptyState } from '@/design/components/EmptyState'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from '@/design/icons'
 import { useAcceptInvite, useInvitePreview } from '@/features/auth/hooks'
 
 export default function InviteAcceptPage() {

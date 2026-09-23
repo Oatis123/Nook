@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
 import { AddTaskButton } from '@/features/tasks/AddTaskButton'

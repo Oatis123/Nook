@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { addDays, format } from 'date-fns'
-import { CalendarRange } from 'lucide-react'
+import { CalendarRange } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
 import { AddTaskButton } from '@/features/tasks/AddTaskButton'

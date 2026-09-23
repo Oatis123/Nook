@@ -9,4 +9,12 @@
   } catch (e) {
     /* localStorage unavailable (private mode, blocked storage) — fall back to system */
   }
+  try {
+    var skin = localStorage.getItem('nook-theme-skin')
+    if (skin === 'telegram' || skin === 'github' || skin === 'material') {
+      document.documentElement.setAttribute('data-theme-skin', skin)
+    }
+  } catch (e) {
+    /* localStorage unavailable — fall back to the default skin */
+  }
 })()

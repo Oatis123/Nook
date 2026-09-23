@@ -11,11 +11,30 @@
 @import '@fontsource/literata/400-italic.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
+/* Per-skin faces — @font-face only, so a file downloads the first time its skin
+   actually renders text with it. */
+@import '@fontsource/roboto/400.css';
+@import '@fontsource/roboto/500.css';
+@import '@fontsource/roboto/700.css';
+@import '@fontsource/roboto/400-italic.css';
+@import '@fontsource/roboto-mono/400.css';
+@import '@fontsource/roboto-mono/500.css';
+@import '@fontsource-variable/mona-sans/wght.css';
+@import '@fontsource-variable/google-sans-flex/wght.css';
+@import '@fontsource-variable/google-sans-code/wght.css';
+
+@import './design/skins/telegram.css';
+@import './design/skins/github.css';
+@import './design/skins/material.css';
 
 @theme {
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Literata', ui-serif, Georgia, serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  /* Skin-driven (design/tokens.css): `font-serif` is really "the display face". */
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-display);
+  --font-mono: var(--font-code);
+
+  --default-transition-timing-function: var(--ease-standard);
+  --ease-spring: var(--ease-spring);
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -70,14 +89,47 @@
 
   body {
     @apply bg-bg text-text font-sans;
-    font-size: 15px;
+    font-size: var(--font-size-body);
     line-height: 1.6;
+  }
+
+  /* Heading face weight/tracking come from the skin; an explicit font-* weight
+     utility on the element still wins (utilities layer). */
+  .font-serif {
+    font-weight: var(--font-display-weight);
+    letter-spacing: var(--font-display-tracking);
   }
 
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+}
+
+/* Theme switch (src/lib/theme.ts): the new theme is revealed as a soft-edged circle
+   growing from the clicked control. JS animates --theme-reveal (the circle's radius)
+   and sets the origin; this disables the default cross-fade, stacks the new snapshot
+   on top and masks it. The 64px feather matches REVEAL_FEATHER in theme.ts. */
+@property --theme-reveal {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+:root.theme-transition::view-transition-old(root),
+:root.theme-transition::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root.theme-transition::view-transition-old(root) {
+  z-index: 0;
+}
+:root.theme-transition::view-transition-new(root) {
+  z-index: 1;
+  mask-image: radial-gradient(
+    circle at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%),
+    #000 calc(var(--theme-reveal) - 64px),
+    transparent var(--theme-reveal)
+  );
 }
 
 /* Spec §10.8: prefers-reduced-motion — collapse transitions/animations to

@@ -1,6 +1,6 @@
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, Sun } from '@/design/icons'
 import { clsx } from 'clsx'
-import { type ThemePreference, useThemeStore } from '@/lib/theme'
+import { type ThemePreference, transitionOriginFromEvent, useThemeStore } from '@/lib/theme'
 
 const OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
   { value: 'light', label: 'Light', icon: Sun },
@@ -16,17 +16,18 @@ export function ThemeToggle() {
     <div
       role="radiogroup"
       aria-label="Theme"
-      className="inline-flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5"
+      className="ui-segmented inline-flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5"
     >
       {OPTIONS.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
           role="radio"
           aria-checked={preference === value}
+          data-active={preference === value}
           title={label}
-          onClick={() => setPreference(value)}
+          onClick={(e) => setPreference(value, transitionOriginFromEvent(e))}
           className={clsx(
-            'inline-flex h-7 w-7 items-center justify-center rounded transition-colors duration-150',
+            'ui-segment inline-flex h-7 w-7 items-center justify-center rounded transition-colors duration-150',
             preference === value
               ? 'bg-surface-raised text-text shadow-sm'
               : 'text-text-muted hover:text-text',

@@ -14,7 +14,7 @@ import {
   Menu,
   ChevronsUpDown,
   TriangleAlert,
-} from 'lucide-react'
+} from '@/design/icons'
 import { clsx } from 'clsx'
 import { APP_NAME } from '@/lib/env'
 import { useUIStore } from '@/lib/ui-store'
@@ -80,14 +80,15 @@ export function AppShell() {
     <div className="flex h-dvh w-full overflow-hidden bg-bg text-text">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          className="fixed inset-0 z-30 bg-(--overlay) md:hidden"
           onClick={toggleSidebar}
           aria-hidden="true"
         />
       )}
       <aside
+        data-open={sidebarOpen || undefined}
         className={clsx(
-          'fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface',
+          'ui-sidebar fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface',
           'transition-transform duration-150 md:relative md:inset-auto md:transition-[width]',
           sidebarOpen
             ? 'translate-x-0 md:m-4 md:rounded-xl md:border md:shadow-md'
@@ -106,12 +107,13 @@ export function AppShell() {
         </div>
 
         <div className="px-3">
-          <div className="inline-flex w-full rounded-md border border-border bg-bg p-0.5">
+          <div className="ui-segmented inline-flex w-full rounded-md border border-border bg-bg p-0.5">
             <NavLink
               to="/notes"
+              data-active={section === 'notes'}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors duration-150',
+                  'ui-segment flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors duration-150',
                   isActive || section === 'notes'
                     ? 'bg-surface-raised text-text shadow-sm'
                     : 'text-text-muted hover:text-text',
@@ -123,9 +125,10 @@ export function AppShell() {
             </NavLink>
             <NavLink
               to="/tasks"
+              data-active={section === 'tasks'}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors duration-150',
+                  'ui-segment flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors duration-150',
                   isActive
                     ? 'bg-surface-raised text-text shadow-sm'
                     : 'text-text-muted hover:text-text',
@@ -157,7 +160,7 @@ export function AppShell() {
                   to={to}
                   className={({ isActive }) =>
                     clsx(
-                      'flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150',
+                      'ui-nav-item flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150',
                       isActive
                         ? 'bg-surface-raised text-text'
                         : 'text-text-muted hover:text-text hover:bg-surface-raised/60',
@@ -203,7 +206,7 @@ export function AppShell() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
+        <header className="ui-topbar flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
           <IconButton
             label="Open menu"
             onClick={toggleSidebar}
@@ -256,7 +259,7 @@ export function AppShell() {
 
       {rightPanelOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          className="fixed inset-0 z-30 bg-(--overlay) md:hidden"
           onClick={toggleRightPanel}
           aria-hidden="true"
         />

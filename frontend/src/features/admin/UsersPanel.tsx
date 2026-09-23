@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { Dialog } from '@/design/components/Dialog'
-import { MoreHorizontal, Copy } from 'lucide-react'
+import { MoreHorizontal, Copy } from '@/design/icons'
 import type { User } from '@/lib/types'
 import { formatDate as formatDateString } from '@/lib/format'
 import {

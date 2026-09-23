@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { Hash } from 'lucide-react'
+import { Hash } from '@/design/icons'
 import { useTags } from '@/features/notes/hooks'
 
 export function TagList() {
@@ -25,8 +25,9 @@ export function TagList() {
             key={tag.name}
             type="button"
             onClick={() => navigate(`/tags/${encodeURIComponent(tag.name)}`)}
+            data-active={activeTag === tag.name || undefined}
             className={clsx(
-              'flex items-center gap-1.5 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-raised',
+              'ui-nav-item flex items-center gap-1.5 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-raised',
               activeTag === tag.name ? 'bg-surface-raised text-text' : 'text-text-muted',
             )}
             style={{ paddingLeft: depth * 14 + 4 }}

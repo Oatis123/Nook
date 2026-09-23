@@ -1,0 +1,432 @@
+/* Material 3 Expressive skin — Google Sans Flex, tonal baseline-purple scheme,
+   pill buttons that morph their corners on press, big 28px containers, the M3
+   switch with growing thumb, connected button groups, spring motion, Material
+   Symbols Rounded (design/icons.tsx).
+   Token contract: design/tokens.css. Widget hooks: the `ui-*` classes on components. */
+
+:root[data-theme-skin='material'] {
+  /* M3 roles: surface / surface-container / container-lowest|high, on-surface,
+     on-surface-variant, outline-variant, primary, error. */
+  --bg: light-dark(#fef7ff, #141218);
+  --surface: light-dark(#f3edf7, #211f26);
+  --surface-raised: light-dark(#ffffff, #2b2930);
+  --border: light-dark(#cac4d0, #49454f);
+  --text: light-dark(#1d1b20, #e6e0e9);
+  --text-muted: light-dark(#49454f, #cac4d0);
+  --accent: light-dark(#6750a4, #d0bcff);
+  --accent-text: light-dark(#ffffff, #381e72);
+  --danger: light-dark(#b3261e, #f2b8b5);
+  --danger-text: light-dark(#ffffff, #601410);
+
+  --priority-low: light-dark(#386a20, #9cd67d);
+  --priority-medium: light-dark(#7d5700, #f5bd48);
+  --priority-high: light-dark(#b3261e, #f2b8b5);
+
+  --m3-container-low: light-dark(#f7f2fa, #1d1b20);
+  --m3-container-high: light-dark(#ece6f0, #2b2930);
+  --m3-container-highest: light-dark(#e6e0e9, #36343b);
+  --m3-outline: light-dark(#79747e, #938f99);
+  --m3-secondary-container: light-dark(#e8def8, #4a4458);
+  --m3-on-secondary-container: light-dark(#4a4458, #e8def8);
+  --m3-primary-container: light-dark(#eaddff, #4f378b);
+  --m3-inverse-surface: light-dark(#322f35, #e6e0e9);
+  --m3-inverse-on-surface: light-dark(#f5eff7, #322f35);
+  /* State layers: on-surface at 8% (hover) / 10% (pressed). */
+  --m3-hover: color-mix(in srgb, var(--text) 8%, transparent);
+  --m3-pressed: color-mix(in srgb, var(--text) 10%, transparent);
+  --overlay: rgb(0 0 0 / 0.32);
+
+  --font-ui: 'Google Sans Flex Variable', 'Roboto', system-ui, sans-serif;
+  --font-display: var(--font-ui);
+  --font-code: 'Google Sans Code Variable', 'Roboto Mono', ui-monospace, monospace;
+  --font-display-weight: 500;
+  --font-display-tracking: 0;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-button: 9999px;
+  --radius-dialog: 28px;
+
+  /* Tonal elevation does most of the work; shadows stay soft (M3 levels 2/3). */
+  --shadow-popover:
+    0 1px 2px light-dark(rgb(0 0 0 / 0.3), rgb(0 0 0 / 0.5)),
+    0 2px 6px 2px light-dark(rgb(0 0 0 / 0.15), rgb(0 0 0 / 0.3));
+  --shadow-dialog:
+    0 4px 8px 3px light-dark(rgb(0 0 0 / 0.15), rgb(0 0 0 / 0.3)),
+    0 1px 3px light-dark(rgb(0 0 0 / 0.3), rgb(0 0 0 / 0.5));
+
+  /* M3 emphasized easing + an expressive spatial spring with a small overshoot. */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: linear(
+    0,
+    0.1 4.5%,
+    0.36 10%,
+    0.72 17%,
+    0.96 24%,
+    1.06 30%,
+    1.08 34%,
+    1.06 40%,
+    1.02 48%,
+    0.995 60%,
+    1
+  );
+}
+
+@keyframes m3-pop-in {
+  from {
+    opacity: 0;
+    scale: 0.9;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes m3-menu-in {
+  from {
+    opacity: 0;
+    scale: 1 0.8;
+  }
+  to {
+    opacity: 1;
+    scale: 1 1;
+  }
+}
+@keyframes m3-check-in {
+  from {
+    scale: 0.4;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+/* Buttons: pill-shaped, 40px, tonal secondary, text-style ghost; on press the corners
+   spring from round to squarish (the Expressive shape morph). */
+:root[data-theme-skin='material'] .ui-button {
+  border: 0;
+  font-weight: 500;
+  letter-spacing: 0.00625em;
+  transition-property: background-color, color, border-radius, box-shadow;
+  transition-duration: 200ms, 200ms, 450ms, 200ms;
+  transition-timing-function:
+    var(--ease-standard), var(--ease-standard), var(--ease-spring), var(--ease-standard);
+}
+@media (min-width: 48rem) {
+  :root[data-theme-skin='material'] .ui-button[data-size='md'] {
+    height: 2.5rem;
+    padding-inline: 1.5rem;
+  }
+  :root[data-theme-skin='material'] .ui-button[data-size='sm'] {
+    height: 2rem;
+    padding-inline: 1rem;
+  }
+}
+:root[data-theme-skin='material'] .ui-button:active:not(:disabled) {
+  border-radius: var(--radius-md);
+}
+:root[data-theme-skin='material'] .ui-button[data-size='sm']:active:not(:disabled) {
+  border-radius: var(--radius-sm);
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='primary']:hover:not(:disabled),
+:root[data-theme-skin='material'] .ui-button[data-variant='danger']:hover:not(:disabled) {
+  opacity: 1;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.3),
+    0 1px 3px 1px rgb(0 0 0 / 0.15);
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='primary']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent), var(--accent-text) 8%);
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='danger']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger), var(--danger-text) 8%);
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='secondary'] {
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='secondary']:hover:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--m3-secondary-container),
+    var(--m3-on-secondary-container) 8%
+  );
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='ghost'] {
+  color: var(--accent);
+}
+:root[data-theme-skin='material'] .ui-button[data-variant='ghost']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Icon buttons: circular with an on-surface state layer; selected = tonal. Same
+   press morph as buttons. */
+:root[data-theme-skin='material'] .ui-icon-button,
+:root[data-theme-skin='material'] .ui-dialog-close {
+  border-radius: 9999px;
+  color: var(--text-muted);
+  transition-property: background-color, color, border-radius;
+  transition-duration: 200ms, 200ms, 450ms;
+  transition-timing-function: var(--ease-standard), var(--ease-standard), var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-icon-button:hover,
+:root[data-theme-skin='material'] .ui-dialog-close:hover {
+  background: var(--m3-hover);
+}
+:root[data-theme-skin='material'] .ui-icon-button:active:not(:disabled),
+:root[data-theme-skin='material'] .ui-dialog-close:active {
+  border-radius: var(--radius-md);
+  background: var(--m3-pressed);
+}
+:root[data-theme-skin='material'] .ui-icon-button[data-active] {
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+}
+
+/* Switch: M3 — 52×32 outlined track, 16px thumb that grows to 24px with a check when
+   on, and to 28px while pressed. */
+:root[data-theme-skin='material'] .ui-switch {
+  width: 52px;
+  height: 32px;
+  border: 2px solid var(--m3-outline);
+  background: var(--m3-container-highest);
+  transition:
+    background-color 200ms var(--ease-standard),
+    border-color 200ms var(--ease-standard);
+}
+:root[data-theme-skin='material'] .ui-switch[data-state='checked'] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+:root[data-theme-skin='material'] .ui-switch-thumb {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  translate: 6px 0;
+  background: var(--m3-outline);
+  transition:
+    translate 450ms var(--ease-spring),
+    width 250ms var(--ease-spring),
+    height 250ms var(--ease-spring),
+    margin 250ms var(--ease-spring),
+    background-color 200ms var(--ease-standard);
+}
+:root[data-theme-skin='material'] .ui-switch-thumb[data-state='checked'] {
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  translate: 22px 0;
+  background: var(--accent-text);
+}
+:root[data-theme-skin='material'] .ui-switch-thumb[data-state='checked']::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  background: var(--accent);
+  mask: var(--mask-check) center / contain no-repeat;
+  animation: m3-check-in 350ms var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-switch:active .ui-switch-thumb {
+  width: 28px;
+  height: 28px;
+  margin-top: -14px;
+  translate: 0 0;
+}
+:root[data-theme-skin='material'] .ui-switch:active .ui-switch-thumb[data-state='checked'] {
+  translate: 20px 0;
+  background: var(--m3-primary-container);
+}
+
+/* Tabs: M3 primary tabs — 3px rounded indicator hugging the label, springing in. */
+:root[data-theme-skin='material'] .ui-tab {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border-bottom-color: transparent;
+  font-weight: 500;
+  transition-property: color, background-color;
+}
+:root[data-theme-skin='material'] .ui-tab:hover {
+  background: var(--m3-hover);
+}
+:root[data-theme-skin='material'] .ui-tab::after {
+  content: '';
+  position: absolute;
+  inset: auto 1rem -2px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+  scale: 0 1;
+  transition: scale 450ms var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-tab[data-state='active'] {
+  color: var(--accent);
+  border-bottom-color: transparent;
+}
+:root[data-theme-skin='material'] .ui-tab[data-state='active']::after {
+  scale: 1 1;
+}
+
+/* Dialogs: 28px corners, surface-container-high, headline-small title, spring pop-in. */
+:root[data-theme-skin='material'] .ui-dialog {
+  padding: 1.5rem;
+  border: 0;
+  background: var(--m3-container-high);
+  animation: m3-pop-in 450ms var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-palette {
+  border: 0;
+  background: var(--m3-container-high);
+  overflow: hidden;
+  animation: m3-pop-in 450ms var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-dialog-header {
+  margin-bottom: 1rem;
+}
+:root[data-theme-skin='material'] .ui-dialog-title {
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 2rem;
+}
+
+:root[data-theme-skin='material'] .ui-menu {
+  border: 0;
+  border-radius: 16px;
+  padding: 0.25rem;
+  background: var(--m3-container-high);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+  animation: m3-menu-in 350ms var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-menu-item {
+  border-radius: 12px;
+  padding: 0.625rem 0.75rem;
+}
+:root[data-theme-skin='material'] .ui-menu-item[data-highlighted] {
+  background: var(--m3-hover);
+}
+:root[data-theme-skin='material'] .ui-tooltip {
+  border: 0;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  background: var(--m3-inverse-surface);
+  color: var(--m3-inverse-on-surface);
+  box-shadow: none;
+}
+:root[data-theme-skin='material'] .ui-tooltip-arrow {
+  display: none;
+}
+
+/* Navigation: drawer items as full pills with the secondary-container indicator. */
+:root[data-theme-skin='material'] .ui-nav-item {
+  border-radius: 9999px;
+  transition-property: background-color, color;
+}
+:root[data-theme-skin='material'] .ui-nav-item:hover {
+  background: var(--m3-hover);
+}
+:root[data-theme-skin='material']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page'])) {
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+  font-weight: 600;
+}
+:root[data-theme-skin='material']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page']))
+  a {
+  color: inherit;
+}
+
+/* Segmented controls as an Expressive connected button group: small gap, inner
+   corners tight, the selected segment springs into a full primary pill. */
+:root[data-theme-skin='material'] .ui-segmented {
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+:root[data-theme-skin='material'] .ui-segment {
+  border-radius: 6px;
+  background: var(--m3-container-highest);
+  color: var(--text-muted);
+  box-shadow: none;
+  font-weight: 500;
+  transition-property: background-color, color, border-radius;
+  transition-duration: 200ms, 200ms, 450ms;
+  transition-timing-function: var(--ease-standard), var(--ease-standard), var(--ease-spring);
+}
+:root[data-theme-skin='material'] .ui-segment:first-child {
+  border-radius: 9999px 6px 6px 9999px;
+}
+:root[data-theme-skin='material'] .ui-segment:last-child {
+  border-radius: 6px 9999px 9999px 6px;
+}
+:root[data-theme-skin='material'] .ui-segment:hover {
+  background: color-mix(in srgb, var(--m3-container-highest), var(--text) 8%);
+}
+:root[data-theme-skin='material'] .ui-segment[data-active='true'] {
+  border-radius: 9999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  box-shadow: none;
+}
+:root[data-theme-skin='material'] .ui-segmented .ui-segment.h-7 {
+  width: 2.25rem;
+  height: 2rem;
+}
+:root[data-theme-skin='material'] .ui-palette-item {
+  border-radius: 9999px;
+  margin-inline: 0.5rem;
+  width: calc(100% - 1rem);
+}
+:root[data-theme-skin='material'] [aria-selected='true'] > .ui-palette-item {
+  background: var(--m3-secondary-container);
+  color: var(--m3-on-secondary-container);
+}
+
+/* Shell: tonal navigation drawer — no border or shadow, extra-large corners. */
+@media (min-width: 48rem) {
+  :root[data-theme-skin='material'] .ui-sidebar[data-open] {
+    border-color: transparent;
+    border-radius: 28px;
+    box-shadow: none;
+    background: var(--m3-container-low);
+  }
+}
+:root[data-theme-skin='material'] .ui-topbar {
+  border-bottom-color: transparent;
+}
+
+/* Task checkbox: M3 checkbox — 18px, 2px outline, tight corners, check springs in. */
+:root[data-theme-skin='material'] .ui-check {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+}
+:root[data-theme-skin='material'] .ui-check[data-checked] {
+  border-color: var(--accent);
+}
+:root[data-theme-skin='material'] .ui-check[data-checked]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-text);
+  mask: var(--mask-check) center / contain no-repeat;
+  animation: m3-check-in 350ms var(--ease-spring);
+}
+
+:root[data-theme-skin='material'] :is(input, select, textarea).border {
+  border-color: var(--m3-outline);
+}
+:root[data-theme-skin='material'] :is(input, select, textarea).border:focus-visible {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+:root[data-theme-skin='material'] :focus-visible {
+  outline-width: 3px;
+}

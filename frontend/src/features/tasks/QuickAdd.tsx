@@ -1,5 +1,5 @@
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Repeat } from 'lucide-react'
+import { Plus, Repeat } from '@/design/icons'
 import { formatDate } from '@/lib/format'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { parseQuickAdd } from '@/features/tasks/quickAddParser'

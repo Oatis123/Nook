@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search as SearchIcon } from 'lucide-react'
+import { Search as SearchIcon } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useUIStore } from '@/lib/ui-store'
 import { useFolders } from '@/features/notes/hooks'

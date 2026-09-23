@@ -17,7 +17,7 @@ import {
   Home,
   Inbox,
   Lightbulb,
-  type LucideIcon,
+  type AppIcon,
   Music,
   Palette,
   PawPrint,
@@ -30,10 +30,10 @@ import {
   Utensils,
   Wallet,
   Wrench,
-} from 'lucide-react'
+} from '@/design/icons'
 import type { TaskListColor, TaskListIcon } from '@/lib/types'
 
-export const LIST_ICON_COMPONENT: Record<TaskListIcon, LucideIcon> = {
+export const LIST_ICON_COMPONENT: Record<TaskListIcon, AppIcon> = {
   inbox: Inbox,
   briefcase: Briefcase,
   home: Home,

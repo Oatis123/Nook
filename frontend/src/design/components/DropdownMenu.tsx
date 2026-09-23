@@ -24,7 +24,7 @@ export function DropdownMenu({
           align="start"
           sideOffset={6}
           className={[
-            'z-50 min-w-40 rounded-md border border-border bg-surface-raised p-1',
+            'ui-menu z-50 min-w-40 rounded-md border border-border bg-surface-raised p-1',
             'shadow-(--shadow-popover) animate-fade-in',
           ].join(' ')}
         >
@@ -32,9 +32,10 @@ export function DropdownMenu({
             <RadixDropdown.Item
               key={item.label}
               disabled={item.disabled}
+              data-danger={item.danger || undefined}
               onSelect={item.onSelect}
               className={clsx(
-                'cursor-pointer rounded px-2.5 py-1.5 text-sm outline-none',
+                'ui-menu-item cursor-pointer rounded px-2.5 py-1.5 text-sm outline-none',
                 'data-[highlighted]:bg-surface',
                 item.danger ? 'text-danger' : 'text-text',
                 item.disabled && 'opacity-50',

@@ -17,13 +17,13 @@ export function Tooltip({ label, children }: { label: string; children: ReactNod
         <RadixTooltip.Content
           sideOffset={6}
           className={[
-            'z-50 rounded-md border border-border bg-surface-raised px-2.5 py-1.5',
+            'ui-tooltip z-50 rounded-md border border-border bg-surface-raised px-2.5 py-1.5',
             'text-xs text-text shadow-(--shadow-popover)',
             'animate-fade-in',
           ].join(' ')}
         >
           {label}
-          <RadixTooltip.Arrow className="fill-surface-raised" />
+          <RadixTooltip.Arrow className="ui-tooltip-arrow fill-surface-raised" />
         </RadixTooltip.Content>
       </RadixTooltip.Portal>
     </RadixTooltip.Root>

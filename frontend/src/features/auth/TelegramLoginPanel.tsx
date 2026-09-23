@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { QrCode } from '@/design/components/QrCode'
 import {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Network } from 'lucide-react'
+import { Network } from '@/design/icons'
 import { clsx } from 'clsx'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Switch } from '@/design/components/Switch'

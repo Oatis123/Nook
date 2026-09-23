@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-import { FileText } from 'lucide-react'
+import { FileText } from '@/design/icons'
 import { AppShell } from '@/features/shell/AppShell'
 import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'

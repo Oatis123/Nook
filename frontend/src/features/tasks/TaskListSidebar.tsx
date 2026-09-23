@@ -1,7 +1,7 @@
 import { type DragEvent, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { Calendar, CalendarClock, CalendarRange, MoreHorizontal, Plus } from 'lucide-react'
+import { Calendar, CalendarClock, CalendarRange, MoreHorizontal, Plus } from '@/design/icons'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { useDeleteTaskList, useTaskLists, useUpdateTaskList } from '@/features/tasks/hooks'
@@ -14,7 +14,7 @@ const DRAG_MIME = 'application/x-nook-task-list'
 
 const fixedNavClass = ({ isActive }: { isActive: boolean }) =>
   clsx(
-    'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors duration-150',
+    'ui-nav-item flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors duration-150',
     isActive
       ? 'bg-surface-raised text-text'
       : 'text-text-muted hover:text-text hover:bg-surface-raised/60',
@@ -104,7 +104,7 @@ export function TaskListSidebar() {
             onDragLeave={() => setDragOverId((id) => (id === list.id ? null : id))}
             onDrop={(e) => handleDrop(e, list)}
             className={clsx(
-              'group flex items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+              'ui-nav-item group flex items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
               dragOverId === list.id && 'ring-1 ring-accent',
             )}
           >

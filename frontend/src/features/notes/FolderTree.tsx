@@ -8,7 +8,7 @@ import {
   FolderPlus,
   FilePlus,
   MoreHorizontal,
-} from 'lucide-react'
+} from '@/design/icons'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { updateNote as updateNoteApi } from '@/features/notes/api'
@@ -256,7 +256,7 @@ function FolderRow({
           onDropOn(e, node.folder.id)
         }}
         className={clsx(
-          'group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-text hover:bg-surface-raised',
+          'ui-nav-item group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-text hover:bg-surface-raised',
           dragOver && 'bg-surface-raised ring-1 ring-accent',
         )}
         style={{ paddingLeft: depth * 14 + 4 }}
@@ -375,8 +375,9 @@ function NoteRow({
           JSON.stringify({ type: 'note', id: note.id } satisfies DragPayload),
         )
       }
+      data-active={active || undefined}
       className={clsx(
-        'group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        'ui-nav-item group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
         active ? 'bg-surface-raised text-text' : 'text-text-muted',
       )}
       style={{ paddingLeft: depth * 14 + 22 }}

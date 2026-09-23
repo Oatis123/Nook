@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Send } from 'lucide-react'
+import { Send } from '@/design/icons'
 import { APP_NAME } from '@/lib/env'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/design/components/Button'

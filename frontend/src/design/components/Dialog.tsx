@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
-import { X } from 'lucide-react'
+import { X } from '@/design/icons'
 
 interface DialogProps {
   /** Omit for a fully controlled dialog (opened programmatically via `open`/`onOpenChange`). */
@@ -17,17 +17,17 @@ export function Dialog({ trigger, title, description, children, open, onOpenChan
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/30 animate-fade-in" />
+        <RadixDialog.Overlay className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in" />
         <RadixDialog.Content
           className={[
-            'fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2',
-            'rounded-lg border border-border bg-surface-raised p-5 shadow-(--shadow-popover)',
+            'ui-dialog fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-md -translate-x-1/2 -translate-y-1/2',
+            'rounded-(--radius-dialog) border border-border bg-surface-raised p-5 shadow-(--shadow-dialog)',
             'animate-fade-in',
           ].join(' ')}
         >
-          <div className="mb-3 flex items-start justify-between gap-4">
+          <div className="ui-dialog-header mb-3 flex items-start justify-between gap-4">
             <div>
-              <RadixDialog.Title className="font-serif text-lg text-text">
+              <RadixDialog.Title className="ui-dialog-title font-serif text-lg text-text">
                 {title}
               </RadixDialog.Title>
               {description && (
@@ -39,7 +39,7 @@ export function Dialog({ trigger, title, description, children, open, onOpenChan
             <RadixDialog.Close asChild>
               <button
                 aria-label="Close"
-                className="rounded-md p-1 text-text-muted hover:bg-surface hover:text-text"
+                className="ui-dialog-close rounded-md p-1 text-text-muted hover:bg-surface hover:text-text"
               >
                 <X size={16} strokeWidth={1.5} />
               </button>

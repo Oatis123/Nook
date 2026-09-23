@@ -13,7 +13,7 @@ import {
   Search,
   Settings,
   Trash2,
-} from 'lucide-react'
+} from '@/design/icons'
 import { useUIStore } from '@/lib/ui-store'
 import { fuzzyFilter } from '@/lib/fuzzy'
 import { useCreateNote, useNotes } from '@/features/notes/hooks'
@@ -158,11 +158,11 @@ export function CommandPalette() {
   return (
     <RadixDialog.Root open={open} onOpenChange={setOpen}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 z-50 bg-black/30 animate-fade-in" />
+        <RadixDialog.Overlay className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in" />
         <RadixDialog.Content
           className={[
-            'fixed left-1/2 top-[20vh] z-50 w-[90vw] max-w-lg -translate-x-1/2',
-            'rounded-lg border border-border bg-surface-raised shadow-(--shadow-popover)',
+            'ui-palette fixed left-1/2 top-[20vh] z-50 w-[90vw] max-w-lg -translate-x-1/2',
+            'rounded-(--radius-dialog) border border-border bg-surface-raised shadow-(--shadow-dialog)',
             'animate-fade-in',
           ].join(' ')}
           onKeyDown={handleKeyDown}
@@ -189,7 +189,7 @@ export function CommandPalette() {
                   onClick={entry.onSelect}
                   onMouseEnter={() => setActiveIndex(i)}
                   className={[
-                    'flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors duration-100',
+                    'ui-palette-item flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors duration-100',
                     i === activeIndex ? 'bg-accent/15 text-text' : 'text-text hover:bg-surface',
                   ].join(' ')}
                 >

@@ -15,7 +15,7 @@ import {
   subMonths,
   subWeeks,
 } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Repeat } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { useCalendar, useUpdateTask } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR } from '@/features/tasks/priority'

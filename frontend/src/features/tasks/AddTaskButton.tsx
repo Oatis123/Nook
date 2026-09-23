@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus } from '@/design/icons'
 import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
 
 function isTypingInField(target: EventTarget | null): boolean {

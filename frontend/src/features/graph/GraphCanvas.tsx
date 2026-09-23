@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ForceGraph2D, { type NodeObject } from 'react-force-graph-2d'
-import { useResolvedTheme } from '@/lib/theme'
+import { useResolvedTheme, useThemeStore } from '@/lib/theme'
 import { useElementSize } from '@/lib/useElementSize'
 import { useCreateNote } from '@/features/notes/hooks'
 import { colorForKey } from '@/features/graph/colors'
@@ -13,9 +13,16 @@ function nodeRadius(linkCount: number): number {
   return 3 + Math.sqrt(Math.max(linkCount, 0)) * 2
 }
 
+// Color tokens are light-dark() expressions, so the raw custom-property text isn't a
+// usable canvas color — resolve it through a probe element's computed `color` instead.
 function readCssVar(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  const probe = document.createElement('span')
+  probe.style.color = `var(${name})`
+  probe.style.display = 'none'
+  document.body.appendChild(probe)
+  const value = getComputedStyle(probe).color
+  probe.remove()
   return value || fallback
 }
 
@@ -31,6 +38,7 @@ export function GraphCanvas({
   const navigate = useNavigate()
   const createNote = useCreateNote()
   const theme = useResolvedTheme()
+  const skin = useThemeStore((s) => s.skin)
   const hoverNodeIdRef = useRef<string | null>(null)
   // react-force-graph auto-detects its canvas width from the nearest ancestor with a
   // definite width — inside a narrow flex/aside column (the local graph panel) that
@@ -45,7 +53,9 @@ export function GraphCanvas({
       accent: readCssVar('--accent', theme === 'dark' ? '#d9805a' : '#c2663f'),
       border: readCssVar('--border', theme === 'dark' ? '#363430' : '#e5e2d9'),
     }),
-    [theme],
+    // skin isn't read inside — it's listed because switching it changes the tokens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [theme, skin],
   )
 
   const adjacency = useMemo(() => {

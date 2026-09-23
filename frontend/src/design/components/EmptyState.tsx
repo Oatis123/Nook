@@ -1,4 +1,4 @@
-import type { LucideIcon } from 'lucide-react'
+import type { AppIcon } from '@/design/icons'
 import type { ReactNode } from 'react'
 
 export function EmptyState({
@@ -6,7 +6,7 @@ export function EmptyState({
   title,
   action,
 }: {
-  icon: LucideIcon
+  icon: AppIcon
   title: string
   action?: ReactNode
 }) {

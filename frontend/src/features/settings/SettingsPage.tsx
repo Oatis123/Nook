@@ -1,8 +1,10 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, Plus, Upload } from 'lucide-react'
+import { Copy, Download, Plus, Upload } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
+import { ThemeSkinPicker } from '@/design/components/ThemeSkinPicker'
+import { ThemeToggle } from '@/design/components/ThemeToggle'
 import { ApiError } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import {
@@ -28,6 +30,24 @@ function timezoneOptions(): string[] {
   }
 }
 
+function AppearanceSection() {
+  return (
+    <section className="border-b border-border py-8 first:pt-0">
+      <h2 className="mb-4 font-serif text-lg text-text">Appearance</h2>
+      <div className="flex flex-col gap-5">
+        <div>
+          <p className="mb-2 text-sm text-text-muted">Theme</p>
+          <ThemeSkinPicker />
+        </div>
+        <div>
+          <p className="mb-2 text-sm text-text-muted">Mode</p>
+          <ThemeToggle />
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function ProfileSection() {
   const { data: user } = useCurrentUser()
   const updateProfile = useUpdateProfile()
@@ -35,7 +55,7 @@ function ProfileSection() {
   if (!user) return null
 
   return (
-    <section className="border-b border-border py-8 first:pt-0">
+    <section className="border-b border-border py-8">
       <h2 className="mb-4 font-serif text-lg text-text">Profile</h2>
       <div className="flex flex-col gap-1.5 max-w-xs">
         <label htmlFor="timezone" className="text-sm text-text-muted">
@@ -444,6 +464,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-xl px-6 py-8">
       <h1 className="mb-2 font-serif text-2xl text-text">Settings</h1>
+      <AppearanceSection />
       <ProfileSection />
       <TelegramSection />
       <ApiTokensSection />

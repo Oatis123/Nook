@@ -1,5 +1,5 @@
 import { type ChangeEvent, useRef } from 'react'
-import { Paperclip, Upload } from 'lucide-react'
+import { Paperclip, Upload } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Button } from '@/design/components/Button'
 import { formatDateTime, formatFileSize } from '@/lib/format'

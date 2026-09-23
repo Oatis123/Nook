@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { Check, Copy, Mail, Plus } from 'lucide-react'
+import { Check, Copy, Mail, Plus } from '@/design/icons'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'

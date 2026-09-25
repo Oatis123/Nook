@@ -20,6 +20,7 @@ export function ConflictDialog({
   return (
     <Dialog
       open={open}
+      dismissible={false}
       title="This note changed elsewhere"
       description="It was edited in another session since you started. Choose which version to keep."
     >

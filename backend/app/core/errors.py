@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -16,6 +16,16 @@ _CODE_BY_STATUS = {
     422: "validation_error",
     429: "rate_limited",
 }
+
+
+class CodedHTTPException(HTTPException):
+    """An HTTPException with a specific machine-readable `code` in the error body, for
+    cases the client must tell apart that share a status (e.g. the note editor treats a
+    409 version conflict very differently from a 409 duplicate title)."""
+
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        super().__init__(status_code, message)
+        self.code = code
 
 
 def _error_response(status_code: int, code: str, message: str, details: Any = None) -> JSONResponse:
@@ -42,7 +52,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     async def http_exception_handler(
         _request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
-        code = _CODE_BY_STATUS.get(exc.status_code, "error")
+        code = getattr(exc, "code", None) or _CODE_BY_STATUS.get(exc.status_code, "error")
         return _error_response(exc.status_code, code, str(exc.detail))
 
     @app.exception_handler(RequestValidationError)

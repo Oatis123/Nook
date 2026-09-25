@@ -6,6 +6,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import CodedHTTPException
 from app.core.isolation import get_owned_or_404
 from app.models.folder import Folder
 from app.models.note import ACTIVE_TITLE_INDEX, Note
@@ -26,6 +27,10 @@ DUPLICATE_TITLE_MESSAGE = "A note with this title already exists in this folder"
 
 def _is_duplicate_title(exc: IntegrityError) -> bool:
     return ACTIVE_TITLE_INDEX in str(exc.orig)
+
+
+def _duplicate_title() -> HTTPException:
+    return CodedHTTPException(status.HTTP_409_CONFLICT, "duplicate_title", DUPLICATE_TITLE_MESSAGE)
 
 
 async def _validate_folder(
@@ -55,7 +60,7 @@ async def _check_title_unique(
         query = query.where(Note.id != exclude_note_id)
     existing = await session.scalar(query)
     if existing is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_TITLE_MESSAGE)
+        raise _duplicate_title()
 
 
 async def purge_old_trash(session: AsyncSession, user_id: uuid.UUID) -> None:
@@ -117,7 +122,7 @@ async def create_note(
         # Lost the race against a concurrent create of the same title.
         await session.rollback()
         if _is_duplicate_title(exc):
-            raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_TITLE_MESSAGE) from exc
+            raise _duplicate_title() from exc
         raise
     await session.refresh(note)
     await resolve_dangling_links_to(session, user_id, note)
@@ -171,10 +176,12 @@ async def update_note(
     # instead of silently overwriting the first (lost update).
     await session.refresh(note, with_for_update=True)
     if note.deleted_at is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, "Note is in trash")
+        raise CodedHTTPException(status.HTTP_409_CONFLICT, "note_in_trash", "Note is in trash")
 
     if data.version != note.version:
-        raise HTTPException(status.HTTP_409_CONFLICT, "This note was changed elsewhere")
+        raise CodedHTTPException(
+            status.HTTP_409_CONFLICT, "version_conflict", "This note was changed elsewhere"
+        )
 
     new_folder_id = None if data.move_to_root else (data.folder_id or note.folder_id)
     folder_changing = data.move_to_root or data.folder_id is not None
@@ -203,7 +210,7 @@ async def update_note(
     except IntegrityError as exc:
         await session.rollback()
         if _is_duplicate_title(exc):
-            raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_TITLE_MESSAGE) from exc
+            raise _duplicate_title() from exc
         raise
     await session.refresh(note)
 

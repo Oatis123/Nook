@@ -237,3 +237,28 @@ async def test_import_continues_after_unexpected_entry_error(
     assert job["report"]["notes_imported"] == 1
     assert job["report"]["errors"] == ['"Broken.md": could not be imported']
     assert "secret" not in str(job["report"])
+
+
+async def test_note_conflicts_have_distinct_error_codes(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+    await _create_note(client, "Taken")
+    note = (await _create_note(client, "Mine")).json()
+    csrf = await csrf_token(client)
+
+    duplicate = await client.patch(
+        f"/api/v1/notes/{note['id']}",
+        json={"version": note["version"], "title": "Taken"},
+        headers={"x-csrf-token": csrf},
+    )
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "duplicate_title"
+
+    stale = await client.patch(
+        f"/api/v1/notes/{note['id']}",
+        json={"version": note["version"] + 5, "content": "x"},
+        headers={"x-csrf-token": csrf},
+    )
+    assert stale.json()["error"]["code"] == "version_conflict"

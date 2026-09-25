@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { type DragEvent, type FormEvent, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
@@ -30,6 +31,8 @@ import {
   useUpdateNote,
 } from '@/features/notes/hooks'
 import { QueryState } from '@/design/components/QueryState'
+import { errorMessage } from '@/lib/errors'
+import { toast } from '@/lib/toast'
 
 type DragPayload = { type: 'note' | 'folder'; id: string }
 const DRAG_MIME = 'application/x-nook-item'
@@ -37,6 +40,7 @@ const DRAG_MIME = 'application/x-nook-item'
 export function FolderTree() {
   const foldersQuery = useFolders()
   const notesQuery = useNotes()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { noteId: activeNoteId } = useParams<{ noteId: string }>()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -63,12 +67,19 @@ export function FolderTree() {
 
   async function moveNoteToFolder(note: NoteSummary, folderId: string | null) {
     if (note.folder_id === folderId) return
-    await updateNoteApi(note.id, {
-      version: note.version,
-      folder_id: folderId,
-      move_to_root: folderId === null,
-    })
-    notesQuery.refetch()
+    try {
+      await updateNoteApi(note.id, {
+        version: note.version,
+        folder_id: folderId,
+        move_to_root: folderId === null,
+      })
+    } catch (error) {
+      toast.error(errorMessage(error))
+    }
+    // The ['notes'] prefix also covers the moved note's own detail query, so an open
+    // editor picks up the bumped version instead of hitting a false conflict on its
+    // next save.
+    queryClient.invalidateQueries({ queryKey: ['notes'] })
   }
 
   function moveToFolder(payload: DragPayload, folderId: string | null) {

@@ -25,6 +25,7 @@ import { DropdownMenu } from '@/design/components/DropdownMenu'
 import { CommandPalette } from '@/features/shell/CommandPalette'
 import { useCurrentUser, useLogout } from '@/features/auth/hooks'
 import { ConnectionBanner } from '@/features/shell/ConnectionBanner'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import { FolderTree } from '@/features/notes/FolderTree'
 import { TagList } from '@/features/notes/TagList'
 import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
@@ -51,6 +52,7 @@ export function AppShell() {
   const section = location.pathname.startsWith('/tasks') ? 'tasks' : 'notes'
   const { data: user } = useCurrentUser()
   const logout = useLogout()
+  const isDesktop = useMediaQuery('(min-width: 768px)')
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -255,7 +257,7 @@ export function AppShell() {
               rightPanelOpen ? 'w-72' : 'w-0 overflow-hidden',
             )}
           >
-            <ContextPanelContent noteId={noteId} />
+            {rightPanelOpen && isDesktop && <ContextPanelContent noteId={noteId} />}
           </aside>
         </div>
       </div>
@@ -277,7 +279,9 @@ export function AppShell() {
         <div className="flex justify-center pt-2">
           <div className="h-1 w-10 rounded-full bg-border" />
         </div>
-        <ContextPanelContent noteId={noteId} />
+        {/* Only one copy of the panel is ever mounted (its graph/backlink queries aren't
+            free), and only while it's actually open. */}
+        {rightPanelOpen && !isDesktop && <ContextPanelContent noteId={noteId} />}
       </div>
 
       <CommandPalette />

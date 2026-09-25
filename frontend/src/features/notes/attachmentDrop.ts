@@ -6,14 +6,14 @@ import { EditorView } from '@codemirror/view'
  * React onPaste/onDrop can't preempt CM's default "insert as text" behavior. Returning
  * `true` from these handlers is what stops that default handling. */
 export function createAttachmentDropHandler(
-  uploadAndInsert: (files: File[], pos: number | 'cursor') => void,
+  uploadAndInsert: (files: File[], pos: number | 'cursor', view: EditorView) => void,
 ) {
   return EditorView.domEventHandlers({
-    paste(event) {
+    paste(event, view) {
       const files = Array.from(event.clipboardData?.files ?? [])
       if (files.length === 0) return false
       event.preventDefault()
-      uploadAndInsert(files, 'cursor')
+      uploadAndInsert(files, 'cursor', view)
       return true
     },
     drop(event, view) {
@@ -21,7 +21,7 @@ export function createAttachmentDropHandler(
       if (files.length === 0) return false
       event.preventDefault()
       const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
-      uploadAndInsert(files, pos ?? 'cursor')
+      uploadAndInsert(files, pos ?? 'cursor', view)
       return true
     },
   })

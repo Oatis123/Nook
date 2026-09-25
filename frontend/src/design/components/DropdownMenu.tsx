@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import * as RadixDropdown from '@radix-ui/react-dropdown-menu'
 import { clsx } from 'clsx'
+import { rememberMenuTrigger } from '@/lib/focusReturn'
 
 export interface DropdownMenuItem {
   label: string
@@ -18,7 +19,13 @@ export function DropdownMenu({
 }) {
   return (
     <RadixDropdown.Root>
-      <RadixDropdown.Trigger asChild>{trigger}</RadixDropdown.Trigger>
+      <RadixDropdown.Trigger
+        asChild
+        onPointerDown={(e) => rememberMenuTrigger(e.currentTarget as HTMLElement)}
+        onKeyDown={(e) => rememberMenuTrigger(e.currentTarget as HTMLElement)}
+      >
+        {trigger}
+      </RadixDropdown.Trigger>
       <RadixDropdown.Portal>
         <RadixDropdown.Content
           align="start"

@@ -1,6 +1,8 @@
-import type { ReactNode } from 'react'
+import { type ReactNode, useRef } from 'react'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import { X } from '@/design/icons'
+import { focusReturnFallback } from '@/lib/focusReturn'
+import { toastPointerEvents } from '@/lib/toast'
 
 interface DialogProps {
   /** Omit for a fully controlled dialog (opened programmatically via `open`/`onOpenChange`). */
@@ -23,6 +25,11 @@ export function Dialog({
   onOpenChange,
   dismissible = true,
 }: DialogProps) {
+  // Dialogs opened programmatically (no trigger) put focus back where it was when they
+  // opened — Radix can only do that for its own trigger — so keyboard users aren't
+  // dropped at the top of the page.
+  const returnFocusRef = useRef<HTMLElement | null>(null)
+
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
@@ -30,7 +37,34 @@ export function Dialog({
         <RadixDialog.Overlay className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in" />
         <RadixDialog.Content
           onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
-          onInteractOutside={dismissible ? undefined : (e) => e.preventDefault()}
+          onInteractOutside={(e) => {
+            // Dismissing a toast (e.g. the error from this very dialog's submit) must
+            // not close the dialog and throw away what was typed in it.
+            const onToast = toastPointerEvents.has(e.detail.originalEvent)
+            if (!dismissible || onToast) e.preventDefault()
+          }}
+          onOpenAutoFocus={(e) => {
+            returnFocusRef.current = document.activeElement as HTMLElement | null
+            // An element marked data-autofocus (the confirm button, the first field)
+            // gets focus instead of the close button.
+            const preferred = (e.currentTarget as HTMLElement | null)?.querySelector<HTMLElement>(
+              '[data-autofocus]',
+            )
+            if (preferred) {
+              e.preventDefault()
+              preferred.focus()
+            }
+          }}
+          onCloseAutoFocus={(e) => {
+            if (trigger) return
+            const target = returnFocusRef.current?.isConnected
+              ? returnFocusRef.current
+              : focusReturnFallback()
+            if (target && target !== document.body) {
+              e.preventDefault()
+              target.focus()
+            }
+          }}
           className={[
             'ui-dialog fixed z-50 overflow-y-auto overscroll-contain border border-border bg-surface-raised p-5 shadow-(--shadow-dialog) animate-fade-in',
             // Phones: a bottom sheet that never runs off-screen — a tall form (e.g. a

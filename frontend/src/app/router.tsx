@@ -24,6 +24,8 @@ export const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     errorElement: <RouteError />,
+    // Shown while a lazily loaded page's code arrives on a direct visit or reload.
+    hydrateFallbackElement: <p className="p-6 text-sm text-text-muted">Loading…</p>,
     children: [
       {
         path: '/',

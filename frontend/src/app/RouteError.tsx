@@ -1,7 +1,7 @@
 import { isRouteErrorResponse, useRouteError } from 'react-router-dom'
 import { AlertTriangle } from '@/design/icons'
 import { Button } from '@/design/components/Button'
-import { errorMessage, isConnectionError } from '@/lib/errors'
+import { errorMessage, isConnectionError, isStaleChunkError } from '@/lib/errors'
 
 /** Router-level error boundary: replaces React Router's developer error page ("Hey
  * developer 👋", stack trace) with something a user can act on. */
@@ -11,6 +11,8 @@ export function RouteError() {
 
   let message = 'Something went wrong while showing this page.'
   if (notFound) message = "This page doesn't exist."
+  else if (isStaleChunkError(error))
+    message = 'A new version of the app is available. Reload to continue.'
   else if (isConnectionError(error)) message = errorMessage(error)
 
   return (

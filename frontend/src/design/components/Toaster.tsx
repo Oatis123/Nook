@@ -1,6 +1,6 @@
 import { clsx } from 'clsx'
 import { AlertTriangle, Check, X } from '@/design/icons'
-import { useToastStore } from '@/lib/toast'
+import { toastPointerEvents, useToastStore } from '@/lib/toast'
 
 /** Bottom-of-screen notifications for background failures (a save or action that went
  * wrong without a form of its own to show the error in). */
@@ -11,7 +11,10 @@ export function Toaster() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed inset-x-4 bottom-4 z-[100] flex flex-col items-center gap-2 sm:inset-x-auto sm:right-4 sm:items-end"
+      data-toaster
+      onPointerDownCapture={(e) => toastPointerEvents.add(e.nativeEvent)}
+      // Top on phones, where the bottom is taken by dialog sheets and their buttons.
+      className="pointer-events-none fixed inset-x-4 top-4 z-[100] flex flex-col items-center gap-2 sm:inset-x-auto sm:top-auto sm:bottom-4 sm:right-4 sm:items-end"
     >
       {toasts.map((t) => (
         <div

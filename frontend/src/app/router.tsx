@@ -18,18 +18,21 @@ import TodayView from '@/features/tasks/TodayView'
 import UpcomingView from '@/features/tasks/UpcomingView'
 import ListView from '@/features/tasks/ListView'
 import CalendarPage from '@/features/tasks/CalendarPage'
+import { RouteError } from '@/app/RouteError'
 
 const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
 
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
-  { path: '/invite/:token', element: <InviteAcceptPage /> },
+  { path: '/login', element: <LoginPage />, errorElement: <RouteError /> },
+  { path: '/invite/:token', element: <InviteAcceptPage />, errorElement: <RouteError /> },
   {
     element: <RequireAuth />,
+    errorElement: <RouteError />,
     children: [
       {
         path: '/',
         element: <AppShell />,
+        errorElement: <RouteError />,
         children: [
           {
             index: true,
@@ -51,6 +54,10 @@ export const router = createBrowserRouter([
           { path: 'attachments', element: <AttachmentsPage /> },
           { path: 'trash', element: <TrashPage /> },
           { path: 'settings', element: <SettingsPage /> },
+          {
+            path: '*',
+            element: <PlaceholderPage icon={FileText} title="This page doesn't exist" />,
+          },
           {
             element: <RequireAdmin />,
             children: [{ path: 'admin', element: <AdminPage /> }],

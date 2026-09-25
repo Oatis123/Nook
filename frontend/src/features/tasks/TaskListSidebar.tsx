@@ -9,6 +9,7 @@ import { LIST_ICON_COMPONENT, listColorVar } from '@/features/tasks/listStyle'
 import { TaskListEditDialog } from '@/features/tasks/TaskListEditDialog'
 import { DeleteTaskListDialog } from '@/features/tasks/DeleteTaskListDialog'
 import type { TaskList } from '@/lib/types'
+import { QueryState } from '@/design/components/QueryState'
 
 const DRAG_MIME = 'application/x-nook-task-list'
 
@@ -30,7 +31,7 @@ export function TaskListSidebar() {
   const [showArchived, setShowArchived] = useState(false)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
 
-  if (!taskListsQuery.data) return null
+  if (!taskListsQuery.data) return <QueryState query={taskListsQuery} compact />
 
   const active = taskListsQuery.data
     .filter((l) => !l.archived_at)

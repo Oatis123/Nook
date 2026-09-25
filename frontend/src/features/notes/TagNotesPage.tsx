@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { FileText, Hash } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useNotes } from '@/features/notes/hooks'
+import { QueryState } from '@/design/components/QueryState'
 
 export default function TagNotesPage() {
   const { name } = useParams<{ name: string }>()
@@ -9,7 +10,7 @@ export default function TagNotesPage() {
   const notes = useNotes({ tag: name })
 
   if (!name) return null
-  if (!notes.data) return null
+  if (!notes.data) return <QueryState query={notes} />
 
   if (notes.data.length === 0) {
     return <EmptyState icon={Hash} title={`No notes tagged #${name}`} />

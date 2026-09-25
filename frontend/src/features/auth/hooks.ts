@@ -4,20 +4,31 @@ import { ApiError } from '@/lib/api'
 
 export const meQueryKey = ['me'] as const
 
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401
+}
+
 export function useCurrentUser(options: { poll?: boolean } = {}) {
   return useQuery({
     queryKey: meQueryKey,
     queryFn: authApi.getMe,
-    retry: false,
+    // 401 is a real answer (signed out). Anything else — server restarting, network
+    // blip — is retried, and while it keeps failing the query polls so the app recovers
+    // (and the "can't reach the server" banner clears) on its own. It never throws into
+    // the error boundary: a deploy used to replace the whole app with an error page.
+    retry: (failureCount, error) => !isUnauthorized(error) && failureCount < 2,
     staleTime: 60_000,
-    refetchInterval: options.poll ? 2000 : false,
-    throwOnError: (error) => !(error instanceof ApiError && error.status === 401),
+    refetchInterval: (query) => {
+      if (query.state.status === 'error' && !isUnauthorized(query.state.error)) return 5000
+      return options.poll ? 2000 : false
+    },
   })
 }
 
 export function useLogin() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { silent: true },
     mutationFn: ({ username, password }: { username: string; password: string }) =>
       authApi.login(username, password),
     onSuccess: (user) => {
@@ -40,6 +51,7 @@ export function useLogout() {
 export function useAcceptInvite() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { silent: true },
     mutationFn: authApi.acceptInvite,
     onSuccess: (user) => {
       queryClient.setQueryData(meQueryKey, user)
@@ -105,7 +117,10 @@ export function useRevokeApiToken() {
 }
 
 export function useCreateTelegramLinkToken() {
-  return useMutation({ mutationFn: authApi.createTelegramLinkToken })
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: authApi.createTelegramLinkToken,
+  })
 }
 
 export function useUnlinkTelegram() {
@@ -143,6 +158,7 @@ export function useUpdateProfile() {
 
 export function useChangePassword() {
   return useMutation({
+    meta: { silent: true },
     mutationFn: ({
       currentPassword,
       newPassword,

@@ -1,20 +1,22 @@
 import { type FormEvent, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { Send } from '@/design/icons'
 import { APP_NAME } from '@/lib/env'
 import { ApiError } from '@/lib/api'
+import { safeNextPath } from '@/lib/nav'
 import { Button } from '@/design/components/Button'
 import { useCurrentUser, useLogin } from '@/features/auth/hooks'
 import { TelegramLoginPanel } from '@/features/auth/TelegramLoginPanel'
 
 export default function LoginPage() {
   const { data: user, isLoading: userLoading } = useCurrentUser()
+  const [searchParams] = useSearchParams()
   const login = useLogin()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showTelegram, setShowTelegram] = useState(false)
 
-  if (!userLoading && user) return <Navigate to="/" replace />
+  if (!userLoading && user) return <Navigate to={safeNextPath(searchParams.get('next'))} replace />
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

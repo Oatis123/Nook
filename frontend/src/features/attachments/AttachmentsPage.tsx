@@ -10,6 +10,7 @@ import {
   useDeleteAttachment,
   useUploadAttachment,
 } from '@/features/attachments/hooks'
+import { QueryState } from '@/design/components/QueryState'
 
 export default function AttachmentsPage() {
   const attachments = useAttachments()
@@ -24,7 +25,7 @@ export default function AttachmentsPage() {
     e.target.value = ''
   }
 
-  if (!attachments.data) return null
+  if (!attachments.data) return <QueryState query={attachments} />
 
   const unusedCount = attachments.data.filter((a) => a.used_by.length === 0).length
 

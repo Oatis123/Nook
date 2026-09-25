@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
+import { ListTodo } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Switch } from '@/design/components/Switch'
 import { useTaskLists, useTasks } from '@/features/tasks/hooks'
@@ -10,6 +11,7 @@ import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import { groupByDate, groupByPriority, noGrouping } from '@/features/tasks/groupTasks'
 import { LIST_ICON_COMPONENT, listColorVar } from '@/features/tasks/listStyle'
 import type { Task } from '@/lib/types'
+import { QueryState } from '@/design/components/QueryState'
 
 type GroupBy = 'none' | 'date' | 'priority'
 
@@ -23,8 +25,10 @@ export default function ListView() {
   const tasksQuery = useTasks({ listId, status: showCompleted ? 'all' : 'open' })
 
   if (!listId) return null
-  const list = taskListsQuery.data?.find((l) => l.id === listId)
-  if (!list || !tasksQuery.data) return null
+  if (!taskListsQuery.data) return <QueryState query={taskListsQuery} />
+  const list = taskListsQuery.data.find((l) => l.id === listId)
+  if (!list) return <EmptyState icon={ListTodo} title="This list doesn't exist or was deleted." />
+  if (!tasksQuery.data) return <QueryState query={tasksQuery} />
 
   const Icon = LIST_ICON_COMPONENT[list.icon]
   const groups =

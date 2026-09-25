@@ -79,6 +79,7 @@ export function useUpdateTask() {
 export function useCompleteTask() {
   const invalidate = useInvalidateTasks()
   return useMutation({
+    meta: { handledStatuses: [409] },
     mutationFn: ({ id, completeSubtasks }: { id: string; completeSubtasks?: boolean }) =>
       tasksApi.completeTask(id, completeSubtasks),
     onSuccess: invalidate,

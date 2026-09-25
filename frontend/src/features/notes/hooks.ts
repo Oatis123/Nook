@@ -85,6 +85,7 @@ export function useUpdateNote(id: string) {
   const queryClient = useQueryClient()
   const invalidate = useInvalidateNotesAndTags()
   return useMutation({
+    meta: { silent: true },
     mutationFn: (input: Parameters<typeof notesApi.updateNote>[1]) =>
       notesApi.updateNote(id, input),
     onSuccess: (note) => {

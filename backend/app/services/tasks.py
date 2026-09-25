@@ -216,8 +216,8 @@ async def update_task(
     if data.priority is not None:
         task.priority = data.priority
 
-    due_date = task.due_date
-    due_time = task.due_time
+    old_due_date = due_date = task.due_date
+    old_due_time = due_time = task.due_time
     if data.clear_due_date:
         due_date, due_time = None, None
     elif data.due_date is not None:
@@ -236,10 +236,23 @@ async def update_task(
     if data.position is not None:
         task.position = data.position
 
+    schedule_changed = (due_date, due_time) != (old_due_date, old_due_time)
     if data.clear_recurrence:
         _clear_recurrence(task)
     elif data.recurrence is not None:
         _apply_recurrence(task, data.recurrence)
+    elif task.is_recurring and (task.due_date is None or task.due_time is None):
+        # A recurring task needs both (see _apply_recurrence); clearing either used to
+        # leave a half-recurring task that 500'd on complete/skip.
+        _clear_recurrence(task)
+    elif task.is_recurring and task.rrule and schedule_changed:
+        # Re-anchor the series on the new date/time, otherwise the next occurrence would
+        # snap back to the old time of day (the RRULE is expanded from dtstart_local).
+        assert task.due_date is not None and task.due_time is not None
+        task.dtstart_local = datetime.combine(task.due_date, task.due_time)
+        task.recurrence_end = recurrence_service.compute_recurrence_end(
+            task.rrule, task.dtstart_local
+        )
 
     await reminders_service.recompute_reminders_for_task(session, task)
     await session.commit()
@@ -272,7 +285,7 @@ async def complete_task(
         subtask.completed_at = now
         await reminders_service.recompute_reminders_for_task(session, subtask, now=now)
 
-    if task.is_recurring and task.rrule and task.dtstart_local:
+    if _is_recurring(task):
         _advance_recurring_task(session, task, now, skipped=False)
     else:
         task.status = TaskStatus.done
@@ -282,6 +295,10 @@ async def complete_task(
     await session.commit()
     await session.refresh(task)
     return task
+
+
+def _is_recurring(task: Task) -> bool:
+    return bool(task.is_recurring and task.rrule and task.dtstart_local and task.due_date)
 
 
 def _advance_recurring_task(
@@ -310,7 +327,7 @@ async def skip_task_occurrence(
     task = await get_owned_or_404(session, Task, task_id, user_id)
     if task.deleted_at is not None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
-    if not task.is_recurring or not task.rrule or not task.dtstart_local:
+    if not _is_recurring(task):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task is not recurring")
 
     now = datetime.now(UTC)

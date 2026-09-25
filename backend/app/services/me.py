@@ -11,7 +11,9 @@ from app.services.auth import revoke_all_sessions
 
 
 async def update_profile(session: AsyncSession, user: User, data: MeUpdate) -> User:
-    updates = data.model_dump(exclude_unset=True)
+    # exclude_none: an explicit null means "no change" — every one of these columns is
+    # NOT NULL, so writing it through used to fail with an IntegrityError (500).
+    updates = data.model_dump(exclude_unset=True, exclude_none=True)
     for field, value in updates.items():
         setattr(user, field, value)
 

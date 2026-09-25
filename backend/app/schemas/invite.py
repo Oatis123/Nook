@@ -2,7 +2,9 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.validation import validate_timezone
 
 
 class InviteStatus(StrEnum):
@@ -37,6 +39,12 @@ class InviteAcceptRequest(BaseModel):
     username: str
     password: str
     timezone: str
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str) -> str:
+        # Empty means "not detected" and falls back to UTC in the service.
+        return validate_timezone(value) if value else value
 
 
 class InvitePreview(BaseModel):

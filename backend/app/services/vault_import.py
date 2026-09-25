@@ -81,6 +81,33 @@ async def process_pending_import_jobs(session: AsyncSession) -> int:
     return len(jobs)
 
 
+INTERRUPTED_MESSAGE = (
+    "The import was interrupted by a server restart. Notes imported before that were kept; "
+    "upload the archive again to import the rest (existing titles get renamed, not replaced)."
+)
+
+
+async def fail_interrupted_import_jobs(session: AsyncSession) -> int:
+    """Called once when the worker starts: a job still `processing` then was cut off by a
+    restart (the worker is the only thing that processes imports) and would otherwise
+    show as in-progress forever. It's failed rather than re-queued, since re-running it
+    would duplicate the notes it had already imported."""
+    jobs = list(
+        await session.scalars(
+            select(ImportJob).where(ImportJob.status == ImportJobStatus.processing)
+        )
+    )
+    for job in jobs:
+        report = dict(job.report or {})
+        report["errors"] = [*report.get("errors", []), INTERRUPTED_MESSAGE]
+        job.report = report
+        job.status = ImportJobStatus.failed
+        job.finished_at = datetime.now(UTC)
+        _zip_path(job.id).unlink(missing_ok=True)
+    await session.commit()
+    return len(jobs)
+
+
 def _is_safe_entry(name: str) -> bool:
     parts = PurePosixPath(name).parts
     return not PurePosixPath(name).is_absolute() and ".." not in parts

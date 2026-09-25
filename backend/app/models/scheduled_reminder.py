@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +28,13 @@ class ScheduledReminder(UUIDPKMixin, Base):
         UniqueConstraint(
             "task_id", "occurrence_at", "kind", name="uq_reminder_task_occurrence_kind"
         ),
+        # The worker polls only pending rows every 30s; a partial index stays small no
+        # matter how much sent/cancelled history accumulates.
+        Index(
+            "ix_scheduled_reminders_pending_remind_at",
+            "remind_at",
+            postgresql_where=text("status = 'pending'"),
+        ),
     )
 
     task_id: Mapped[uuid.UUID] = mapped_column(
@@ -37,7 +44,7 @@ class ScheduledReminder(UUIDPKMixin, Base):
     # recurrence occurrence) this reminder is about; the (task_id, occurrence_at, kind)
     # triple is what the unique constraint keys idempotency on (spec §8.4).
     occurrence_at: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
-    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     kind: Mapped[ReminderKind] = mapped_column(
         Enum(ReminderKind, name="reminder_kind"), nullable=False
     )

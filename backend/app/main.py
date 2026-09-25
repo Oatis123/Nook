@@ -2,12 +2,15 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import structlog
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import api_router
 from app.core.config import get_settings
 from app.core.cookies import CSRF_COOKIE, ensure_csrf_cookie
-from app.core.db import async_session_factory
+from app.core.db import async_session_factory, get_db
 from app.core.errors import register_exception_handlers
 from app.mcp.asgi import app as mcp_app
 from app.services.admin import bootstrap_admin_if_empty
@@ -53,8 +56,15 @@ async def csrf_cookie_middleware(
     return response
 
 
-@app.get("/health")
-async def health() -> dict[str, str]:
+@app.get("/health", response_model=None)
+async def health(session: AsyncSession = Depends(get_db)) -> dict[str, str] | JSONResponse:
+    """Liveness plus a database round-trip, so the compose healthcheck (and anything
+    gating on it: worker, bot, web) sees the API as down when Postgres is unreachable."""
+    try:
+        await session.execute(text("SELECT 1"))
+    except Exception:
+        log.exception("health.db_unreachable")
+        return JSONResponse(status_code=503, content={"status": "db_unavailable"})
     return {"status": "ok"}
 
 

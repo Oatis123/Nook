@@ -1,5 +1,6 @@
 import uuid
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import hash_password
 from app.core.validation import ValidationError, validate_password, validate_username
 from app.models.user import User, UserRole
+
+log = structlog.get_logger()
 
 
 async def create_admin(session: AsyncSession, username: str, password: str) -> User:
@@ -34,8 +37,10 @@ async def bootstrap_admin_if_empty(session: AsyncSession, username: str, passwor
 
     try:
         await create_admin(session, username, password)
-    except ValidationError:
-        return
+    except ValidationError as exc:
+        # Surfaced in the logs instead of silently skipped: otherwise a too-weak
+        # ADMIN_PASSWORD leaves a fresh install with no account and no hint why.
+        log.warning("admin.bootstrap_skipped", username=username, reason=str(exc))
 
 
 async def list_users(session: AsyncSession) -> list[User]:

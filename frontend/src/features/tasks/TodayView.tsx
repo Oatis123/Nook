@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CalendarClock } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
+import { useToday } from '@/features/tasks/useToday'
 import { AddTaskButton } from '@/features/tasks/AddTaskButton'
 import { TaskGroupedList } from '@/features/tasks/TaskGroupedList'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
@@ -12,10 +13,10 @@ import { QueryState } from '@/design/components/QueryState'
 export default function TodayView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const tasksQuery = useTasks({ view: 'today' })
+  const today = useToday()
 
   if (!tasksQuery.data) return <QueryState query={tasksQuery} />
 
-  const today = new Date().toISOString().slice(0, 10)
   const overdue = tasksQuery.data.filter((t) => t.due_date! < today)
   const dueToday = tasksQuery.data.filter((t) => t.due_date! === today)
   const groups: TaskGroup[] = [

@@ -75,7 +75,8 @@ export function TaskCreateDialog({
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const trimmed = title.trim()
-    if (!trimmed) return
+    // A double click (or Enter + click) used to create the task twice.
+    if (!trimmed || createTask.isPending) return
     createTask.mutate(
       {
         title: trimmed,
@@ -99,6 +100,8 @@ export function TaskCreateDialog({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Task title"
+          aria-label="Task title"
+          maxLength={500}
           className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
 
@@ -106,12 +109,14 @@ export function TaskCreateDialog({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Description (markdown, optional)"
+          aria-label="Description"
           rows={3}
           className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
 
         <div className="flex flex-wrap items-center gap-3">
           <select
+            aria-label="Priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
             className={selectClass}
@@ -130,6 +135,7 @@ export function TaskCreateDialog({
 
           <input
             type="date"
+            aria-label="Due date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
             className={selectClass}
@@ -137,6 +143,7 @@ export function TaskCreateDialog({
 
           <input
             type="time"
+            aria-label="Due time"
             value={dueTime}
             onChange={(e) => setDueTime(e.target.value)}
             className={selectClass}
@@ -144,6 +151,7 @@ export function TaskCreateDialog({
 
           {taskListsQuery.data && taskListsQuery.data.length > 0 && (
             <select
+              aria-label="List"
               value={selectedListId ?? ''}
               onChange={(e) => setSelectedListId(e.target.value)}
               className={selectClass}
@@ -206,8 +214,8 @@ export function TaskCreateDialog({
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary" disabled={!title.trim()}>
-            Create task
+          <Button type="submit" variant="primary" disabled={!title.trim() || createTask.isPending}>
+            {createTask.isPending ? 'Creating…' : 'Create task'}
           </Button>
         </div>
       </form>

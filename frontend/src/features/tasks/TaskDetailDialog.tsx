@@ -186,6 +186,27 @@ export function TaskDetailDialog({
   }
   if (!task) return null
 
+  // Title and description save on blur — but closing the dialog (Esc, the close button,
+  // clicking outside) unmounts the fields without a blur event, so closing saves too.
+  function saveTitle() {
+    const trimmed = title.trim()
+    if (trimmed && trimmed !== task!.title) updateTask.mutate({ id: task!.id, title: trimmed })
+  }
+
+  function saveDescription() {
+    if (description !== (task!.description ?? '')) {
+      updateTask.mutate({ id: task!.id, description })
+    }
+  }
+
+  function handleOpenChange(open: boolean) {
+    if (!open) {
+      saveTitle()
+      saveDescription()
+    }
+    onOpenChange(open)
+  }
+
   async function handleToggleDone() {
     if (task!.status === 'done') {
       reopenTask.mutate(task!.id)
@@ -202,7 +223,7 @@ export function TaskDetailDialog({
   }
 
   return (
-    <Dialog open={taskId !== null} onOpenChange={onOpenChange} title="Task">
+    <Dialog open={taskId !== null} onOpenChange={handleOpenChange} title="Task">
       <div className="flex flex-col gap-4">
         <div className="flex items-start gap-2.5">
           <button
@@ -219,11 +240,9 @@ export function TaskDetailDialog({
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            onBlur={() => {
-              if (title.trim() && title !== task.title) {
-                updateTask.mutate({ id: task.id, title: title.trim() })
-              }
-            }}
+            onBlur={saveTitle}
+            aria-label="Task title"
+            maxLength={500}
             className={clsx(
               'w-full bg-transparent text-base outline-none',
               task.status === 'done' ? 'text-text-muted line-through' : 'text-text',
@@ -234,11 +253,8 @@ export function TaskDetailDialog({
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          onBlur={() => {
-            if (description !== (task.description ?? '')) {
-              updateTask.mutate({ id: task.id, description })
-            }
-          }}
+          onBlur={saveDescription}
+          aria-label="Description"
           placeholder="Description (markdown)"
           rows={3}
           className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
@@ -246,6 +262,7 @@ export function TaskDetailDialog({
 
         <div className="flex flex-wrap items-center gap-3">
           <select
+            aria-label="Priority"
             value={task.priority}
             onChange={(e) =>
               updateTask.mutate({ id: task.id, priority: e.target.value as TaskPriority })
@@ -266,6 +283,7 @@ export function TaskDetailDialog({
 
           <input
             type="date"
+            aria-label="Due date"
             value={task.due_date ?? ''}
             onChange={(e) =>
               e.target.value
@@ -278,6 +296,7 @@ export function TaskDetailDialog({
           {task.due_date && (
             <input
               type="time"
+              aria-label="Due time"
               value={task.due_time?.slice(0, 5) ?? ''}
               onChange={(e) =>
                 e.target.value
@@ -290,6 +309,7 @@ export function TaskDetailDialog({
 
           {!task.parent_id && (
             <select
+              aria-label="List"
               value={task.list_id}
               onChange={(e) => updateTask.mutate({ id: task.id, list_id: e.target.value })}
               className={selectClass}

@@ -7,9 +7,7 @@ import {
   endOfMonth,
   endOfWeek,
   format,
-  isSameDay,
   isSameMonth,
-  isToday,
   startOfMonth,
   startOfWeek,
   subMonths,
@@ -21,6 +19,8 @@ import { useCalendar, useUpdateTask } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR } from '@/features/tasks/priority'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
+import { useToday } from '@/features/tasks/useToday'
+import { parseLocalDate } from '@/lib/dates'
 import type { CalendarEntry } from '@/lib/types'
 
 type ViewMode = 'month' | 'week'
@@ -92,7 +92,8 @@ export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<ViewMode>(() =>
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'week' : 'month',
   )
-  const [anchorDate, setAnchorDate] = useState(new Date())
+  const today = useToday()
+  const [anchorDate, setAnchorDate] = useState(() => parseLocalDate(today))
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)
   const [quickCreateDate, setQuickCreateDate] = useState<Date | null>(null)
@@ -136,7 +137,7 @@ export default function CalendarPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setAnchorDate(new Date())}>
+          <Button variant="ghost" size="sm" onClick={() => setAnchorDate(parseLocalDate(today))}>
             Today
           </Button>
           <IconNavButton
@@ -182,7 +183,7 @@ export default function CalendarPage() {
                 onClick={() => handleDayClick(day)}
                 className={clsx(
                   'flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left',
-                  isToday(day) ? 'text-accent' : 'text-text',
+                  format(day, 'yyyy-MM-dd') === today ? 'text-accent' : 'text-text',
                 )}
               >
                 <span className="text-sm font-medium">{format(day, 'EEE, MMM d')}</span>
@@ -233,7 +234,7 @@ export default function CalendarPage() {
               <span
                 className={clsx(
                   'self-start rounded-full px-1.5 text-xs',
-                  isSameDay(day, new Date()) && isToday(day)
+                  format(day, 'yyyy-MM-dd') === today
                     ? 'bg-accent text-accent-text'
                     : 'text-text-muted',
                 )}

@@ -61,6 +61,8 @@ services:
     init: true
     logging: *default-logging
     mem_limit: ${WORKER_MEM_LIMIT:-1g}
+    # Time to finish the current reminder/import step after SIGTERM before SIGKILL.
+    stop_grace_period: 30s
     command: python worker/main.py
     env_file: .env
     environment:

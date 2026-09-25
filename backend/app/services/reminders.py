@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.scheduled_reminder import ReminderKind, ReminderStatus, ScheduledReminder
@@ -166,23 +166,33 @@ def reminder_task_url(public_url: str, task: Task) -> str:
 
 
 async def schedule_next_occurrence_reminder(
-    session: AsyncSession, task: Task, sent_occurrence_at: datetime
+    session: AsyncSession,
+    task: Task,
+    sent_occurrence_at: datetime,
+    *,
+    not_before: datetime | None = None,
 ) -> None:
-    """After sending a recurring task's "occurrence" reminder, spec §8.4 says the table
-    should immediately hold the *next* occurrence's reminder — independent of whether the
-    user ever completes/skips the current one (that path recomputes via
-    recompute_reminders_for_task on its own, through the normal update flow)."""
+    """After a recurring task's "occurrence" reminder is resolved (sent, or given up on),
+    spec §8.4 says the table should immediately hold the *next* occurrence's reminder —
+    independent of whether the user ever completes/skips the current one (that path
+    recomputes via recompute_reminders_for_task on its own, through the normal update
+    flow). `not_before` (UTC) skips occurrences already in the past, so a reminder
+    missed during a long outage continues with the next *future* occurrence instead of
+    walking through every missed one."""
     if not (task.is_recurring and task.rrule and task.dtstart_local):
-        return
-    next_occ = recurrence_service.next_occurrence(
-        task.rrule, task.dtstart_local, sent_occurrence_at
-    )
-    if next_occ is None:
         return
 
     user = await session.get(User, task.user_id)
-    assert user is not None
+    if user is None:
+        return
     tz = ZoneInfo(user.timezone)
+
+    after = sent_occurrence_at
+    if not_before is not None:
+        after = max(after, not_before.astimezone(tz).replace(tzinfo=None))
+    next_occ = recurrence_service.next_occurrence(task.rrule, task.dtstart_local, after)
+    if next_occ is None:
+        return
     remind_at = _local_to_utc(next_occ, tz)
 
     existing_row = await session.scalar(
@@ -201,3 +211,21 @@ async def schedule_next_occurrence_reminder(
                 kind=ReminderKind.occurrence,
             )
         )
+
+
+# Resolved reminders are only needed while their occurrence could still be re-desired;
+# compute_desired_reminders never returns a remind_at in the past, so old history rows
+# can go (the table otherwise grows forever).
+RESOLVED_REMINDER_RETENTION = timedelta(days=30)
+
+
+async def purge_resolved_reminders(session: AsyncSession, *, now: datetime | None = None) -> int:
+    now = now or datetime.now(UTC)
+    result = await session.execute(
+        delete(ScheduledReminder).where(
+            ScheduledReminder.status != ReminderStatus.pending,
+            ScheduledReminder.remind_at < now - RESOLVED_REMINDER_RETENTION,
+        )
+    )
+    await session.commit()
+    return getattr(result, "rowcount", 0) or 0

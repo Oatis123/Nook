@@ -15,6 +15,7 @@ from aiogram.types import (
     Message,
 )
 from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -322,9 +323,30 @@ async def _create_task_from_parsed(
     return task, task_list.name if task_list is not None else "Inbox"
 
 
+def _validation_hint(exc: ValidationError) -> str:
+    fields = {str(part) for error in exc.errors() for part in error["loc"]}
+    if "title" in fields:
+        return (
+            "I couldn't find a task title in that (it must be 1–500 characters). "
+            'Try something like "Buy milk tomorrow 18:00".'
+        )
+    if fields & {"interval", "recurrence", "end_count", "end_date", "by_weekday"}:
+        return 'That repeat rule is out of range — try e.g. "every 2 days" or "every week".'
+    return "I couldn't turn that into a task — try rephrasing it."
+
+
 async def _create_and_reply(message: Message, user: User, parsed: ParsedQuickAdd) -> None:
-    async with async_session_factory() as session:
-        task, list_name = await _create_task_from_parsed(session, user, parsed)
+    # Invalid input used to raise out of the handler: aiogram logged it and the user got
+    # no reply at all.
+    try:
+        async with async_session_factory() as session:
+            task, list_name = await _create_task_from_parsed(session, user, parsed)
+    except ValidationError as exc:
+        await message.answer(_validation_hint(exc))
+        return
+    except HTTPException as exc:
+        await message.answer(f"Couldn't create the task: {exc.detail}")
+        return
     await message.answer(_summary_text(task, list_name), reply_markup=_result_keyboard(task.id))
 
 

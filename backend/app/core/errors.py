@@ -1,6 +1,8 @@
+from collections.abc import Sequence
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -23,6 +25,18 @@ def _error_response(status_code: int, code: str, message: str, details: Any = No
     )
 
 
+def _serializable_errors(errors: Sequence[Any]) -> list[Any]:
+    """A field validator that raises ValueError puts the exception object itself into the
+    error's `ctx` — which JSONResponse can't serialize, turning a 422 into a 500."""
+    cleaned = []
+    for error in errors:
+        error = dict(error)
+        if "ctx" in error:
+            error["ctx"] = {key: str(value) for key, value in error["ctx"].items()}
+        cleaned.append(error)
+    return jsonable_encoder(cleaned)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
@@ -39,5 +53,5 @@ def register_exception_handlers(app: FastAPI) -> None:
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "validation_error",
             "Invalid request",
-            exc.errors(),
+            _serializable_errors(exc.errors()),
         )

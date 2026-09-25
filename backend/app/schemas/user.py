@@ -2,8 +2,9 @@ import uuid
 from datetime import datetime, time
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.validation import validate_timezone
 from app.models.user import Theme, User, UserRole
 
 
@@ -45,6 +46,12 @@ class UserPublic(BaseModel):
 
 class MeUpdate(BaseModel):
     timezone: str | None = None
+
+    @field_validator("timezone")
+    @classmethod
+    def _known_timezone(cls, value: str | None) -> str | None:
+        return validate_timezone(value) if value is not None else None
+
     daily_reminder_time: time | None = None
     notifications_enabled: bool | None = None
     theme: Theme | None = None

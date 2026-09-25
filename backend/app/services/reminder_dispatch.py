@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
@@ -31,42 +32,65 @@ class ReminderBlocked(Exception):
 Sender = Callable[[int, str, str], Awaitable[None]]
 
 
+# Upper bound on rows handled per call, so one tick can't run unbounded after downtime.
+MAX_REMINDERS_PER_TICK = 500
+
+
 async def dispatch_due_reminders(
     session: AsyncSession, send: Sender, *, now: datetime | None = None
 ) -> int:
-    """Selects every `pending` reminder due by `now` (FOR UPDATE SKIP LOCKED, so multiple
-    worker instances never double-send the same row) and resolves each one: send, cancel
-    (stale past the catch-up window), or leave pending for a later tick. Returns how many
-    rows it looked at. Takes `send` as a parameter rather than importing a Bot directly so
+    """Resolves every `pending` reminder due by `now`, one row per transaction: send,
+    cancel (stale past the catch-up window), or leave pending for a later tick. Returns
+    how many rows it looked at.
+
+    Each row is locked (FOR UPDATE SKIP LOCKED, so multiple worker instances never
+    double-send it) and committed right after it's handled — a crash or send failure
+    midway through a batch used to roll back the rows already sent, and the next tick
+    sent them again. Takes `send` as a parameter rather than importing a Bot directly so
     the dispatch/backoff/catch-up logic can be tested without a live Telegram connection."""
     now = now or datetime.now(UTC)
-    rows = list(
-        await session.scalars(
+    seen: list[uuid.UUID] = []
+    while len(seen) < MAX_REMINDERS_PER_TICK:
+        query = (
             select(ScheduledReminder)
             .where(
                 ScheduledReminder.status == ReminderStatus.pending,
                 ScheduledReminder.remind_at <= now,
             )
+            .order_by(ScheduledReminder.remind_at)
+            .limit(1)
             .with_for_update(skip_locked=True)
         )
-    )
-    for row in rows:
+        if seen:
+            # Rows left pending on purpose (not deliverable right now) aren't retried
+            # within the same tick.
+            query = query.where(ScheduledReminder.id.not_in(seen))
+        row = await session.scalar(query)
+        if row is None:
+            break
+        seen.append(row.id)
         await _dispatch_one(session, row, send, now)
+        await session.commit()
     await session.commit()
-    return len(rows)
+    return len(seen)
 
 
 async def _dispatch_one(
     session: AsyncSession, row: ScheduledReminder, send: Sender, now: datetime
 ) -> None:
-    if now - row.remind_at > WORKER_CATCHUP_WINDOW:
-        row.status = ReminderStatus.cancelled
-        return
-
     task = await session.get(Task, row.task_id)
     if task is None or task.deleted_at is not None:
         row.status = ReminderStatus.cancelled
         return
+
+    if now - row.remind_at > WORKER_CATCHUP_WINDOW:
+        row.status = ReminderStatus.cancelled
+        # A recurring task's chain of "occurrence" reminders is only ever extended from
+        # here — without this, one missed reminder (downtime, notifications off) ended
+        # the task's reminders for good.
+        await schedule_next_occurrence_reminder(session, task, row.occurrence_at, not_before=now)
+        return
+
     user = await session.get(User, task.user_id)
     if user is None:
         row.status = ReminderStatus.cancelled
@@ -92,12 +116,16 @@ async def _dispatch_one(
         user.telegram_blocked = True
         row.status = ReminderStatus.failed
         row.last_error = "blocked"
+        await schedule_next_occurrence_reminder(session, task, row.occurrence_at, not_before=now)
         return
     except Exception as exc:  # noqa: BLE001 — any send failure feeds the same retry/backoff path
         row.attempts += 1
         row.last_error = str(exc)[:500]
         if row.attempts >= MAX_ATTEMPTS:
             row.status = ReminderStatus.failed
+            await schedule_next_occurrence_reminder(
+                session, task, row.occurrence_at, not_before=now
+            )
         else:
             row.remind_at = now + timedelta(minutes=RETRY_BACKOFF_MINUTES[row.attempts - 1])
         return

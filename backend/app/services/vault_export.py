@@ -1,16 +1,21 @@
-import io
+import os
 import re
+import tempfile
 import uuid
 import zipfile
 from pathlib import Path
 from urllib.parse import quote
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.models.attachment import Attachment
 from app.models.folder import Folder
 from app.models.note import Note
+
+log = structlog.get_logger()
 
 _UNSAFE_CHARS_RE = re.compile(r'[\\/:*?"<>|]')
 
@@ -78,39 +83,66 @@ def export_note_markdown(note: Note) -> bytes:
     return note.content.encode("utf-8")
 
 
-async def build_vault_zip(session: AsyncSession, user_id: uuid.UUID) -> bytes:
+def _write_vault_zip(
+    folder_paths: dict[uuid.UUID | None, str],
+    notes: list[tuple[str, uuid.UUID | None, str]],
+    attachments: list[tuple[str, str]],
+) -> Path:
+    """Blocking part of the export (file I/O + compression), run in a worker thread.
+    Streams into a temporary file — attachments are copied from disk by the zip writer,
+    never read whole into memory — and returns its path; the caller deletes it."""
+    fd, tmp_name = tempfile.mkstemp(prefix="nook-export-", suffix=".zip")
+    try:
+        with os.fdopen(fd, "wb") as out, zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+            used_note_paths: set[str] = set()
+            for title, folder_id, content in notes:
+                folder_path = folder_paths.get(folder_id, "")
+                filename = _sanitize_path_segment(title) + ".md"
+                entry_path = f"{folder_path}/{filename}" if folder_path else filename
+                entry_path = _unique_name(used_note_paths, entry_path)
+                zf.writestr(entry_path, content.encode("utf-8"))
+
+            used_attachment_names: set[str] = set()
+            for filename, storage_path in attachments:
+                source = Path(storage_path)
+                if not source.is_file():
+                    # A missing file used to fail the whole export with a 500.
+                    log.warning("export.attachment_missing", path=storage_path)
+                    continue
+                name = _unique_name(used_attachment_names, _sanitize_path_segment(filename))
+                zf.write(source, f"attachments/{name}")
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+    return Path(tmp_name)
+
+
+async def build_vault_zip_file(session: AsyncSession, user_id: uuid.UUID) -> Path:
     """Spec §6.9: folder structure, .md files with frontmatter, attachments/ — built to
     open in Obsidian without edits (wikilinks and embeds are already Obsidian-native
-    syntax, unchanged from how the editor stores them)."""
+    syntax, unchanged from how the editor stores them). Returns a temporary file the
+    caller must delete."""
     folder_paths = await _folder_paths(session, user_id)
-    notes = list(
-        await session.scalars(
-            select(Note)
-            .where(Note.user_id == user_id, Note.deleted_at.is_(None))
-            .order_by(Note.title)
-        )
+    note_rows = await session.execute(
+        select(Note.title, Note.folder_id, Note.content)
+        .where(Note.user_id == user_id, Note.deleted_at.is_(None))
+        .order_by(Note.title)
     )
-    attachments = list(
-        await session.scalars(select(Attachment).where(Attachment.user_id == user_id))
+    attachment_rows = await session.execute(
+        select(Attachment.filename, Attachment.storage_path).where(Attachment.user_id == user_id)
     )
+    notes = [(title, folder_id, content) for title, folder_id, content in note_rows.all()]
+    attachments = [(filename, path) for filename, path in attachment_rows.all()]
+    return await run_in_threadpool(_write_vault_zip, folder_paths, notes, attachments)
 
-    buffer = io.BytesIO()
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        used_note_paths: set[str] = set()
-        for note in notes:
-            folder_path = folder_paths.get(note.folder_id, "")
-            filename = _sanitize_path_segment(note.title) + ".md"
-            entry_path = f"{folder_path}/{filename}" if folder_path else filename
-            entry_path = _unique_name(used_note_paths, entry_path)
-            zf.writestr(entry_path, export_note_markdown(note))
 
-        used_attachment_names: set[str] = set()
-        for attachment in attachments:
-            name = _unique_name(used_attachment_names, _sanitize_path_segment(attachment.filename))
-            data = Path(attachment.storage_path).read_bytes()
-            zf.writestr(f"attachments/{name}", data)
-
-    return buffer.getvalue()
+async def build_vault_zip(session: AsyncSession, user_id: uuid.UUID) -> bytes:
+    """In-memory variant for small exports and tests; the HTTP endpoint streams the file."""
+    path = await build_vault_zip_file(session, user_id)
+    try:
+        return path.read_bytes()
+    finally:
+        path.unlink(missing_ok=True)
 
 
 def export_note_filename(note: Note) -> str:

@@ -5,17 +5,21 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.task_note_link import LinkedTaskOut
 
+# Generous for a text note, but bounded: Postgres' generated full-text columns fail on
+# enormous documents, and every save re-parses the whole content.
+MAX_NOTE_CONTENT_CHARS = 500_000
+
 
 class NoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     folder_id: uuid.UUID | None = None
-    content: str = ""
+    content: str = Field(default="", max_length=MAX_NOTE_CONTENT_CHARS)
 
 
 class NoteUpdate(BaseModel):
     version: int
     title: str | None = Field(default=None, min_length=1, max_length=255)
-    content: str | None = None
+    content: str | None = Field(default=None, max_length=MAX_NOTE_CONTENT_CHARS)
     folder_id: uuid.UUID | None = Field(default=None)
     move_to_root: bool = False
     # When renaming, also rewrite `[[OldTitle]]` to `[[NewTitle]]` in every note that

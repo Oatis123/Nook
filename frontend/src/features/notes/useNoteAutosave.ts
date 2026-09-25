@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import * as notesApi from '@/features/notes/api'
 import { noteKey } from '@/features/notes/hooks'
 import { ApiError } from '@/lib/api'
+import { toast } from '@/lib/toast'
 import type { NoteDetail } from '@/lib/types'
 
 export const SAVE_DEBOUNCE_MS = 800
@@ -166,6 +167,12 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
           }
           setStatus('error')
         }
+      } else if (error instanceof ApiError && error.status === 422) {
+        // Rejected as invalid (in practice: over the size limit). Retrying the same text
+        // can't succeed; the next edit tries again.
+        if (titleCommit) pendingTitleRef.current = titleCommit
+        setStatus('error')
+        toast.error("This note couldn't be saved: it's over the 500,000-character limit.")
       } else {
         // Network error, 5xx, expired session…: keep the edits (they're in localStorage
         // too) and try again shortly; the next keystroke or reconnect also retries.

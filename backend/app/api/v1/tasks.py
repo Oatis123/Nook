@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.deps import CurrentUser, DbSession, require_csrf
 from app.models.task import Task
@@ -19,6 +19,9 @@ from app.services import tasks as tasks_service
 from app.services.tasks import SubtaskCounts, TaskWithCounts
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+# The UI asks for a month or a week at a time; a year leaves room for any other client.
+MAX_CALENDAR_RANGE_DAYS = 366
 Csrf = Depends(require_csrf)
 _DEFAULT_COMPLETE_REQUEST = TaskCompleteRequest()
 
@@ -92,6 +95,13 @@ async def create_task(body: TaskCreate, user: CurrentUser, session: DbSession) -
 async def get_calendar(
     start: date, end: date, user: CurrentUser, session: DbSession
 ) -> list[CalendarEntryOut]:
+    if end < start:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "end must not be before start")
+    if (end - start).days > MAX_CALENDAR_RANGE_DAYS:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            f"Calendar range can span at most {MAX_CALENDAR_RANGE_DAYS} days",
+        )
     return await tasks_service.get_calendar_entries(session, user.id, start, end)
 
 

@@ -3,10 +3,12 @@ from pathlib import Path, PurePosixPath
 
 import filetype
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
+from app.core.errors import CodedHTTPException
 from app.core.isolation import get_owned_or_404
 from app.models.attachment import Attachment, NoteAttachment
 from app.models.note import Note
@@ -71,15 +73,43 @@ def _attachment_dir(user_id: uuid.UUID) -> Path:
     return path
 
 
+def max_upload_bytes() -> int:
+    return get_settings().max_upload_mb * 1024 * 1024
+
+
+def file_too_large() -> HTTPException:
+    limit = get_settings().max_upload_mb
+    return CodedHTTPException(
+        status.HTTP_413_CONTENT_TOO_LARGE,
+        "file_too_large",
+        f"File exceeds the {limit} MB limit",
+    )
+
+
+async def _check_quota(session: AsyncSession, user_id: uuid.UUID, incoming: int) -> None:
+    """Per-user cap on total attachment storage, so one account can't fill the disk
+    (or build an export too large to serve)."""
+    quota_mb = get_settings().max_storage_mb
+    if quota_mb <= 0:
+        return
+    used = await session.scalar(
+        select(func.coalesce(func.sum(Attachment.size), 0)).where(Attachment.user_id == user_id)
+    )
+    if (used or 0) + incoming > quota_mb * 1024 * 1024:
+        raise CodedHTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE,
+            "storage_quota_exceeded",
+            f"Your attachment storage is full ({quota_mb} MB). "
+            "Delete unused attachments to free up space.",
+        )
+
+
 async def save_attachment(
     session: AsyncSession, user_id: uuid.UUID, filename: str, data: bytes
 ) -> Attachment:
-    settings = get_settings()
-    max_bytes = settings.max_upload_mb * 1024 * 1024
-    if len(data) > max_bytes:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, f"File exceeds the {settings.max_upload_mb} MB limit"
-        )
+    if len(data) > max_upload_bytes():
+        raise file_too_large()
+    await _check_quota(session, user_id, len(data))
 
     clean_name = await _unique_filename(session, user_id, _sanitize_filename(filename))
     mime = _detect_mime(data, clean_name)
@@ -91,7 +121,7 @@ async def save_attachment(
     await session.flush()
 
     dest = _attachment_dir(user_id) / str(attachment.id)
-    dest.write_bytes(data)
+    await run_in_threadpool(dest.write_bytes, data)
     attachment.storage_path = str(dest)
 
     await session.commit()

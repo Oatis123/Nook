@@ -367,6 +367,10 @@ async def delete_task(session: AsyncSession, user_id: uuid.UUID, task_id: uuid.U
     await session.commit()
 
 
+# Bounds the response (and the work to build it) however many recurring tasks overlap.
+MAX_CALENDAR_ENTRIES = 5000
+
+
 async def get_calendar_entries(
     session: AsyncSession, user_id: uuid.UUID, start: date, end: date
 ) -> list[CalendarEntryOut]:
@@ -419,8 +423,11 @@ async def get_calendar_entries(
             # calendar when browsing a past range, rather than mechanically re-deriving
             # every occurrence the RRULE would ever produce since dtstart.
             expand_from = max(range_start, current_occurrence)
+            remaining = MAX_CALENDAR_ENTRIES - len(entries)
+            if remaining <= 0:
+                break
             for occ in recurrence_service.occurrences_between(
-                task.rrule, task.dtstart_local, expand_from, range_end
+                task.rrule, task.dtstart_local, expand_from, range_end, limit=remaining
             ):
                 if occ == current_occurrence:
                     continue

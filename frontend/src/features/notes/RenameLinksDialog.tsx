@@ -15,6 +15,9 @@ export function RenameLinksDialog({
   return (
     <Dialog
       open={open}
+      onOpenChange={(next) => {
+        if (!next) onSkip()
+      }}
       title="Update links to this note?"
       description={`${affectedNotes} ${affectedNotes === 1 ? 'note links' : 'notes link'} to this note by its old title.`}
     >

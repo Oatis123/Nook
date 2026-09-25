@@ -9,81 +9,35 @@ import { IconButton } from '@/design/components/IconButton'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
-import { getNote, getRenameImpact, noteExportUrl } from '@/features/notes/api'
+import { getRenameImpact, noteExportUrl } from '@/features/notes/api'
 import { editorTheme } from '@/features/notes/editorTheme'
-import { useNote, useNotes, useTags, useUpdateNote } from '@/features/notes/hooks'
+import { useNote, useNotes, useTags } from '@/features/notes/hooks'
+import { type SaveStatus, useNoteAutosave } from '@/features/notes/useNoteAutosave'
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
 import { createAttachmentDropHandler } from '@/features/notes/attachmentDrop'
 import { MarkdownPreview } from '@/features/notes/MarkdownPreview'
 import { ConflictDialog } from '@/features/notes/ConflictDialog'
 import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import { useUploadAttachment } from '@/features/attachments/hooks'
-import type { NoteDetail } from '@/lib/types'
 import { QueryState } from '@/design/components/QueryState'
-
-const SAVE_DEBOUNCE_MS = 800
-
-type SaveStatus = 'saved' | 'saving' | 'offline' | 'error'
 
 export function NoteEditor({ noteId }: { noteId: string }) {
   const noteQuery = useNote(noteId)
-  const updateNote = useUpdateNote(noteId)
   const { data: user } = useCurrentUser()
   const updateProfile = useUpdateProfile()
   const uploadAttachment = useUploadAttachment()
   const viewRef = useRef<EditorView | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const autosave = useNoteAutosave(noteId, noteQuery.data)
+  const { draft, status } = autosave
 
-  const [draft, setDraft] = useState<{ title: string; content: string; version: number } | null>(
-    null,
-  )
-  const [status, setStatus] = useState<SaveStatus>('saved')
-  const [conflict, setConflict] = useState<NoteDetail | null>(null)
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
-  const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null)
   const [renamePrompt, setRenamePrompt] = useState<{ affectedNotes: number } | null>(null)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const draftRef = useRef(draft)
-  const lastSavedTitleRef = useRef<string | null>(null)
 
   const notesQuery = useNotes()
   const tagsQuery = useTags()
 
-  useEffect(() => {
-    draftRef.current = draft
-  }, [draft])
-
   const previewEnabled = user?.editor_preview_enabled ?? true
-
-  // Reset the local draft when a different note loads, but not on every background
-  // refetch of the same note, so in-flight typing isn't clobbered. Runs during render
-  // (React's documented pattern for adjusting state from a changed id/prop) rather than
-  // in an effect, since it only needs to happen once per noteId, not after every commit.
-  if (noteQuery.data && loadedNoteId !== noteId) {
-    setDraft({
-      title: noteQuery.data.title,
-      content: noteQuery.data.content,
-      version: noteQuery.data.version,
-    })
-    setStatus('saved')
-    setLoadedNoteId(noteId)
-    lastSavedTitleRef.current = noteQuery.data.title
-  }
-
-  useEffect(() => {
-    function handleOffline() {
-      setStatus('offline')
-    }
-    function handleOnline() {
-      setStatus((s) => (s === 'offline' ? 'saved' : s))
-    }
-    window.addEventListener('offline', handleOffline)
-    window.addEventListener('online', handleOnline)
-    return () => {
-      window.removeEventListener('offline', handleOffline)
-      window.removeEventListener('online', handleOnline)
-    }
-  }, [])
 
   useEffect(() => {
     function handleKeydown(e: KeyboardEvent) {
@@ -97,93 +51,35 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewEnabled])
 
-  function scheduleSave(next: { title: string; content: string }) {
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => save(next), SAVE_DEBOUNCE_MS)
-  }
-
-  async function save(next: { title: string; content: string }, updateLinks = false) {
-    const current = draftRef.current
-    if (!current) return
-    if (!navigator.onLine) {
-      setStatus('offline')
+  // Title changes are saved explicitly on blur/Enter, not on every keystroke like
+  // content — renaming needs a settled title to check link impact against.
+  async function handleTitleBlur() {
+    if (!autosave.titleChanged()) {
+      autosave.commitTitle(false) // normalizes whitespace / restores an emptied title
       return
     }
-    setStatus('saving')
+    let affected = 0
     try {
-      const result = await updateNote.mutateAsync({
-        version: current.version,
-        title: next.title,
-        content: next.content,
-        update_links: updateLinks,
-      })
-      setDraft({ title: result.title, content: result.content, version: result.version })
-      lastSavedTitleRef.current = result.title
-      setStatus('saved')
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        const server = await getNote(noteId)
-        setConflict(server)
-      }
-      setStatus('error')
+      affected = (await getRenameImpact(noteId)).affected_notes
+    } catch {
+      // Can't check link impact right now; rename without touching links.
     }
-  }
-
-  function handleContentChange(content: string) {
-    if (!draft) return
-    const next = { ...draft, content }
-    setDraft(next)
-    scheduleSave(next)
-  }
-
-  function handleTitleChange(title: string) {
-    if (!draft) return
-    // Title changes are saved explicitly on blur/Enter (see handleTitleBlur), not on
-    // every keystroke like content — renaming needs a settled title to check link
-    // impact against, and debouncing it too raced the impact check against the
-    // autosave in practice (whichever fired first "won", so the cascade dialog was
-    // easy to miss).
-    setDraft({ ...draft, title })
-  }
-
-  async function handleTitleBlur() {
-    if (!draft) return
-    if (draft.title === lastSavedTitleRef.current) return
-    if (timerRef.current) clearTimeout(timerRef.current)
-    const impact = await getRenameImpact(noteId)
-    if (impact.affected_notes > 0) {
-      setRenamePrompt({ affectedNotes: impact.affected_notes })
-    } else {
-      save(draft, false)
-    }
+    if (affected > 0) setRenamePrompt({ affectedNotes: affected })
+    else autosave.commitTitle(false)
   }
 
   function resolveRenamePrompt(updateLinks: boolean) {
     setRenamePrompt(null)
-    if (draft) save(draft, updateLinks)
-  }
-
-  function resolveKeepMine() {
-    if (!draft || !conflict) return
-    const next = { ...draft, version: conflict.version }
-    draftRef.current = next
-    setDraft(next)
-    setConflict(null)
-    scheduleSave(next)
-  }
-
-  function resolveLoadServer() {
-    if (!conflict) return
-    setDraft({ title: conflict.title, content: conflict.content, version: conflict.version })
-    setConflict(null)
-    setStatus('saved')
+    autosave.commitTitle(updateLinks)
   }
 
   const uploadAndInsert = useCallback(
-    async (files: File[], pos: number | 'cursor') => {
-      const uploaded = await Promise.all(files.map((f) => uploadAttachment.mutateAsync(f)))
-      const view = viewRef.current
-      if (!view) return
+    async (files: File[], pos: number | 'cursor', view: EditorView) => {
+      // A failed upload is already reported by the global mutation error toast.
+      const uploaded = await Promise.all(files.map((f) => uploadAttachment.mutateAsync(f))).catch(
+        () => null,
+      )
+      if (!uploaded) return
       const insertPos = pos === 'cursor' ? view.state.selection.main.from : pos
       const embedText = uploaded.map((a) => `![[${a.filename}]]`).join(' ')
       view.dispatch({
@@ -222,16 +118,26 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
-        <input
-          value={draft.title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          onBlur={handleTitleBlur}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-          }}
-          className="min-w-0 flex-1 truncate bg-transparent font-serif text-xl text-text outline-none"
-          aria-label="Note title"
-        />
+        <div className="min-w-0 flex-1">
+          <input
+            value={draft.title}
+            maxLength={255}
+            onChange={(e) => autosave.setTitle(e.target.value)}
+            onBlur={handleTitleBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+            }}
+            className="w-full truncate bg-transparent font-serif text-xl text-text outline-none"
+            aria-label="Note title"
+            aria-invalid={autosave.titleError ? true : undefined}
+            aria-describedby={autosave.titleError ? 'note-title-error' : undefined}
+          />
+          {autosave.titleError && (
+            <p id="note-title-error" role="alert" className="mt-0.5 text-xs text-danger">
+              {autosave.titleError}
+            </p>
+          )}
+        </div>
         <div className="flex shrink-0 items-center gap-3">
           <SaveIndicator status={status} />
           <Tooltip label="Attach a file">
@@ -247,7 +153,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
             aria-label="Attach a file"
             onChange={(e) => {
               const files = Array.from(e.target.files ?? [])
-              if (files.length > 0) uploadAndInsert(files, 'cursor')
+              if (files.length > 0 && viewRef.current) {
+                uploadAndInsert(files, 'cursor', viewRef.current)
+              }
               e.target.value = ''
             }}
           />
@@ -279,6 +187,15 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         </div>
       </header>
 
+      {autosave.fatalError && (
+        <p
+          role="alert"
+          className="border-b border-border bg-danger/10 px-6 py-2 text-sm text-danger"
+        >
+          {autosave.fatalError}
+        </p>
+      )}
+
       <div className="flex md:hidden">
         {(['edit', 'preview'] as const).map((tab) => (
           <button
@@ -302,7 +219,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         >
           <CodeMirror
             value={draft.content}
-            onChange={handleContentChange}
+            onChange={autosave.setContent}
             onCreateEditor={(view) => {
               viewRef.current = view
             }}
@@ -326,11 +243,11 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       </div>
 
       <ConflictDialog
-        open={conflict !== null}
+        open={autosave.conflict !== null}
         myContent={draft.content}
-        serverContent={conflict?.content ?? ''}
-        onKeepMine={resolveKeepMine}
-        onLoadServer={resolveLoadServer}
+        serverContent={autosave.conflict?.content ?? ''}
+        onKeepMine={autosave.keepMine}
+        onLoadServer={autosave.loadServer}
       />
 
       <RenameLinksDialog
@@ -347,9 +264,13 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   const label = {
     saved: 'Saved',
     saving: 'Saving…',
-    offline: 'Offline',
-    error: 'Couldn’t save',
+    offline: 'Offline — saved on this device',
+    error: 'Couldn’t save — retrying',
   }[status]
   const color = status === 'error' ? 'text-danger' : 'text-text-muted'
-  return <span className={`text-xs ${color}`}>{label}</span>
+  return (
+    <span role="status" className={`text-xs ${color}`}>
+      {label}
+    </span>
+  )
 }

@@ -68,7 +68,7 @@ async def export_note(note_id: uuid.UUID, user: CurrentUser, session: DbSession)
     return Response(
         content=data,
         media_type="text/markdown",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": vault_export_service.content_disposition(filename)},
     )
 
 

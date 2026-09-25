@@ -11,12 +11,44 @@ from app.core.isolation import get_owned_or_404
 from app.models.attachment import Attachment, NoteAttachment
 from app.models.note import Note
 
+MAX_FILENAME_LENGTH = 255  # Attachment.filename is String(255)
+
 
 def _sanitize_filename(filename: str) -> str:
     """Never used to build a filesystem path (attachments are stored under their id),
     but sanitized anyway so a malicious/odd name doesn't render confusingly in the UI."""
-    name = PurePosixPath(filename.replace("\\", "/")).name.strip()
-    return name or "file"
+    name = PurePosixPath(filename.replace("\\", "/")).name.strip() or "file"
+    if len(name) > MAX_FILENAME_LENGTH:
+        path = PurePosixPath(name)
+        suffix = path.suffix if len(path.suffix) <= 16 else ""
+        name = path.stem[: MAX_FILENAME_LENGTH - len(suffix)] + suffix
+    return name
+
+
+async def _unique_filename(session: AsyncSession, user_id: uuid.UUID, name: str) -> str:
+    """Embeds resolve by filename (`![[image.png]]`), and only when exactly one of the
+    user's attachments has that name — so a second `image.png` (every pasted screenshot
+    is called that) would break the first one's embeds and leave the new one looking
+    unused to cleanup. Numbers duplicates instead: `image (2).png`, `image (3).png`…"""
+    path = PurePosixPath(name)
+    stem, suffix = path.stem, path.suffix
+    taken = set(
+        await session.scalars(
+            select(Attachment.filename).where(
+                Attachment.user_id == user_id,
+                Attachment.filename.startswith(stem, autoescape=True),
+            )
+        )
+    )
+    if name not in taken:
+        return name
+    counter = 2
+    while True:
+        marker = f" ({counter})"
+        candidate = stem[: MAX_FILENAME_LENGTH - len(marker) - len(suffix)] + marker + suffix
+        if candidate not in taken:
+            return candidate
+        counter += 1
 
 
 def _detect_mime(data: bytes, fallback_name: str) -> str:
@@ -49,7 +81,7 @@ async def save_attachment(
             status.HTTP_400_BAD_REQUEST, f"File exceeds the {settings.max_upload_mb} MB limit"
         )
 
-    clean_name = _sanitize_filename(filename)
+    clean_name = await _unique_filename(session, user_id, _sanitize_filename(filename))
     mime = _detect_mime(data, clean_name)
 
     attachment = Attachment(

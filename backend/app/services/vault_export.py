@@ -3,6 +3,7 @@ import re
 import uuid
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,10 @@ def _sanitize_path_segment(name: str) -> str:
     the zip entry name is sanitized for portability, content and the real title are not
     touched."""
     cleaned = _UNSAFE_CHARS_RE.sub("-", name).strip()
-    return cleaned or "Untitled"
+    # "." / ".." as a folder name would make a path-traversing zip entry ("../x.md").
+    if not cleaned or set(cleaned) == {"."}:
+        return "Untitled"
+    return cleaned
 
 
 def _unique_name(used: set[str], name: str) -> str:
@@ -47,14 +51,18 @@ async def _folder_paths(session: AsyncSession, user_id: uuid.UUID) -> dict[uuid.
     by_id = {f.id: f for f in folders}
 
     def path_for(folder_id: uuid.UUID | None) -> str:
-        if folder_id is None:
-            return ""
-        folder = by_id.get(folder_id)
-        if folder is None:
-            return ""
-        parent_path = path_for(folder.parent_id)
-        segment = _sanitize_path_segment(folder.name)
-        return f"{parent_path}/{segment}" if parent_path else segment
+        # Iterative, with a visited set: a corrupted parent chain that loops back on itself
+        # must not recurse forever (RecursionError → the whole export failing).
+        segments: list[str] = []
+        seen: set[uuid.UUID] = set()
+        while folder_id is not None and folder_id not in seen:
+            folder = by_id.get(folder_id)
+            if folder is None:
+                break
+            seen.add(folder_id)
+            segments.append(_sanitize_path_segment(folder.name))
+            folder_id = folder.parent_id
+        return "/".join(reversed(segments))
 
     paths: dict[uuid.UUID | None, str] = {None: ""}
     for folder in folders:
@@ -107,3 +115,12 @@ async def build_vault_zip(session: AsyncSession, user_id: uuid.UUID) -> bytes:
 
 def export_note_filename(note: Note) -> str:
     return _sanitize_path_segment(note.title) + ".md"
+
+
+def content_disposition(filename: str) -> str:
+    """RFC 6266/5987: a plain `filename="..."` header must be latin-1 (Starlette encodes
+    headers that way), so a Cyrillic title used to crash the response with a 500. Sends
+    an ASCII fallback plus the real name percent-encoded as UTF-8 in `filename*`."""
+    fallback = filename.encode("ascii", "replace").decode("ascii").replace("?", "_")
+    fallback = fallback.replace('"', "_").replace("\\", "_")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"

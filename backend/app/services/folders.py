@@ -81,6 +81,11 @@ async def update_folder(
     new_parent_id = None if data.move_to_root else data.parent_id
     if data.move_to_root or data.parent_id is not None:
         if new_parent_id is not None:
+            # Lock the user's folders so two concurrent moves (A into B, B into A) can't
+            # both pass the cycle check below against the same pre-move tree.
+            await session.execute(
+                select(Folder.id).where(Folder.user_id == user_id).with_for_update()
+            )
             if new_parent_id == folder.id or new_parent_id in await _descendant_ids(
                 session, user_id, folder.id
             ):

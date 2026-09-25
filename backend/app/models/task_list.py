@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -66,6 +66,10 @@ class TaskListIcon(enum.StrEnum):
 
 class TaskList(UUIDPKMixin, Base):
     __tablename__ = "task_lists"
+    __table_args__ = (
+        # At most one Inbox per user, even if two requests create it concurrently.
+        Index("uq_task_lists_one_inbox", "user_id", unique=True, postgresql_where=text("is_inbox")),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True

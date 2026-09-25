@@ -4,6 +4,7 @@ import zipfile
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
+import structlog
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,11 @@ from app.models.import_job import ImportJob, ImportJobStatus
 from app.services import attachments as attachments_service
 from app.services import folders as folders_service
 from app.services import notes as notes_service
+
+log = structlog.get_logger()
+
+# Note titles and folder names are String(255); the "(imported N)" suffix needs room too.
+MAX_IMPORTED_NAME_LENGTH = 240
 
 # Zip-bomb protection (spec §13): an archive is rejected outright rather than partially
 # processed if it exceeds either limit.
@@ -95,7 +101,7 @@ async def _folder_id_for_path(
         return cache[parts]
 
     parent_id = await _folder_id_for_path(session, user_id, parts[:-1], cache)
-    name = parts[-1]
+    name = parts[-1][:MAX_IMPORTED_NAME_LENGTH]
 
     existing_folder = await session.scalar(
         select(Folder).where(
@@ -122,6 +128,7 @@ async def _import_note(
     content: str,
     report: dict,
 ) -> None:
+    title = title[:MAX_IMPORTED_NAME_LENGTH]
     final_title = title
     for attempt in range(1, 6):
         try:
@@ -138,7 +145,19 @@ async def _import_note(
     report["errors"].append(f'"{title}": too many title conflicts, skipped')
 
 
+async def _recover(session: AsyncSession, name: str, report: dict) -> None:
+    """An unexpected (non-HTTP) error while importing one entry: logs it, rolls the
+    session back so the rest of the import (and the final job update) can still commit,
+    and records a generic message rather than the raw exception text."""
+    log.exception("import.entry_failed", entry=name)
+    await session.rollback()
+    report["errors"].append(f'"{name}": could not be imported')
+
+
 async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
+    # Read up front: after a rollback the ORM object is expired, and lazily reloading
+    # an attribute isn't possible in an async session.
+    job_id, user_id = job.id, job.user_id
     job.status = ImportJobStatus.processing
     await session.commit()
 
@@ -148,7 +167,8 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
         "conflicts": [],
         "errors": [],
     }
-    zip_path = _zip_path(job.id)
+    zip_path = _zip_path(job_id)
+    final_status = ImportJobStatus.failed
 
     try:
         with zipfile.ZipFile(zip_path) as zf:
@@ -175,31 +195,40 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                     continue
                 try:
                     data = zf.read(info)
-                    await attachments_service.save_attachment(session, job.user_id, filename, data)
+                    await attachments_service.save_attachment(session, user_id, filename, data)
                     report["attachments_imported"] += 1
                 except HTTPException as exc:
                     report["errors"].append(f'"{info.filename}": {exc.detail}')
+                except Exception:  # noqa: BLE001 — one bad entry must not abort the import
+                    await _recover(session, info.filename, report)
 
             for info in note_entries:
                 path = PurePosixPath(info.filename)
                 try:
                     folder_id = await _folder_id_for_path(
-                        session, job.user_id, path.parent.parts, folder_cache
+                        session, user_id, path.parent.parts, folder_cache
                     )
                     content = zf.read(info).decode("utf-8", errors="replace")
-                    await _import_note(session, job.user_id, folder_id, path.stem, content, report)
+                    await _import_note(session, user_id, folder_id, path.stem, content, report)
                 except HTTPException as exc:
                     report["errors"].append(f'"{info.filename}": {exc.detail}')
+                except Exception:  # noqa: BLE001 — one bad entry must not abort the import
+                    # Folders created in the rolled-back transaction are gone too.
+                    folder_cache = {(): None}
+                    await _recover(session, info.filename, report)
 
-        job.status = ImportJobStatus.done
+        final_status = ImportJobStatus.done
     except (zipfile.BadZipFile, ImportRejected) as exc:
         report["errors"].append(str(exc))
-        job.status = ImportJobStatus.failed
-    except Exception as exc:  # noqa: BLE001 — surfaced to the user via the job report, not raised
-        report["errors"].append(f"Unexpected error: {exc}")
-        job.status = ImportJobStatus.failed
+    except Exception:  # noqa: BLE001 — surfaced to the user via the job report, not raised
+        log.exception("import.failed", job_id=str(job_id))
+        await session.rollback()
+        report["errors"].append("Unexpected error while importing the archive")
     finally:
-        job.report = report
-        job.finished_at = datetime.now(UTC)
-        await session.commit()
+        job_row = await session.get(ImportJob, job_id)
+        if job_row is not None:
+            job_row.status = final_status
+            job_row.report = report
+            job_row.finished_at = datetime.now(UTC)
+            await session.commit()
         zip_path.unlink(missing_ok=True)

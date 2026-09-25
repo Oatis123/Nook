@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.isolation import get_owned_or_404
@@ -12,9 +13,8 @@ from app.schemas.task_list import TaskListUpdate
 
 
 async def get_or_create_inbox(session: AsyncSession, user_id: uuid.UUID) -> TaskList:
-    inbox = await session.scalar(
-        select(TaskList).where(TaskList.user_id == user_id, TaskList.is_inbox.is_(True))
-    )
+    query = select(TaskList).where(TaskList.user_id == user_id, TaskList.is_inbox.is_(True))
+    inbox = await session.scalar(query)
     if inbox is not None:
         return inbox
     inbox = TaskList(
@@ -26,7 +26,15 @@ async def get_or_create_inbox(session: AsyncSession, user_id: uuid.UUID) -> Task
         is_inbox=True,
     )
     session.add(inbox)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # A concurrent request created it first (uq_task_lists_one_inbox): use theirs.
+        await session.rollback()
+        existing = await session.scalar(query)
+        if existing is None:
+            raise
+        return existing
     await session.refresh(inbox)
     return inbox
 

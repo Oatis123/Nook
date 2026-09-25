@@ -319,3 +319,43 @@
 .markdown-preview blockquote.callout[data-callout-type='success'] {
   border-left-color: var(--priority-low);
 }
+
+/* Row actions that appear on hover (the "…" menus, remove buttons). Touch screens have no
+   hover, and keyboard users need to see what they've focused — so they're always shown
+   there and whenever something in the row has focus. */
+.reveal-on-hover {
+  opacity: 0;
+  transition: opacity 150ms;
+}
+.group:hover .reveal-on-hover,
+.group:focus-within .reveal-on-hover,
+.reveal-on-hover:focus-within {
+  opacity: 1;
+}
+@media (hover: none) {
+  .reveal-on-hover {
+    opacity: 1;
+  }
+}
+
+/* Small visual controls (the round task checkbox) keep their look but get a larger
+   invisible hit area on touch screens (spec §10.8: 44px touch targets). */
+@media (pointer: coarse) {
+  .touch-target {
+    position: relative;
+  }
+  .touch-target::after {
+    content: '';
+    position: absolute;
+    inset: -14px -8px -14px -14px;
+  }
+}
+
+/* iOS Safari zooms the page when a focused field's text is under 16px. */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

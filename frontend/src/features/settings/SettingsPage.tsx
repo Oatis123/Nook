@@ -303,12 +303,12 @@ function VaultSection() {
       <div className="flex flex-col gap-4 max-w-sm">
         <div className="flex items-center justify-between">
           <p className="text-sm text-text-muted">Export everything as a .zip.</p>
-          <a href={vaultExportUrl()} download className="inline-flex">
-            <Button variant="secondary">
-              <Download size={14} strokeWidth={1.5} />
-              Export vault
-            </Button>
-          </a>
+          {/* A button that navigates to the download (the response is an attachment, so
+              the page stays) — not a button nested inside a link. */}
+          <Button variant="secondary" onClick={() => window.location.assign(vaultExportUrl())}>
+            <Download size={14} strokeWidth={1.5} />
+            Export vault
+          </Button>
         </div>
 
         <div className="flex items-center justify-between">

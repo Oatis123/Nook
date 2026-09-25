@@ -60,7 +60,7 @@ function SubtaskRow({ subtask }: { subtask: Task }) {
         type="button"
         onClick={() => deleteTask.mutate(subtask.id)}
         aria-label={`Delete ${subtask.title}`}
-        className="shrink-0 text-text-muted opacity-0 hover:text-danger group-hover:opacity-100"
+        className="shrink-0 text-text-muted reveal-on-hover hover:text-danger"
       >
         <Trash2 size={13} strokeWidth={1.5} />
       </button>
@@ -107,7 +107,7 @@ function LinkedNotesSection({ task }: { task: TaskDetail }) {
                 type="button"
                 onClick={() => unlinkNote.mutate(note.id)}
                 aria-label={`Unlink ${note.title}`}
-                className="shrink-0 text-text-muted opacity-0 hover:text-danger group-hover:opacity-100"
+                className="shrink-0 text-text-muted reveal-on-hover hover:text-danger"
               >
                 <X size={13} strokeWidth={1.5} />
               </button>
@@ -231,7 +231,7 @@ export function TaskDetailDialog({
             onClick={handleToggleDone}
             aria-label={task.status === 'done' ? 'Mark as not done' : 'Mark as done'}
             className={clsx(
-              'mt-1 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
+              'touch-target mt-1 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
               task.status === 'done'
                 ? 'border-accent bg-accent'
                 : 'border-border hover:border-accent',

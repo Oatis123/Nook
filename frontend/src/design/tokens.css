@@ -28,13 +28,14 @@
   --border: light-dark(#e5e2d9, #363430);
   --text: light-dark(#1f1e1b, #eceae3);
   --text-muted: light-dark(#6b6860, #9c998f);
-  --accent: light-dark(#c2663f, #d9805a);
+  --accent: light-dark(#a65635, #d9805a);
   --accent-text: light-dark(#ffffff, #1c1b19);
   --danger: light-dark(#b5483a, #d0685a);
   --danger-text: light-dark(#ffffff, #1c1b19);
 
-  /* Priority markers — muted, fixed palette, AA contrast on --surface */
-  --priority-low: light-dark(#6b8f71, #86ab8c);
+  /* Priority markers — muted, fixed palette, AA contrast (4.5:1) on --surface, since
+     they're also used as text colors */
+  --priority-low: light-dark(#56735b, #86ab8c);
   --priority-medium: light-dark(#c2953f, #d9ac5a);
   --priority-high: light-dark(#b5483a, #d0685a);
 

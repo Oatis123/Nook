@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { type DragEvent, type FormEvent, useState } from 'react'
+import { createContext, type DragEvent, type FormEvent, useContext, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
@@ -10,6 +10,8 @@ import {
   FilePlus,
   MoreHorizontal,
 } from '@/design/icons'
+import { Button } from '@/design/components/Button'
+import { Dialog } from '@/design/components/Dialog'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { updateNote as updateNoteApi } from '@/features/notes/api'
@@ -35,6 +37,10 @@ import { errorMessage } from '@/lib/errors'
 import { toast } from '@/lib/toast'
 
 type DragPayload = { type: 'note' | 'folder'; id: string }
+
+/** Rows ask the tree to open the "Move to…" dialog — the touch- and keyboard-friendly
+ * alternative to drag and drop (which phones don't support). */
+const MoveContext = createContext<(payload: DragPayload) => void>(() => {})
 const DRAG_MIME = 'application/x-nook-item'
 
 export function FolderTree() {
@@ -45,6 +51,7 @@ export function FolderTree() {
   const { noteId: activeNoteId } = useParams<{ noteId: string }>()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [renaming, setRenaming] = useState<string | null>(null)
+  const [moving, setMoving] = useState<DragPayload | null>(null)
 
   const createFolder = useCreateFolder()
   const createNote = useCreateNote()
@@ -107,68 +114,153 @@ export function FolderTree() {
   }
 
   return (
-    <div
-      className="flex flex-col gap-0.5 px-2"
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={(e) => handleDrop(e, null)}
-    >
-      <div className="mb-1 flex items-center justify-between px-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Notes</span>
-        <div className="flex gap-0.5">
-          <IconButton
-            label="New folder"
-            onClick={() => createFolder.mutate({ name: 'New folder', parent_id: null })}
-          >
-            <FolderPlus size={14} strokeWidth={1.5} />
-          </IconButton>
-          <IconButton
-            label="New note"
-            onClick={() =>
-              createNote.mutate(
-                {
-                  title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], null),
-                  folder_id: null,
-                },
-                { onSuccess: (note) => navigate(`/notes/${note.id}`) },
-              )
-            }
-          >
-            <FilePlus size={14} strokeWidth={1.5} />
-          </IconButton>
+    <MoveContext.Provider value={setMoving}>
+      <div
+        className="flex flex-col gap-0.5 px-2"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => handleDrop(e, null)}
+      >
+        <div className="mb-1 flex items-center justify-between px-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Notes</span>
+          <div className="flex gap-0.5">
+            <IconButton
+              label="New folder"
+              onClick={() => createFolder.mutate({ name: 'New folder', parent_id: null })}
+            >
+              <FolderPlus size={14} strokeWidth={1.5} />
+            </IconButton>
+            <IconButton
+              label="New note"
+              onClick={() =>
+                createNote.mutate(
+                  {
+                    title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], null),
+                    folder_id: null,
+                  },
+                  { onSuccess: (note) => navigate(`/notes/${note.id}`) },
+                )
+              }
+            >
+              <FilePlus size={14} strokeWidth={1.5} />
+            </IconButton>
+          </div>
         </div>
+
+        {tree.roots.map((node) => (
+          <FolderRow
+            key={node.folder.id}
+            node={node}
+            depth={0}
+            expanded={expanded}
+            onToggle={toggle}
+            renaming={renaming}
+            setRenaming={setRenaming}
+            activeNoteId={activeNoteId}
+            onDropOn={handleDrop}
+          />
+        ))}
+
+        {tree.rootNotes.map((note) => (
+          <NoteRow
+            key={note.id}
+            note={note}
+            depth={0}
+            active={note.id === activeNoteId}
+            renaming={renaming === `note:${note.id}`}
+            onStartRename={() => setRenaming(`note:${note.id}`)}
+            onFinishRename={() => setRenaming(null)}
+            onDelete={() => deleteNoteMutation.mutate(note.id)}
+          />
+        ))}
+
+        {tree.roots.length === 0 && tree.rootNotes.length === 0 && (
+          <p className="px-1 py-2 text-sm text-text-muted">No notes yet.</p>
+        )}
       </div>
+      <MoveDialog
+        payload={moving}
+        tree={tree}
+        onClose={() => setMoving(null)}
+        onMove={(payload, folderId) => {
+          moveToFolder(payload, folderId)
+          setMoving(null)
+        }}
+      />
+    </MoveContext.Provider>
+  )
+}
 
-      {tree.roots.map((node) => (
-        <FolderRow
-          key={node.folder.id}
-          node={node}
-          depth={0}
-          expanded={expanded}
-          onToggle={toggle}
-          renaming={renaming}
-          setRenaming={setRenaming}
-          activeNoteId={activeNoteId}
-          onDropOn={handleDrop}
-        />
-      ))}
+function folderOptions(
+  nodes: FolderNode[],
+  exclude: string | null,
+  prefix = '',
+): { id: string; path: string }[] {
+  return nodes.flatMap((node) => {
+    if (node.folder.id === exclude) return [] // a folder can't move into itself or below
+    const path = prefix ? `${prefix} / ${node.folder.name}` : node.folder.name
+    return [{ id: node.folder.id, path }, ...folderOptions(node.children, exclude, path)]
+  })
+}
 
-      {tree.rootNotes.map((note) => (
-        <NoteRow
-          key={note.id}
-          note={note}
-          depth={0}
-          active={note.id === activeNoteId}
-          renaming={renaming === `note:${note.id}`}
-          onStartRename={() => setRenaming(`note:${note.id}`)}
-          onFinishRename={() => setRenaming(null)}
-          onDelete={() => deleteNoteMutation.mutate(note.id)}
-        />
-      ))}
+function MoveDialog({
+  payload,
+  tree,
+  onClose,
+  onMove,
+}: {
+  payload: DragPayload | null
+  tree: ReturnType<typeof buildTree>
+  onClose: () => void
+  onMove: (payload: DragPayload, folderId: string | null) => void
+}) {
+  const [target, setTarget] = useState('')
+  const options = folderOptions(tree.roots, payload?.type === 'folder' ? payload.id : null)
 
-      {tree.roots.length === 0 && tree.rootNotes.length === 0 && (
-        <p className="px-1 py-2 text-sm text-text-muted">No notes yet.</p>
-      )}
-    </div>
+  return (
+    <Dialog
+      open={payload !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setTarget('')
+          onClose()
+        }
+      }}
+      title={payload?.type === 'folder' ? 'Move folder' : 'Move note'}
+    >
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (payload) onMove(payload, target || null)
+          setTarget('')
+        }}
+      >
+        <label className="flex flex-col gap-1.5 text-sm text-text-muted">
+          Destination
+          <select
+            autoFocus
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="h-10 rounded-md border border-border bg-surface-raised px-2 text-sm text-text outline-none focus-visible:border-accent"
+          >
+            <option value="">Top level</option>
+            {options.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.path}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary">
+            Move
+          </Button>
+        </div>
+      </form>
+    </Dialog>
   )
 }
 
@@ -209,6 +301,7 @@ function FolderRow({
   const deleteFolder = useDeleteFolder()
   const deleteNoteMutation = useDeleteNote()
   const notesQuery = useNotes()
+  const startMove = useContext(MoveContext)
   const [dragOver, setDragOver] = useState(false)
 
   const items: DropdownMenuItem[] = [
@@ -228,6 +321,7 @@ function FolderRow({
       onSelect: () => createFolder.mutate({ name: 'New folder', parent_id: node.folder.id }),
     },
     { label: 'Rename', onSelect: () => setRenaming(`folder:${node.folder.id}`) },
+    { label: 'Move to…', onSelect: () => startMove({ type: 'folder', id: node.folder.id }) },
     {
       label: 'Delete',
       danger: true,
@@ -301,7 +395,7 @@ function FolderRow({
             {node.folder.name}
           </button>
         )}
-        <span className="opacity-0 group-hover:opacity-100">
+        <span className="reveal-on-hover">
           <DropdownMenu
             items={items}
             trigger={
@@ -366,8 +460,11 @@ function NoteRow({
   const navigate = useNavigate()
   const updateNote = useUpdateNote(note.id)
 
+  const startMove = useContext(MoveContext)
+
   const items: DropdownMenuItem[] = [
     { label: 'Rename', onSelect: onStartRename },
+    { label: 'Move to…', onSelect: () => startMove({ type: 'note', id: note.id }) },
     { label: 'Delete', danger: true, onSelect: onDelete },
   ]
 
@@ -415,7 +512,7 @@ function NoteRow({
           {note.title}
         </button>
       )}
-      <span className="opacity-0 group-hover:opacity-100">
+      <span className="reveal-on-hover">
         <DropdownMenu
           items={items}
           trigger={

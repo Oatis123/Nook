@@ -44,7 +44,7 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => 
         aria-label={done ? 'Mark as not done' : 'Mark as done'}
         data-checked={done || undefined}
         className={clsx(
-          'ui-check mt-0.5 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
+          'ui-check touch-target mt-0.5 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
           done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
         )}
       />

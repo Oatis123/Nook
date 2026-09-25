@@ -35,3 +35,33 @@ export function todayIn(timeZone?: string | null, now: Date = new Date()): strin
   const get = (type: string) => resolved.find((p) => p.type === type)?.value ?? ''
   return `${get('year')}-${get('month')}-${get('day')}`
 }
+
+/** The current wall-clock time in `timeZone`, as a local Date with those same fields —
+ * a reference point for "today"/"tomorrow 6pm" parsing that follows the profile's
+ * timezone instead of the browser's. Falls back to the browser's clock. */
+export function nowIn(timeZone?: string | null, now: Date = new Date()): Date {
+  let parts
+  try {
+    parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone ?? undefined,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(now)
+  } catch {
+    return now
+  }
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0)
+  return new Date(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour'),
+    get('minute'),
+    get('second'),
+  )
+}

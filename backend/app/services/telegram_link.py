@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -11,6 +12,8 @@ from app.core.tokens import generate_token, hash_token
 from app.models.auth_token import AuthToken, AuthTokenKind
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
+
+LOGIN_CODE_CHOICES = 4
 
 
 async def get_user_by_telegram_id(session: AsyncSession, telegram_user_id: int) -> User | None:
@@ -89,8 +92,23 @@ async def consume_link_token(
     return user
 
 
+def new_confirm_code() -> str:
+    """Two digits shown in the browser that started a Telegram login; the bot makes the
+    user pick them among decoys. Someone who was merely sent the login link can't see
+    that browser, so tapping through the confirmation isn't enough to hand a session
+    over (a blind guess succeeds 1 time in 4, and a wrong pick denies the login)."""
+    return f"{secrets.randbelow(100):02d}"
+
+
+def confirm_code_choices(code: str) -> list[str]:
+    choices = {code}
+    while len(choices) < LOGIN_CODE_CHOICES:
+        choices.add(new_confirm_code())
+    return sorted(choices)
+
+
 async def create_login_token(
-    session: AsyncSession, user_agent: str | None, ip: str | None
+    session: AsyncSession, user_agent: str | None, ip: str | None, code: str | None = None
 ) -> tuple[str, datetime]:
     settings = get_settings()
     plain = generate_token()
@@ -101,7 +119,7 @@ async def create_login_token(
             kind=AuthTokenKind.login,
             token_hash=hash_token(plain),
             expires_at=expires_at,
-            meta={"status": "pending", "user_agent": user_agent, "ip": ip},
+            meta={"status": "pending", "user_agent": user_agent, "ip": ip, "code": code},
         )
     )
     await session.commit()

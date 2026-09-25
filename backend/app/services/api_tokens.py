@@ -42,7 +42,9 @@ async def resolve_api_token(session: AsyncSession, plain: str) -> User | None:
         return None
 
     user = await session.get(User, token.user_id)
-    if user is None or not user.is_active:
+    # Same rule as the web API (spec §5.1): no linked Telegram, no access — including
+    # for tokens created before Telegram was unlinked.
+    if user is None or not user.is_active or user.telegram_user_id is None:
         return None
 
     token.last_used_at = datetime.now(UTC)

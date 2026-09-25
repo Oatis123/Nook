@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
 from app.core.deps import CurrentUser, DbSession, require_csrf
+from app.core.errors import CodedHTTPException
 from app.schemas.note import NoteCreate, NoteDetail, NoteSummary, NoteUpdate
 from app.schemas.note_link import BacklinkOut, RenameImpact
 from app.schemas.task import TaskOut
@@ -16,6 +17,7 @@ from app.services import vault_export as vault_export_service
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 Csrf = Depends(require_csrf)
+_exports_running: set[uuid.UUID] = set()
 
 
 @router.get("", response_model=list[NoteSummary])
@@ -48,7 +50,16 @@ async def create_note(body: NoteCreate, user: CurrentUser, session: DbSession) -
 
 @router.get("/export")
 async def export_vault(user: CurrentUser, session: DbSession) -> FileResponse:
-    path = await vault_export_service.build_vault_zip_file(session, user.id)
+    # One export per user at a time: each builds a zip of the whole vault on disk.
+    if user.id in _exports_running:
+        raise CodedHTTPException(
+            status.HTTP_409_CONFLICT, "export_in_progress", "An export is already being prepared"
+        )
+    _exports_running.add(user.id)
+    try:
+        path = await vault_export_service.build_vault_zip_file(session, user.id)
+    finally:
+        _exports_running.discard(user.id)
     return FileResponse(
         path,
         media_type="application/zip",

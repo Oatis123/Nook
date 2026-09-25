@@ -62,6 +62,17 @@ export function TelegramLoginPanel({ onBack }: { onBack: () => void }) {
           >
             Open in Telegram
           </a>
+          {createToken.data.confirm_code && (
+            <div className="flex flex-col items-center gap-1">
+              <p className="text-sm text-text-muted">In Telegram, tap this code to confirm:</p>
+              <p
+                className="font-mono text-3xl tracking-widest text-text"
+                aria-label={`Confirmation code ${createToken.data.confirm_code}`}
+              >
+                {createToken.data.confirm_code}
+              </p>
+            </div>
+          )}
         </>
       )}
 

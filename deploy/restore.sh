@@ -32,6 +32,16 @@ if ! $assume_yes; then
     [ "$answer" = "restore" ] || { echo "Aborted."; exit 1; }
 fi
 
+# Check the backup files are readable *before* anything is deleted — a truncated or
+# corrupt backup must not leave you with neither the old data nor the new.
+echo "Checking the backup files…"
+docker compose exec -T db pg_restore --list > /dev/null < "$db_file" \
+    || { echo "The database dump can't be read — nothing was changed." >&2; exit 1; }
+if [ -n "$files_file" ] && ! { gzip -t "$files_file" && tar -tzf "$files_file" > /dev/null; }; then
+    echo "The attachments archive can't be read — nothing was changed." >&2
+    exit 1
+fi
+
 echo "Stopping the app (the database keeps running)…"
 docker compose stop web api worker bot
 
@@ -39,7 +49,7 @@ echo "Restoring the database…"
 docker compose exec -T db sh -c \
     'dropdb -U "$POSTGRES_USER" --if-exists "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
 docker compose exec -T db sh -c \
-    'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error' < "$db_file"
+    'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --exit-on-error --single-transaction' < "$db_file"
 
 if [ -n "$files_file" ]; then
     echo "Restoring attachments…"

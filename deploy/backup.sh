@@ -7,6 +7,8 @@
 #   BACKUP_KEEP=14         how many backups of each kind to keep
 #   BACKUP_RSYNC_TARGET=   optional off-host copy, e.g. user@backup-host:/srv/nook/
 set -euo pipefail
+# Dumps contain every note and the password hashes: readable by the owner only.
+umask 077
 
 cd "$(dirname "$0")/.."
 BACKUP_DIR=${BACKUP_DIR:-./backups}

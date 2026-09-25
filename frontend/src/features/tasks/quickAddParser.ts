@@ -24,7 +24,7 @@ function removeMatch(text: string, match: RegExpExecArray): string {
  * use for quick add), and recurrence (`every monday`, `every 3 days`, `weekly`, ...). The
  * recurrence phrase is pulled out before chrono runs so a bare weekday name in it (e.g.
  * "every monday") isn't also parsed as a one-off date. */
-export function parseQuickAdd(raw: string): ParsedQuickAdd {
+export function parseQuickAdd(raw: string, now: Date = new Date()): ParsedQuickAdd {
   let text = raw
 
   let priority: TaskPriority | null = null
@@ -46,7 +46,7 @@ export function parseQuickAdd(raw: string): ParsedQuickAdd {
 
   let dueDate: string | null = null
   let dueTime: string | null = null
-  const [result] = chrono.parse(text, new Date(), { forwardDate: true })
+  const [result] = chrono.parse(text, now, { forwardDate: true })
   if (result) {
     const dt = result.start.date()
     dueDate = format(dt, 'yyyy-MM-dd')

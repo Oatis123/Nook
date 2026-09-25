@@ -120,21 +120,41 @@ async def _handle_login(message: Message, telegram_user_id: int, plain_token: st
 
     device = meta.get("user_agent") or "an unknown device"
     ip = meta.get("ip") or "an unknown location"
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="Confirm login", callback_data=f"tglogin:confirm:{token_id}"
-                ),
-                InlineKeyboardButton(text="Deny", callback_data=f"tglogin:deny:{token_id}"),
+    code = meta.get("code")
+    if code:
+        # The user must pick the code their browser shows; see new_confirm_code().
+        choices = telegram_link_service.confirm_code_choices(code)
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text=c, callback_data=f"tglogin:code:{token_id}:{c}")
+                    for c in choices
+                ],
+                [InlineKeyboardButton(text="Deny", callback_data=f"tglogin:deny:{token_id}")],
             ]
-        ]
-    )
+        )
+        prompt = (
+            "To confirm, tap the code shown in your browser. If you didn't start this "
+            "login yourself just now — for example, someone sent you this link — press Deny."
+        )
+    else:
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="Confirm login", callback_data=f"tglogin:confirm:{token_id}"
+                    ),
+                    InlineKeyboardButton(text="Deny", callback_data=f"tglogin:deny:{token_id}"),
+                ]
+            ]
+        )
+        prompt = (
+            "Only confirm if you started this login yourself, just now. If someone sent you "
+            "this link, press Deny — confirming would give them access to your account."
+        )
     await message.answer(
         f"Someone is trying to log in to {settings.app_name} as '{user.username}' from:\n"
-        f"{device}\n{ip}\n\n"
-        "Only confirm if you started this login yourself, just now. If someone sent you "
-        "this link, press Deny — confirming would give them access to your account.",
+        f"{device}\n{ip}\n\n{prompt}",
         reply_markup=keyboard,
     )
 
@@ -148,10 +168,12 @@ async def handle_login_callback(callback: CallbackQuery) -> None:
         or callback.from_user is None
     ):
         return
-    _, action, token_id_raw = callback.data.split(":", 2)
+    parts = callback.data.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+    picked_code = parts[3] if action == "code" and len(parts) > 3 else None
     try:
-        token_id = uuid.UUID(token_id_raw)
-    except ValueError:
+        token_id = uuid.UUID(parts[2])
+    except (ValueError, IndexError):
         await callback.answer("This request is no longer valid.", show_alert=True)
         return
 
@@ -166,16 +188,26 @@ async def handle_login_callback(callback: CallbackQuery) -> None:
             await callback.answer("This isn't your login request.", show_alert=True)
             return
 
+        expected_code = (token.meta or {}).get("code")
+        if expected_code:
+            # Code-protected login: only picking the right code confirms it.
+            confirmed = action == "code" and picked_code == expected_code
+        else:
+            confirmed = action == "confirm"
         await telegram_link_service.set_login_status(
-            session, token, "confirmed" if action == "confirm" else "denied"
+            session, token, "confirmed" if confirmed else "denied"
         )
-        log.info("bot.telegram_login_answered", user_id=str(user.id), action=action)
+        log.info("bot.telegram_login_answered", user_id=str(user.id), confirmed=confirmed)
 
-    text = (
-        "Login confirmed. You can return to the browser."
-        if action == "confirm"
-        else "Login denied."
-    )
+    if confirmed:
+        text = "Login confirmed. You can return to the browser."
+    elif action == "code":
+        text = (
+            "That code doesn't match, so the login was denied. If you didn't start this "
+            "login, someone may be trying to get into your account — change your password."
+        )
+    else:
+        text = "Login denied."
     await callback.message.edit_text(text)
     await callback.answer()
 

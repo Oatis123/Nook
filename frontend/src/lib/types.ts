@@ -63,6 +63,8 @@ export interface InvitePreview {
 export interface TelegramToken {
   deep_link_url: string
   expires_at: string
+  /** Login only: the code to pick in the bot to confirm this browser's login. */
+  confirm_code?: string | null
 }
 
 export type TelegramLoginStatus = 'pending' | 'confirmed' | 'denied' | 'expired'

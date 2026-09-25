@@ -8,6 +8,8 @@ from app.schemas.user import UserPublic
 class TelegramTokenOut(BaseModel):
     deep_link_url: str
     expires_at: datetime
+    # Login only: the code to pick in the bot to confirm this browser's login.
+    confirm_code: str | None = None
 
 
 class TelegramLoginStatusIn(BaseModel):

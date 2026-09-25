@@ -50,14 +50,18 @@ Then enable HTTPS by adding:
 COMPOSE_FILE=docker-compose.yml:docker-compose.caddy.yml
 DOMAIN=notes.example.com
 PUBLIC_URL=https://notes.example.com
-TRUSTED_PROXY_CIDR=172.30.0.10/32
 ```
 
 - `COMPOSE_FILE` makes every `docker compose` command include the Caddy setup, so you
   never have to pass `-f` flags.
-- `TRUSTED_PROXY_CIDR` is the fixed address of the Caddy container
-  (`docker-compose.caddy.yml`). nginx trusts `X-Forwarded-For` from it only, so the API
-  sees the visitor's real IP — login rate limiting and the session list depend on that.
+- The Caddy setup gives Caddy a fixed address and tells nginx to trust
+  `X-Forwarded-For` from it only (`TRUSTED_PROXY_CIDR` in `docker-compose.caddy.yml`),
+  so the API sees the visitor's real IP — login rate limiting and the session list
+  depend on that.
+- If the domain has an `AAAA` (IPv6) record, make sure Docker publishes ports on IPv6
+  natively (`"ipv6": true` in `/etc/docker/daemon.json`, or no `AAAA` record at all).
+  Otherwise Docker's userland proxy forwards IPv6 visitors from its own gateway
+  address, and they all share one rate-limit bucket.
 - Optional: `MAX_UPLOAD_MB` (per file), `MAX_IMPORT_MB` (vault import archive),
   `MAX_STORAGE_MB` (attachments per user, `0` = unlimited), `*_MEM_LIMIT` for each
   service (see `docker-compose.yml`).

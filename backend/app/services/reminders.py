@@ -190,7 +190,10 @@ async def schedule_next_occurrence_reminder(
     after = sent_occurrence_at
     if not_before is not None:
         after = max(after, not_before.astimezone(tz).replace(tzinfo=None))
-    next_occ = recurrence_service.next_occurrence(task.rrule, task.dtstart_local, after)
+    # sent_occurrence_at is itself an occurrence: expand from there, not from dtstart.
+    next_occ = recurrence_service.next_occurrence(
+        task.rrule, task.dtstart_local, after, anchor=sent_occurrence_at
+    )
     if next_occ is None:
         return
     remind_at = _local_to_utc(next_occ, tz)

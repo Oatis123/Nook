@@ -1,11 +1,25 @@
 import uuid
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.task import TaskPriority, TaskStatus
 from app.schemas.task_note_link import LinkedNoteOut
 from app.services.recurrence import RecurrenceInput
+
+EARLIEST_DUE_DATE = date(2000, 1, 1)
+MAX_DUE_YEARS_AHEAD = 50
+
+
+def _check_due_date(value: date | None) -> date | None:
+    """Bounded so a nonsense date (year 1, year 9999) can't be used to make recurrence
+    expansion or the calendar do absurd amounts of work."""
+    if value is None:
+        return None
+    latest = date.today() + timedelta(days=365 * MAX_DUE_YEARS_AHEAD)
+    if not EARLIEST_DUE_DATE <= value <= latest:
+        raise ValueError(f"due_date must be between {EARLIEST_DUE_DATE} and {latest}")
+    return value
 
 
 class TaskCreate(BaseModel):
@@ -18,6 +32,8 @@ class TaskCreate(BaseModel):
     due_time: time | None = None
     reminders_enabled: bool = True
     recurrence: RecurrenceInput | None = None
+
+    _due_date_range = field_validator("due_date")(_check_due_date)
 
 
 class TaskUpdate(BaseModel):
@@ -33,6 +49,8 @@ class TaskUpdate(BaseModel):
     position: int | None = None
     recurrence: RecurrenceInput | None = None
     clear_recurrence: bool = False
+
+    _due_date_range = field_validator("due_date")(_check_due_date)
 
 
 class TaskCompleteRequest(BaseModel):

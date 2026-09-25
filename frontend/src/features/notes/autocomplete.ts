@@ -35,7 +35,7 @@ export function createWikilinkCompletion(notes: NoteSummary[]): CompletionSource
 /** After `#`, suggest existing tags — spec §6.2. */
 export function createTagCompletion(tags: Tag[]): CompletionSource {
   return (context: CompletionContext) => {
-    const match = context.matchBefore(/#[\w/-]*/)
+    const match = context.matchBefore(/#[\p{L}\p{N}_/-]*/u)
     if (!match) return null
     if (match.from === match.to && !context.explicit) return null
 

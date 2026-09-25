@@ -162,3 +162,24 @@ async def test_attachment_isolation_between_users(
         f"/api/v1/attachments/{alice_upload['id']}", headers={"x-csrf-token": csrf_bob}
     )
     assert bob_delete.status_code == 404
+
+
+async def test_duplicate_filenames_are_numbered(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+
+    names = [(await _upload(client, "image.png", _PNG_MAGIC))["filename"] for _ in range(3)]
+    assert names == ["image.png", "image (2).png", "image (3).png"]
+
+
+async def test_overlong_filename_is_clipped_keeping_extension(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+
+    uploaded = await _upload(client, "a" * 300 + ".png", _PNG_MAGIC)
+    assert len(uploaded["filename"]) == 255
+    assert uploaded["filename"].endswith(".png")

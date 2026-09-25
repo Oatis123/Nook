@@ -1,16 +1,46 @@
+import math
 import re
 from dataclasses import dataclass
+from datetime import date, datetime, time
+from typing import Any
 
 import yaml
+
+# Matches the String(255) columns that tags, aliases and link targets are stored in.
+MAX_NAME_LENGTH = 255
 
 _FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n?", re.DOTALL)
 _FENCED_CODE_RE = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
 _INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 _MARKDOWN_LINK_URL_RE = re.compile(r"\]\((https?://[^)]*|[^)]*)\)")
 _BARE_URL_RE = re.compile(r"https?://\S+")
-_TAG_RE = re.compile(r"(?<![\w#/])#([A-Za-z][\w-]*(?:/[A-Za-z][\w-]*)*)")
+# `[^\W\d_]` is "any Unicode letter", so `#заметка` is a tag just like `#note`.
+_TAG_RE = re.compile(r"(?<![\w#/])#([^\W\d_][\w-]*(?:/[^\W\d_][\w-]*)*)")
 _WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\[\]]+)\]\]")
 _EMBED_RE = re.compile(r"!\[\[([^\[\]]+)\]\]")
+
+
+def _json_safe(value: Any) -> Any:
+    """YAML happily produces values JSONB can't store — `created: 2024-01-01` becomes a
+    `datetime.date`, `.nan` a float NaN, `? [a, b]` a non-string key. Normalizes the
+    parsed frontmatter into plain JSON types (dates as ISO strings)."""
+    if value is None or isinstance(value, bool | int | str):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else str(value)
+    if isinstance(value, datetime | date | time):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {str(_json_safe(k)): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list | tuple | set):
+        return [_json_safe(v) for v in value]
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def clip_name(value: str) -> str:
+    return value[:MAX_NAME_LENGTH]
 
 
 def extract_frontmatter(content: str) -> tuple[dict, str]:
@@ -24,7 +54,7 @@ def extract_frontmatter(content: str) -> tuple[dict, str]:
         return {}, content
     if not isinstance(data, dict):
         return {}, content
-    return data, content[match.end() :]
+    return _json_safe(data), content[match.end() :]
 
 
 def _strip_non_prose(text: str) -> str:

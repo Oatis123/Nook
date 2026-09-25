@@ -3,11 +3,12 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import and_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.isolation import get_owned_or_404
 from app.models.folder import Folder
-from app.models.note import Note
+from app.models.note import ACTIVE_TITLE_INDEX, Note
 from app.models.tag import NoteTag, Tag
 from app.schemas.note import NoteDetail, NoteUpdate
 from app.schemas.task_note_link import LinkedTaskOut
@@ -20,6 +21,11 @@ from app.services.note_links import (
 from app.services.task_note_links import get_linked_tasks
 
 TRASH_RETENTION_DAYS = 30
+DUPLICATE_TITLE_MESSAGE = "A note with this title already exists in this folder"
+
+
+def _is_duplicate_title(exc: IntegrityError) -> bool:
+    return ACTIVE_TITLE_INDEX in str(exc.orig)
 
 
 async def _validate_folder(
@@ -49,9 +55,7 @@ async def _check_title_unique(
         query = query.where(Note.id != exclude_note_id)
     existing = await session.scalar(query)
     if existing is not None:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, "A note with this title already exists in this folder"
-        )
+        raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_TITLE_MESSAGE)
 
 
 async def purge_old_trash(session: AsyncSession, user_id: uuid.UUID) -> None:
@@ -105,9 +109,16 @@ async def create_note(
 
     note = Note(user_id=user_id, folder_id=folder_id, title=title, content=content)
     session.add(note)
-    await session.flush()
-    await sync_note_from_content(session, user_id, note)
-    await session.commit()
+    try:
+        await session.flush()
+        await sync_note_from_content(session, user_id, note)
+        await session.commit()
+    except IntegrityError as exc:
+        # Lost the race against a concurrent create of the same title.
+        await session.rollback()
+        if _is_duplicate_title(exc):
+            raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_TITLE_MESSAGE) from exc
+        raise
     await session.refresh(note)
     await resolve_dangling_links_to(session, user_id, note)
     await session.commit()
@@ -155,6 +166,10 @@ async def update_note(
     session: AsyncSession, user_id: uuid.UUID, note_id: uuid.UUID, data: NoteUpdate
 ) -> Note:
     note = await get_owned_or_404(session, Note, note_id, user_id)
+    # Row lock for the rest of this transaction: two concurrent saves of the same version
+    # are serialized, so the second one sees the bumped version below and gets a 409
+    # instead of silently overwriting the first (lost update).
+    await session.refresh(note, with_for_update=True)
     if note.deleted_at is not None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Note is in trash")
 
@@ -182,8 +197,14 @@ async def update_note(
         note.folder_id = new_folder_id
     note.version += 1
 
-    await sync_note_from_content(session, user_id, note)
-    await session.commit()
+    try:
+        await sync_note_from_content(session, user_id, note)
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        if _is_duplicate_title(exc):
+            raise HTTPException(status.HTTP_409_CONFLICT, DUPLICATE_TITLE_MESSAGE) from exc
+        raise
     await session.refresh(note)
 
     if title_changing:
@@ -212,17 +233,27 @@ async def restore_note(session: AsyncSession, user_id: uuid.UUID, note_id: uuid.
         if folder is None or folder.deleted_at is not None:
             note.folder_id = None
 
-    try:
-        await _check_title_unique(
-            session, user_id, note.folder_id, note.title, exclude_note_id=note.id
-        )
-    except HTTPException:
-        note.title = f"{note.title} (restored)"
+    base_title = note.title
+    for attempt in range(1, 100):
+        candidate = base_title if attempt == 1 else _restored_title(base_title, attempt)
+        try:
+            await _check_title_unique(
+                session, user_id, note.folder_id, candidate, exclude_note_id=note.id
+            )
+        except HTTPException:
+            continue
+        note.title = candidate
+        break
 
     note.deleted_at = None
     await session.commit()
     await session.refresh(note)
     return note
+
+
+def _restored_title(title: str, attempt: int) -> str:
+    suffix = " (restored)" if attempt == 2 else f" (restored {attempt - 1})"
+    return title[: 255 - len(suffix)] + suffix
 
 
 async def hard_delete_note(session: AsyncSession, user_id: uuid.UUID, note_id: uuid.UUID) -> None:

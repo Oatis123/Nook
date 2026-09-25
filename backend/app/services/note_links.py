@@ -1,9 +1,9 @@
 import re
 import uuid
+from dataclasses import dataclass
 
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.models.attachment import Attachment, NoteAttachment
 from app.models.folder import Folder
@@ -13,6 +13,7 @@ from app.models.note_link import NoteLink
 from app.models.tag import NoteTag, Tag
 from app.services.note_parsing import (
     Wikilink,
+    clip_name,
     extract_embeds,
     extract_frontmatter,
     extract_inline_tags,
@@ -22,55 +23,107 @@ from app.services.note_parsing import (
 )
 
 
-async def _active_notes(session: AsyncSession, user_id: uuid.UUID) -> list[Note]:
-    result = await session.scalars(
-        select(Note)
-        .options(selectinload(Note.aliases))
-        .where(Note.user_id == user_id, Note.deleted_at.is_(None))
-    )
-    return list(result)
+@dataclass(frozen=True)
+class _Candidate:
+    id: uuid.UUID
+    title: str
+    folder_id: uuid.UUID | None
+    aliases: frozenset[str]
 
 
-async def resolve_target(
-    session: AsyncSession, user_id: uuid.UUID, target_raw: str, notes: list[Note] | None = None
-) -> uuid.UUID | None:
-    """Matches a wikilink target to exactly one active note by title or alias, or the
-    `folder/Title` form (matched against the note's immediate containing folder's name —
-    a one-level approximation of a full path, on the agent's discretion). Returns None
-    if there's no match or more than one (ambiguous), same as a dangling link."""
-    notes = notes if notes is not None else await _active_notes(session, user_id)
-
-    folder_name = None
-    title = target_raw
+def _split_target(target_raw: str) -> tuple[str | None, str]:
+    """`folder/Title` → ("folder", "Title"); a plain `Title` → (None, "Title")."""
     if "/" in target_raw:
         folder_name, _, title = target_raw.rpartition("/")
+        return folder_name or None, title
+    return None, target_raw
 
-    if folder_name:
-        folders = {
-            f.id: f.name
-            for f in await session.scalars(
-                select(Folder).where(Folder.user_id == user_id, Folder.deleted_at.is_(None))
+
+async def _load_candidates(
+    session: AsyncSession, user_id: uuid.UUID, names: set[str]
+) -> tuple[list[_Candidate], dict[uuid.UUID, str]]:
+    """Only the active notes whose title or an alias is one of `names` (plus their folder
+    names) — never the whole vault, so saving a note stays cheap however many notes the
+    user has."""
+    if not names:
+        return [], {}
+    alias_note_ids = select(NoteAlias.note_id).where(NoteAlias.alias.in_(names))
+    rows = (
+        await session.execute(
+            select(Note.id, Note.title, Note.folder_id).where(
+                Note.user_id == user_id,
+                Note.deleted_at.is_(None),
+                or_(Note.title.in_(names), Note.id.in_(alias_note_ids)),
             )
-        }
+        )
+    ).all()
+    if not rows:
+        return [], {}
+
+    aliases: dict[uuid.UUID, set[str]] = {}
+    alias_rows = await session.execute(
+        select(NoteAlias.note_id, NoteAlias.alias).where(
+            NoteAlias.note_id.in_([row.id for row in rows])
+        )
+    )
+    for note_id, alias in alias_rows.all():
+        aliases.setdefault(note_id, set()).add(alias)
+
+    folder_ids = {row.folder_id for row in rows if row.folder_id is not None}
+    folders: dict[uuid.UUID, str] = {}
+    if folder_ids:
+        folder_rows = await session.execute(
+            select(Folder.id, Folder.name).where(
+                Folder.id.in_(folder_ids), Folder.deleted_at.is_(None)
+            )
+        )
+        folders = {folder_id: name for folder_id, name in folder_rows.all()}
+
+    candidates = [
+        _Candidate(row.id, row.title, row.folder_id, frozenset(aliases.get(row.id, ())))
+        for row in rows
+    ]
+    return candidates, folders
+
+
+def _match_target(
+    target_raw: str, candidates: list[_Candidate], folders: dict[uuid.UUID, str]
+) -> uuid.UUID | None:
+    folder_name, title = _split_target(target_raw)
+    if folder_name:
         matches = [
-            n
-            for n in notes
-            if n.title == title
-            and n.folder_id is not None
-            and folders.get(n.folder_id) == folder_name
+            c
+            for c in candidates
+            if c.title == title
+            and c.folder_id is not None
+            and folders.get(c.folder_id) == folder_name
         ]
     else:
-        matches = [n for n in notes if n.title == title or any(a.alias == title for a in n.aliases)]
-
+        matches = [c for c in candidates if c.title == title or title in c.aliases]
     if len(matches) == 1:
         return matches[0].id
     return None
 
 
+async def resolve_target(
+    session: AsyncSession, user_id: uuid.UUID, target_raw: str
+) -> uuid.UUID | None:
+    """Matches a wikilink target to exactly one active note by title or alias, or the
+    `folder/Title` form (matched against the note's immediate containing folder's name —
+    a one-level approximation of a full path, on the agent's discretion). Returns None
+    if there's no match or more than one (ambiguous), same as a dangling link."""
+    candidates, folders = await _load_candidates(session, user_id, {_split_target(target_raw)[1]})
+    return _match_target(target_raw, candidates, folders)
+
+
 def _dedup_links(links: list[Wikilink]) -> list[Wikilink]:
+    """Also clips target/heading to their column length, so an absurdly long `[[...]]`
+    is stored (truncated) rather than failing the whole save."""
     seen: dict[tuple[str, str | None], Wikilink] = {}
     for link in links:
-        seen[(link.target, link.heading)] = link
+        target = clip_name(link.target)
+        heading = clip_name(link.heading) if link.heading is not None else None
+        seen[(target, heading)] = Wikilink(target=target, heading=heading, alias=link.alias)
     return list(seen.values())
 
 
@@ -80,10 +133,15 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
     frontmatter, body = extract_frontmatter(note.content)
     note.frontmatter = frontmatter
 
-    tag_names = frontmatter_tags(frontmatter) | extract_inline_tags(body)
-    existing_tags = {
-        t.name: t for t in await session.scalars(select(Tag).where(Tag.user_id == user_id))
-    }
+    tag_names = {clip_name(t) for t in frontmatter_tags(frontmatter) | extract_inline_tags(body)}
+    existing_tags: dict[str, Tag] = {}
+    if tag_names:
+        existing_tags = {
+            t.name: t
+            for t in await session.scalars(
+                select(Tag).where(Tag.user_id == user_id, Tag.name.in_(tag_names))
+            )
+        }
     tag_ids: list[uuid.UUID] = []
     for name in tag_names:
         tag = existing_tags.get(name)
@@ -98,21 +156,22 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
     for tag_id in tag_ids:
         await session.execute(insert(NoteTag).values(note_id=note.id, tag_id=tag_id))
 
-    aliases = frontmatter_aliases(frontmatter)
+    aliases = {clip_name(a) for a in frontmatter_aliases(frontmatter)}
     await session.execute(delete(NoteAlias).where(NoteAlias.note_id == note.id))
     for alias in aliases:
         session.add(NoteAlias(note_id=note.id, alias=alias))
 
     wikilinks = _dedup_links(extract_wikilinks(body))
-    notes = await _active_notes(session, user_id)
     await session.execute(delete(NoteLink).where(NoteLink.source_note_id == note.id))
+    candidates, folders = await _load_candidates(
+        session, user_id, {_split_target(link.target)[1] for link in wikilinks}
+    )
     for link in wikilinks:
-        target_id = await resolve_target(session, user_id, link.target, notes=notes)
         session.add(
             NoteLink(
                 user_id=user_id,
                 source_note_id=note.id,
-                target_note_id=target_id,
+                target_note_id=_match_target(link.target, candidates, folders),
                 target_raw=link.target,
                 heading=link.heading,
             )
@@ -121,10 +180,14 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
     embed_filenames = extract_embeds(body)
     await session.execute(delete(NoteAttachment).where(NoteAttachment.note_id == note.id))
     if embed_filenames:
-        attachments = await session.scalars(select(Attachment).where(Attachment.user_id == user_id))
+        attachments = await session.execute(
+            select(Attachment.id, Attachment.filename).where(
+                Attachment.user_id == user_id, Attachment.filename.in_(embed_filenames)
+            )
+        )
         by_filename: dict[str, list[uuid.UUID]] = {}
-        for att in attachments:
-            by_filename.setdefault(att.filename, []).append(att.id)
+        for attachment_id, filename in attachments.all():
+            by_filename.setdefault(filename, []).append(attachment_id)
         for filename in embed_filenames:
             matches = by_filename.get(filename, [])
             if len(matches) == 1:
@@ -137,23 +200,28 @@ async def resolve_dangling_links_to(session: AsyncSession, user_id: uuid.UUID, n
     """Called after a note is created or renamed: any other note's dangling link whose
     raw target now matches this note's title/aliases gets re-resolved (spec §6.5)."""
     aliases = {a.alias for a in note.aliases} if note.aliases else set()
-    candidates = {note.title, *aliases}
+    names = {note.title, *aliases}
 
-    dangling = await session.scalars(
-        select(NoteLink).where(
-            NoteLink.user_id == user_id,
-            NoteLink.target_note_id.is_(None),
-            NoteLink.source_note_id != note.id,
+    dangling = list(
+        await session.scalars(
+            select(NoteLink).where(
+                NoteLink.user_id == user_id,
+                NoteLink.target_note_id.is_(None),
+                NoteLink.source_note_id != note.id,
+                or_(
+                    NoteLink.target_raw.in_(names),
+                    *(NoteLink.target_raw.endswith(f"/{name}", autoescape=True) for name in names),
+                ),
+            )
         )
     )
-    notes = await _active_notes(session, user_id)
+    if not dangling:
+        return
+    candidates, folders = await _load_candidates(
+        session, user_id, {_split_target(link.target_raw)[1] for link in dangling}
+    )
     for link in dangling:
-        base_target = (
-            link.target_raw.rpartition("/")[2] if "/" in link.target_raw else link.target_raw
-        )
-        if base_target not in candidates:
-            continue
-        resolved = await resolve_target(session, user_id, link.target_raw, notes=notes)
+        resolved = _match_target(link.target_raw, candidates, folders)
         if resolved is not None:
             link.target_note_id = resolved
 

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Computed, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import Computed, DateTime, ForeignKey, Index, Integer, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,6 +18,9 @@ _SEARCH_VECTOR_RU_SQL = (
 )
 
 
+ACTIVE_TITLE_INDEX = "uq_notes_active_title"
+
+
 class Note(UUIDPKMixin, Base):
     __tablename__ = "notes"
     __table_args__ = (
@@ -28,6 +31,18 @@ class Note(UUIDPKMixin, Base):
             "title",
             postgresql_using="gin",
             postgresql_ops={"title": "gin_trgm_ops"},
+        ),
+        # One active note per title per folder (root included, hence NULLS NOT DISTINCT).
+        # The service checks this first for a friendly 409; the index closes the race
+        # between two concurrent creates/renames.
+        Index(
+            ACTIVE_TITLE_INDEX,
+            "user_id",
+            "folder_id",
+            "title",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+            postgresql_nulls_not_distinct=True,
         ),
     )
 

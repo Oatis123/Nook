@@ -9,11 +9,13 @@ import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import type { TaskGroup } from '@/features/tasks/groupTasks'
 import type { Task } from '@/lib/types'
 import { QueryState } from '@/design/components/QueryState'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function TodayView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const tasksQuery = useTasks({ view: 'today' })
   const today = useToday()
+  useDocumentTitle('Today')
 
   if (!tasksQuery.data) return <QueryState query={tasksQuery} />
 

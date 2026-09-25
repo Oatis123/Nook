@@ -7,11 +7,13 @@ import { useElementSize } from '@/lib/useElementSize'
 import { useFolders, useTags } from '@/features/notes/hooks'
 import { useGraph } from '@/features/graph/hooks'
 import { GraphCanvas, type ColorBy } from '@/features/graph/GraphCanvas'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const selectClass =
   'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
 export default function GraphPage() {
+  useDocumentTitle('Graph')
   const [folderId, setFolderId] = useState('')
   const [tag, setTag] = useState('')
   const [hideOrphans, setHideOrphans] = useState(false)

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import type { ComponentType } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { FileText } from '@/design/icons'
 import { AppShell } from '@/features/shell/AppShell'
@@ -6,21 +6,17 @@ import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'
 import InviteAcceptPage from '@/features/auth/InviteAcceptPage'
 import { RequireAdmin, RequireAuth } from '@/features/auth/RequireAuth'
-import SettingsPage from '@/features/settings/SettingsPage'
-import AdminPage from '@/features/admin/AdminPage'
-import NoteEditorRoute from '@/features/notes/NoteEditorRoute'
-import TrashPage from '@/features/notes/TrashPage'
-import TagNotesPage from '@/features/notes/TagNotesPage'
-import SearchPage from '@/features/search/SearchPage'
-import AttachmentsPage from '@/features/attachments/AttachmentsPage'
-import GraphPage from '@/features/graph/GraphPage'
 import TodayView from '@/features/tasks/TodayView'
 import UpcomingView from '@/features/tasks/UpcomingView'
 import ListView from '@/features/tasks/ListView'
-import CalendarPage from '@/features/tasks/CalendarPage'
 import { RouteError } from '@/app/RouteError'
 
-const StyleguidePage = lazy(() => import('@/features/styleguide/StyleguidePage'))
+/** Route-level code splitting: each heavier page (the CodeMirror editor, the graph,
+ * the calendar, settings/admin…) is its own chunk, fetched on first visit instead of
+ * being part of the initial bundle. */
+function page(load: () => Promise<{ default: ComponentType }>) {
+  return async () => ({ Component: (await load()).default })
+}
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage />, errorElement: <RouteError /> },
@@ -42,35 +38,34 @@ export const router = createBrowserRouter([
             path: 'notes',
             element: <PlaceholderPage icon={FileText} title="Select or create a note" />,
           },
-          { path: 'notes/:noteId', element: <NoteEditorRoute /> },
-          { path: 'tags/:name', element: <TagNotesPage /> },
+          { path: 'notes/:noteId', lazy: page(() => import('@/features/notes/NoteEditorRoute')) },
+          { path: 'tags/:name', lazy: page(() => import('@/features/notes/TagNotesPage')) },
           { path: 'tasks', element: <Navigate to="/tasks/today" replace /> },
           { path: 'tasks/today', element: <TodayView /> },
           { path: 'tasks/upcoming', element: <UpcomingView /> },
           { path: 'tasks/list/:listId', element: <ListView /> },
-          { path: 'tasks/calendar', element: <CalendarPage /> },
-          { path: 'graph', element: <GraphPage /> },
-          { path: 'search', element: <SearchPage /> },
-          { path: 'attachments', element: <AttachmentsPage /> },
-          { path: 'trash', element: <TrashPage /> },
-          { path: 'settings', element: <SettingsPage /> },
+          { path: 'tasks/calendar', lazy: page(() => import('@/features/tasks/CalendarPage')) },
+          { path: 'graph', lazy: page(() => import('@/features/graph/GraphPage')) },
+          { path: 'search', lazy: page(() => import('@/features/search/SearchPage')) },
+          {
+            path: 'attachments',
+            lazy: page(() => import('@/features/attachments/AttachmentsPage')),
+          },
+          { path: 'trash', lazy: page(() => import('@/features/notes/TrashPage')) },
+          { path: 'settings', lazy: page(() => import('@/features/settings/SettingsPage')) },
           {
             path: '*',
             element: <PlaceholderPage icon={FileText} title="This page doesn't exist" />,
           },
           {
             element: <RequireAdmin />,
-            children: [{ path: 'admin', element: <AdminPage /> }],
+            children: [{ path: 'admin', lazy: page(() => import('@/features/admin/AdminPage')) }],
           },
           ...(import.meta.env.DEV
             ? [
                 {
                   path: 'styleguide',
-                  element: (
-                    <Suspense fallback={null}>
-                      <StyleguidePage />
-                    </Suspense>
-                  ),
+                  lazy: page(() => import('@/features/styleguide/StyleguidePage')),
                 },
               ]
             : []),

@@ -35,6 +35,7 @@ import {
 import { QueryState } from '@/design/components/QueryState'
 import { errorMessage } from '@/lib/errors'
 import { toast } from '@/lib/toast'
+import { confirmAction } from '@/lib/confirm'
 
 type DragPayload = { type: 'note' | 'folder'; id: string }
 
@@ -325,10 +326,14 @@ function FolderRow({
     {
       label: 'Delete',
       danger: true,
-      onSelect: () => {
-        if (confirm(`Delete "${node.folder.name}" and everything inside it?`)) {
-          deleteFolder.mutate(node.folder.id)
-        }
+      onSelect: async () => {
+        const ok = await confirmAction({
+          title: 'Delete folder?',
+          description: `"${node.folder.name}" and everything inside it will be moved to the trash.`,
+          confirmLabel: 'Delete',
+          danger: true,
+        })
+        if (ok) deleteFolder.mutate(node.folder.id)
       },
     },
   ]

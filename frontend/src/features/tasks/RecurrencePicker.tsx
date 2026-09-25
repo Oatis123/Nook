@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
-import { DEFAULT_RECURRENCE, RecurrenceFields } from '@/features/tasks/RecurrenceFields'
+import { RecurrenceFields } from '@/features/tasks/RecurrenceFields'
+import { DEFAULT_RECURRENCE } from '@/features/tasks/recurrenceDefaults'
 import type { RecurrenceInput } from '@/lib/types'
 
 export function RecurrencePicker({

@@ -15,7 +15,7 @@ test('an admin invite lets a new user register, then gates them until Telegram i
   await page.getByRole('button', { name: 'New invite' }).click()
   await page.getByRole('button', { name: 'Create invite' }).click()
 
-  const urlText = await page.getByText(/\/invite\//).innerText()
+  const urlText = await page.getByRole('textbox', { name: 'Invite link' }).inputValue()
   const match = urlText.match(/\/invite\/([\w-]+)/)
   if (!match) throw new Error(`couldn't find an invite token in "${urlText}"`)
   const token = match[1]

@@ -3,9 +3,13 @@ import { clsx } from 'clsx'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { Dialog } from '@/design/components/Dialog'
-import { MoreHorizontal, Copy } from '@/design/icons'
+import { MoreHorizontal } from '@/design/icons'
 import type { User } from '@/lib/types'
 import { formatDate as formatDateString } from '@/lib/format'
+import { CopyField } from '@/design/components/CopyField'
+import { QueryState } from '@/design/components/QueryState'
+import { useCurrentUser } from '@/features/auth/hooks'
+import { confirmAction } from '@/lib/confirm'
 import {
   useActivateUser,
   useDeactivateUser,
@@ -27,9 +31,18 @@ export function UsersPanel() {
   const setRole = useSetUserRole()
   const resetPassword = useResetPassword()
   const [resetLink, setResetLink] = useState<string | null>(null)
+  const { data: me } = useCurrentUser()
+
+  async function confirmThen(
+    options: Parameters<typeof confirmAction>[0],
+    action: () => void,
+  ): Promise<void> {
+    if (await confirmAction(options)) action()
+  }
 
   return (
     <div className="flex flex-col gap-4">
+      {!users.data && <QueryState query={users} compact />}
       {users.data && (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
@@ -48,21 +61,68 @@ export function UsersPanel() {
               {users.data.map((user: User) => {
                 const items: DropdownMenuItem[] = [
                   user.is_active
-                    ? { label: 'Deactivate', onSelect: () => deactivate.mutate(user.id) }
+                    ? {
+                        label: 'Deactivate',
+                        danger: true,
+                        onSelect: () =>
+                          confirmThen(
+                            {
+                              title: `Deactivate ${user.username}?`,
+                              description: 'They are signed out and can no longer sign in.',
+                              confirmLabel: 'Deactivate',
+                              danger: true,
+                            },
+                            () => deactivate.mutate(user.id),
+                          ),
+                      }
                     : { label: 'Activate', onSelect: () => activate.mutate(user.id) },
                   user.role === 'admin'
                     ? {
                         label: 'Remove admin role',
-                        onSelect: () => setRole.mutate({ id: user.id, role: 'user' }),
+                        onSelect: () =>
+                          confirmThen(
+                            {
+                              title:
+                                user.id === me?.id
+                                  ? 'Remove your own admin role?'
+                                  : `Remove admin role from ${user.username}?`,
+                              description:
+                                user.id === me?.id
+                                  ? 'You lose access to this admin panel immediately; only another admin can give it back.'
+                                  : 'They lose access to the admin panel.',
+                              confirmLabel: 'Remove admin role',
+                              danger: true,
+                            },
+                            () => setRole.mutate({ id: user.id, role: 'user' }),
+                          ),
                       }
                     : {
                         label: 'Make admin',
-                        onSelect: () => setRole.mutate({ id: user.id, role: 'admin' }),
+                        onSelect: () =>
+                          confirmThen(
+                            {
+                              title: `Make ${user.username} an admin?`,
+                              description:
+                                'Admins can manage users and invites, including other admins.',
+                              confirmLabel: 'Make admin',
+                            },
+                            () => setRole.mutate({ id: user.id, role: 'admin' }),
+                          ),
                       },
                   {
                     label: 'Unlink Telegram',
                     disabled: !user.telegram_linked,
-                    onSelect: () => unlinkTelegram.mutate(user.id),
+                    onSelect: () =>
+                      confirmThen(
+                        {
+                          title: `Unlink ${user.username}'s Telegram?`,
+                          description:
+                            'Reminders stop and they have to link Telegram again before using the app.',
+                          confirmLabel: 'Unlink',
+                          danger: true,
+                        },
+                        () => unlinkTelegram.mutate(user.id),
+                      ),
                   },
                   {
                     label: 'Reset password',
@@ -114,17 +174,7 @@ export function UsersPanel() {
         title="Password reset link"
         description="Share this one-time link with the user. It expires after use."
       >
-        <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-          <span className="flex-1 truncate text-sm">{resetLink}</span>
-          <button
-            type="button"
-            aria-label="Copy reset link"
-            onClick={() => resetLink && navigator.clipboard.writeText(resetLink)}
-            className="text-text-muted hover:text-text"
-          >
-            <Copy size={15} strokeWidth={1.5} />
-          </button>
-        </div>
+        {resetLink && <CopyField value={resetLink} label="Reset link" />}
       </Dialog>
     </div>
   )

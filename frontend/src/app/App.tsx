@@ -1,5 +1,6 @@
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router-dom'
+import { ConfirmHost } from '@/design/components/ConfirmHost'
 import { Toaster } from '@/design/components/Toaster'
 import { TooltipProvider } from '@/design/components/Tooltip'
 import { router } from '@/app/router'
@@ -60,6 +61,7 @@ export function App() {
       <TooltipProvider>
         <RouterProvider router={router} />
         <Toaster />
+        <ConfirmHost />
       </TooltipProvider>
     </QueryClientProvider>
   )

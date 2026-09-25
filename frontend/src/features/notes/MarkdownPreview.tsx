@@ -1,4 +1,11 @@
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useState } from 'react'
+import {
+  type ImgHTMLAttributes,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import { unified, type Processor } from 'unified'
@@ -76,7 +83,29 @@ function buildProcessor(
       fallbackLanguage: 'text',
     })
     .use(rehypeSanitize, sanitizeSchema)
-    .use(rehypeReact, { Fragment, jsx, jsxs })
+    .use(rehypeReact, { Fragment, jsx, jsxs, components: { img: PreviewImage } })
+}
+
+function isExternalUrl(src: string): boolean {
+  if (!/^https?:/i.test(src)) return false
+  try {
+    return new URL(src).origin !== window.location.origin
+  } catch {
+    return false
+  }
+}
+
+/** The CSP only allows images from this site (a remote image would otherwise leak the
+ * reader's IP to whoever hosts it), so an external image in a note can't load — show a
+ * link to it instead of a broken image. */
+function PreviewImage(props: ImgHTMLAttributes<HTMLImageElement>) {
+  const src = typeof props.src === 'string' ? props.src : ''
+  if (!isExternalUrl(src)) return <img {...props} />
+  return (
+    <a href={src} target="_blank" rel="noreferrer noopener" className="external-image">
+      {props.alt || 'External image'} (opens in a new tab)
+    </a>
+  )
 }
 
 export function MarkdownPreview({ content }: { content: string }) {
@@ -88,6 +117,7 @@ export function MarkdownPreview({ content }: { content: string }) {
   const createNote = useCreateNote()
   const [highlighter, setHighlighter] = useState<HighlighterCore | null>(null)
   const [highlighterError, setHighlighterError] = useState(false)
+  const [highlighterAttempt, setHighlighterAttempt] = useState(0)
   const [tree, setTree] = useState<ReactNode>(null)
 
   useEffect(() => {
@@ -102,7 +132,7 @@ export function MarkdownPreview({ content }: { content: string }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [highlighterAttempt])
 
   const wikilinkIndex = useMemo(
     () => buildWikilinkIndex(notesQuery.data ?? [], foldersQuery.data ?? []),
@@ -160,14 +190,24 @@ export function MarkdownPreview({ content }: { content: string }) {
   if (highlighterError) {
     return (
       <div className="markdown-preview" onClick={handleClick}>
-        <p className="text-danger">Couldn't load the syntax highlighter. Preview unavailable.</p>
+        <p className="text-danger">Couldn't load the preview.</p>
+        <button
+          type="button"
+          className="text-sm text-accent underline"
+          onClick={() => {
+            setHighlighterError(false)
+            setHighlighterAttempt((n) => n + 1)
+          }}
+        >
+          Retry
+        </button>
       </div>
     )
   }
 
   return (
     <div className="markdown-preview" onClick={handleClick}>
-      {tree}
+      {tree ?? <p className="text-sm text-text-muted">Loading preview…</p>}
     </div>
   )
 }

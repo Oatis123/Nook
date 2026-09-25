@@ -8,8 +8,11 @@ import {
   useRestoreNote,
 } from '@/features/notes/hooks'
 import { QueryState } from '@/design/components/QueryState'
+import { confirmAction } from '@/lib/confirm'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function TrashPage() {
+  useDocumentTitle('Trash')
   const trashed = useNotes({ deleted: true })
   const restore = useRestoreNote()
   const permanentlyDelete = usePermanentlyDeleteNote()
@@ -27,8 +30,14 @@ export default function TrashPage() {
         <h1 className="font-serif text-2xl text-text">Trash</h1>
         <button
           type="button"
-          onClick={() => {
-            if (confirm('Permanently delete everything in the trash?')) emptyTrash.mutate()
+          onClick={async () => {
+            const ok = await confirmAction({
+              title: 'Empty trash?',
+              description: 'Every note in the trash is deleted permanently. This cannot be undone.',
+              confirmLabel: 'Empty trash',
+              danger: true,
+            })
+            if (ok) emptyTrash.mutate()
           }}
           className="text-sm text-danger hover:underline"
         >
@@ -61,10 +70,14 @@ export default function TrashPage() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`Permanently delete "${note.title}"?`)) {
-                    permanentlyDelete.mutate(note.id)
-                  }
+                onClick={async () => {
+                  const ok = await confirmAction({
+                    title: 'Delete permanently?',
+                    description: `"${note.title}" will be deleted for good. This cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    danger: true,
+                  })
+                  if (ok) permanentlyDelete.mutate(note.id)
                 }}
                 className="text-text-muted hover:text-danger"
               >

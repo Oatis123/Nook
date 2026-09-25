@@ -5,12 +5,6 @@ const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const selectClass =
   'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
-export const DEFAULT_RECURRENCE: RecurrenceInput = {
-  freq: 'weekly',
-  interval: 1,
-  end_type: 'never',
-}
-
 /** The interval/frequency/weekday/monthly/end-condition fields shared by the inline
  * recurring-mode form (TaskCreateDialog) and the edit popup (RecurrencePicker). */
 export function RecurrenceFields({

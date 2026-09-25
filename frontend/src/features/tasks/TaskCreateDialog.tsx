@@ -5,7 +5,8 @@ import { Dialog } from '@/design/components/Dialog'
 import { Switch } from '@/design/components/Switch'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
-import { DEFAULT_RECURRENCE, RecurrenceFields } from '@/features/tasks/RecurrenceFields'
+import { RecurrenceFields } from '@/features/tasks/RecurrenceFields'
+import { DEFAULT_RECURRENCE } from '@/features/tasks/recurrenceDefaults'
 import type { RecurrenceInput, TaskPriority } from '@/lib/types'
 
 const selectClass =

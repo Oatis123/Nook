@@ -14,10 +14,21 @@ export function TelegramGate() {
 
   useEffect(() => {
     createLinkToken.mutate()
-    // Intentionally runs once on mount; a fresh token is requested only if the user
-    // explicitly asks (link expires in a few minutes, see "Get a new link" below).
+    // Intentionally runs once on mount; after that a fresh link is requested when the
+    // current one expires (below) or when the user asks for one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Links expire after a few minutes; replace an expired one automatically rather than
+  // leaving a QR code on screen that the bot will reject.
+  const expiresAt = createLinkToken.data?.expires_at
+  useEffect(() => {
+    if (!expiresAt) return
+    const ms = new Date(expiresAt).getTime() - Date.now()
+    const timer = setTimeout(() => createLinkToken.mutate(), Math.max(ms, 0) + 1000)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when a new link arrives
+  }, [expiresAt])
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-bg px-4 text-center">
@@ -41,10 +52,18 @@ export function TelegramGate() {
           >
             Open in Telegram
           </a>
+          <button
+            type="button"
+            onClick={() => createLinkToken.mutate()}
+            disabled={createLinkToken.isPending}
+            className="text-xs text-text-muted hover:text-text disabled:opacity-50"
+          >
+            Link not working? Get a new one
+          </button>
         </>
       )}
 
-      {createLinkToken.isPending && (
+      {createLinkToken.isPending && !createLinkToken.data && (
         <div className="h-[200px] w-[200px] animate-pulse rounded-md bg-surface" />
       )}
 

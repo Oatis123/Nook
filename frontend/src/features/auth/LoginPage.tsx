@@ -7,10 +7,12 @@ import { safeNextPath } from '@/lib/nav'
 import { Button } from '@/design/components/Button'
 import { useCurrentUser, useLogin } from '@/features/auth/hooks'
 import { TelegramLoginPanel } from '@/features/auth/TelegramLoginPanel'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function LoginPage() {
   const { data: user, isLoading: userLoading } = useCurrentUser()
   const [searchParams] = useSearchParams()
+  useDocumentTitle('Sign in')
   const login = useLogin()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')

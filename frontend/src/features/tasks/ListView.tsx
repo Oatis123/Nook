@@ -12,6 +12,7 @@ import { groupByDate, groupByPriority, noGrouping } from '@/features/tasks/group
 import { LIST_ICON_COMPONENT, listColorVar } from '@/features/tasks/listStyle'
 import type { Task } from '@/lib/types'
 import { QueryState } from '@/design/components/QueryState'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 type GroupBy = 'none' | 'date' | 'priority'
 
@@ -22,6 +23,7 @@ export default function ListView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
 
   const taskListsQuery = useTaskLists()
+  useDocumentTitle(taskListsQuery.data?.find((l) => l.id === listId)?.name)
   const tasksQuery = useTasks({ listId, status: showCompleted ? 'all' : 'open' })
 
   if (!listId) return null

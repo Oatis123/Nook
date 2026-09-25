@@ -20,6 +20,7 @@ import { ConflictDialog } from '@/features/notes/ConflictDialog'
 import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import { useUploadAttachment } from '@/features/attachments/hooks'
 import { QueryState } from '@/design/components/QueryState'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export function NoteEditor({ noteId }: { noteId: string }) {
   const noteQuery = useNote(noteId)
@@ -30,6 +31,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autosave = useNoteAutosave(noteId, noteQuery.data)
   const { draft, status } = autosave
+  useDocumentTitle(draft?.title ?? noteQuery.data?.title)
 
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [renamePrompt, setRenamePrompt] = useState<{ affectedNotes: number } | null>(null)

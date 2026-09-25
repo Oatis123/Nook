@@ -359,3 +359,12 @@
     font-size: 16px;
   }
 }
+
+.markdown-preview a.external-image {
+  display: inline-block;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.3em 0.6em;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}

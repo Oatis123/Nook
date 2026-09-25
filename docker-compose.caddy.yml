@@ -1,0 +1,49 @@
+# HTTPS for a public deployment. Enable by adding to .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.caddy.yml
+#   DOMAIN=notes.example.com
+#   PUBLIC_URL=https://notes.example.com
+#   TRUSTED_PROXY_CIDR=172.30.0.10/32
+# See docs/DEPLOY.md.
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    init: true
+    mem_limit: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env to the public hostname}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      default:
+        # Fixed, so nginx can trust exactly this address for X-Forwarded-For.
+        ipv4_address: 172.30.0.10
+
+  web:
+    # Only Caddy talks to nginx now; the plain-HTTP port is not published.
+    ports: !reset []
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  caddy_data:
+  caddy_config:

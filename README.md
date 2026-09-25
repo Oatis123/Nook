@@ -36,9 +36,17 @@ for implementation decisions left to the agent's discretion by the spec.
    Every account, including admin, has to link Telegram before it can use the app — see
    "Setting up the Telegram bot" below.
 
+## Deploying to a server (HTTPS, backups)
+
+The quick start above serves plain HTTP on port 8080 — fine on your own machine, not on
+the internet. For a public server follow **[docs/DEPLOY.md](docs/DEPLOY.md)**: strong
+secrets, automatic HTTPS through Caddy (`docker-compose.caddy.yml`), firewall, daily
+backups with `deploy/backup.sh` and restoring with `deploy/restore.sh`.
+
 ## Updating
 
 ```bash
+deploy/backup.sh   # back up first
 git pull
 docker compose up -d --build
 ```

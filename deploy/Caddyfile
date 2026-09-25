@@ -1,0 +1,15 @@
+# TLS front for Nook: automatic HTTPS certificates (Let's Encrypt), HTTP → HTTPS
+# redirect, HSTS. Used by docker-compose.caddy.yml — see docs/DEPLOY.md.
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# Caddy replaces any X-Forwarded-For sent by the client with the real address
+	# (it trusts no upstream proxies by default); nginx trusts this container's
+	# address for it (TRUSTED_PROXY_CIDR), so the API sees the browser's IP.
+	reverse_proxy web:80
+}

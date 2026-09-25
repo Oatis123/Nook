@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import hash_password_async
 from app.core.tokens import generate_token, hash_token
 from app.core.validation import ValidationError, validate_password, validate_username
 from app.models.invite import Invite
@@ -75,6 +75,11 @@ async def accept_invite(
     session: AsyncSession, plain_token: str, username: str, password: str, timezone: str
 ) -> User:
     invite = await get_active_invite_by_token(session, plain_token)
+    # Row lock + re-check: two concurrent accepts of the same invite are serialized and
+    # the second finds it already used, so one invite can't create two accounts.
+    await session.refresh(invite, with_for_update=True)
+    if invite_status(invite) != InviteStatus.active:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Invite not found or no longer valid")
 
     try:
         validate_username(username)
@@ -88,7 +93,7 @@ async def accept_invite(
 
     user = User(
         username=username,
-        password_hash=hash_password(password),
+        password_hash=await hash_password_async(password),
         timezone=timezone or "UTC",
     )
     session.add(user)

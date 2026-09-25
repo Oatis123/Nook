@@ -70,7 +70,11 @@ export const consumePasswordReset = (token: string, newPassword: string) =>
 export const createTelegramLinkToken = () =>
   apiFetch<TelegramToken>('/me/telegram/link-token', { method: 'POST' })
 
-export const unlinkTelegram = () => apiFetch<User>('/me/telegram/unlink', { method: 'POST' })
+export const unlinkTelegram = (currentPassword: string) =>
+  apiFetch<User>('/me/telegram/unlink', {
+    method: 'POST',
+    body: { current_password: currentPassword },
+  })
 
 export const createTelegramLoginToken = () =>
   apiFetch<TelegramToken>('/auth/telegram/login-token', { method: 'POST' })

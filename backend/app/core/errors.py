@@ -1,11 +1,14 @@
 from collections.abc import Sequence
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+log = structlog.get_logger()
 
 _CODE_BY_STATUS = {
     400: "bad_request",
@@ -54,6 +57,13 @@ def register_exception_handlers(app: FastAPI) -> None:
     ) -> JSONResponse:
         code = getattr(exc, "code", None) or _CODE_BY_STATUS.get(exc.status_code, "error")
         return _error_response(exc.status_code, code, str(exc.detail))
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        # A consistent JSON body the frontend can show, and no internals in the
+        # response; the full traceback goes to the log.
+        log.exception("api.unhandled_error", path=request.url.path, method=request.method)
+        return _error_response(500, "internal_error", "Something went wrong on the server")
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(

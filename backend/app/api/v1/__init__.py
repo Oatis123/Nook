@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
     admin,
@@ -15,18 +15,27 @@ from app.api.v1 import (
     task_lists,
     tasks,
 )
+from app.core.deps import require_telegram_linked
 
 api_router = APIRouter(prefix="/api/v1")
+# Usable before Telegram is linked: signing in/out and the account itself (the
+# onboarding gate needs /me and /me/telegram/*).
 api_router.include_router(auth.router)
 api_router.include_router(me.router)
-api_router.include_router(api_tokens.router)
-api_router.include_router(admin.router)
-api_router.include_router(folders.router)
-api_router.include_router(notes.router)
-api_router.include_router(tags.router)
-api_router.include_router(search.router)
-api_router.include_router(attachments.router)
-api_router.include_router(import_jobs.router)
-api_router.include_router(graph.router)
-api_router.include_router(task_lists.router)
-api_router.include_router(tasks.router)
+
+# Everything else requires a linked Telegram account (spec §5.1).
+_linked = [Depends(require_telegram_linked)]
+for feature_router in (
+    api_tokens.router,
+    admin.router,
+    folders.router,
+    notes.router,
+    tags.router,
+    search.router,
+    attachments.router,
+    import_jobs.router,
+    graph.router,
+    task_lists.router,
+    tasks.router,
+):
+    api_router.include_router(feature_router, dependencies=_linked)

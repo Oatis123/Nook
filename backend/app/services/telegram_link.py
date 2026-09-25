@@ -3,12 +3,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.tokens import generate_token, hash_token
 from app.models.auth_token import AuthToken, AuthTokenKind
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 
@@ -37,6 +38,20 @@ async def create_link_token(session: AsyncSession, user_id: uuid.UUID) -> tuple[
     return plain, expires_at
 
 
+async def chat_linked_before(session: AsyncSession, plain: str) -> int | None:
+    """The Telegram chat the link token's user is linked to right now (before consuming
+    the token), so the bot can tell that chat when the account gets relinked elsewhere."""
+    token = await session.scalar(
+        select(AuthToken).where(
+            AuthToken.token_hash == hash_token(plain), AuthToken.kind == AuthTokenKind.link
+        )
+    )
+    if token is None or token.user_id is None:
+        return None
+    user = await session.get(User, token.user_id)
+    return user.telegram_chat_id if user is not None else None
+
+
 async def consume_link_token(
     session: AsyncSession, plain: str, telegram_user_id: int, telegram_chat_id: int
 ) -> User | None:
@@ -44,9 +59,9 @@ async def consume_link_token(
     the token is invalid/expired/used, or if this Telegram account is already linked to
     a different user (spec §5.2: one Telegram account links to exactly one user)."""
     token = await session.scalar(
-        select(AuthToken).where(
-            AuthToken.token_hash == hash_token(plain), AuthToken.kind == AuthTokenKind.link
-        )
+        select(AuthToken)
+        .where(AuthToken.token_hash == hash_token(plain), AuthToken.kind == AuthTokenKind.link)
+        .with_for_update()  # single use, even under concurrent /start messages
     )
     now = datetime.now(UTC)
     if (
@@ -166,3 +181,22 @@ async def claim_login_token(session: AsyncSession, plain: str) -> tuple[str, Use
         return "confirmed", user
 
     return "pending", None
+
+
+async def purge_expired_tokens(session: AsyncSession) -> int:
+    """Link/login/reset tokens and refresh tokens are only useful until they expire (or
+    are used/revoked). Anonymous "log in with Telegram" requests create a row each, so
+    without this the table only grows. Run periodically by the worker."""
+    now = datetime.now(UTC)
+    grace = timedelta(days=1)
+    auth_result = await session.execute(delete(AuthToken).where(AuthToken.expires_at < now - grace))
+    refresh_result = await session.execute(
+        delete(RefreshToken).where(
+            (RefreshToken.expires_at < now - grace)
+            | (RefreshToken.revoked_at < now - timedelta(days=30))
+        )
+    )
+    await session.commit()
+    return (getattr(auth_result, "rowcount", 0) or 0) + (
+        getattr(refresh_result, "rowcount", 0) or 0
+    )

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.security import hash_password
+from app.core.security import hash_password_async
 from app.core.tokens import generate_token, hash_token
 from app.core.validation import ValidationError, validate_password
 from app.models.auth_token import AuthToken, AuthTokenKind
@@ -31,10 +31,12 @@ async def create_reset_token(session: AsyncSession, user_id: uuid.UUID) -> str:
 
 async def consume_reset_token(session: AsyncSession, plain: str, new_password: str) -> User:
     token = await session.scalar(
-        select(AuthToken).where(
+        select(AuthToken)
+        .where(
             AuthToken.token_hash == hash_token(plain),
             AuthToken.kind == AuthTokenKind.password_reset,
         )
+        .with_for_update()  # single use, even under concurrent requests
     )
     now = datetime.now(UTC)
     if (
@@ -54,7 +56,7 @@ async def consume_reset_token(session: AsyncSession, plain: str, new_password: s
     if user is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or expired reset link")
 
-    user.password_hash = hash_password(new_password)
+    user.password_hash = await hash_password_async(new_password)
     token.used_at = now
     await session.commit()
 

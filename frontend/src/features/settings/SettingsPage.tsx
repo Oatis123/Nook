@@ -6,6 +6,7 @@ import { Dialog } from '@/design/components/Dialog'
 import { ThemeSkinPicker } from '@/design/components/ThemeSkinPicker'
 import { ThemeToggle } from '@/design/components/ThemeToggle'
 import { ApiError } from '@/lib/api'
+import { errorMessage } from '@/lib/errors'
 import { formatDateTime } from '@/lib/format'
 import {
   useApiTokens,
@@ -82,8 +83,22 @@ function TelegramSection() {
   const { data: user } = useCurrentUser()
   const unlink = useUnlinkTelegram()
   const [open, setOpen] = useState(false)
+  const [password, setPassword] = useState('')
 
   if (!user) return null
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next)
+    if (!next) {
+      setPassword('')
+      unlink.reset()
+    }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    unlink.mutate(password, { onSuccess: () => handleOpenChange(false) })
+  }
 
   return (
     <section className="border-b border-border py-8">
@@ -94,23 +109,37 @@ function TelegramSection() {
         </p>
         <Dialog
           open={open}
-          onOpenChange={setOpen}
+          onOpenChange={handleOpenChange}
           trigger={<Button variant="secondary">Disconnect</Button>}
           title="Disconnect Telegram"
           description="You'll be asked to reconnect before you can use the app again."
         >
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="danger"
-              disabled={unlink.isPending}
-              onClick={() => unlink.mutate(undefined, { onSuccess: () => setOpen(false) })}
-            >
-              Disconnect
-            </Button>
-          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <label className="flex flex-col gap-1.5 text-sm text-text-muted">
+              Current password
+              <input
+                type="password"
+                autoComplete="current-password"
+                autoFocus
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+              />
+            </label>
+            {unlink.isError && (
+              <p role="alert" className="text-sm text-danger">
+                {errorMessage(unlink.error)}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="danger" disabled={unlink.isPending || !password}>
+                Disconnect
+              </Button>
+            </div>
+          </form>
         </Dialog>
       </div>
     </section>

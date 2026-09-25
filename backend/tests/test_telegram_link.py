@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.tokens import hash_token
 from app.models.auth_token import AuthToken
 from app.services import telegram_link as telegram_link_service
-from tests.conftest import login, make_user
+from tests.conftest import DEFAULT_PASSWORD, login, make_user
 
 
 async def test_consume_link_token_links_user(db_session: AsyncSession) -> None:
@@ -102,7 +102,7 @@ async def test_login_token_flow_denied(db_session: AsyncSession) -> None:
 async def test_create_telegram_link_token_endpoint(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    await make_user(db_session, "alice")
+    await make_user(db_session, "alice", linked=False)
     await login(client, "alice")
     csrf = client.cookies.get("csrf_token")
 
@@ -157,7 +157,11 @@ async def test_self_service_unlink(client: AsyncClient, db_session: AsyncSession
     await login(client, "alice")
     csrf = client.cookies.get("csrf_token")
 
-    response = await client.post("/api/v1/me/telegram/unlink", headers={"x-csrf-token": csrf})
+    response = await client.post(
+        "/api/v1/me/telegram/unlink",
+        json={"current_password": DEFAULT_PASSWORD},
+        headers={"x-csrf-token": csrf},
+    )
 
     assert response.status_code == 200
     assert response.json()["telegram_linked"] is False

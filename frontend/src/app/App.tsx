@@ -1,4 +1,4 @@
-import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router-dom'
 import { Toaster } from '@/design/components/Toaster'
 import { TooltipProvider } from '@/design/components/Tooltip'
@@ -19,7 +19,18 @@ declare module '@tanstack/react-query' {
   }
 }
 
-const queryClient = new QueryClient({
+/** Telegram was unlinked (e.g. in another tab): refetch the user so the app shows the
+ * onboarding gate instead of failing request by request. */
+function handleNotLinked(error: unknown): boolean {
+  if (error instanceof ApiError && error.status === 403 && error.code === 'telegram_not_linked') {
+    queryClient.invalidateQueries({ queryKey: meQueryKey })
+    return true
+  }
+  return false
+}
+
+const queryClient: QueryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: handleNotLinked }),
   defaultOptions: {
     queries: {
       retry: 1,
@@ -31,7 +42,7 @@ const queryClient = new QueryClient({
   mutationCache: new MutationCache({
     onError: (error, _variables, _context, mutation) => {
       const meta = mutation.options.meta
-      if (meta?.silent) return
+      if (handleNotLinked(error) || meta?.silent) return
       if (error instanceof ApiError) {
         if (error.status === 401) return // session expired: the app is heading to /login
         if (meta?.handledStatuses?.includes(error.status)) return

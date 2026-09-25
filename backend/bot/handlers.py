@@ -73,6 +73,7 @@ async def handle_start_plain(message: Message) -> None:
 
 async def _handle_link(message: Message, telegram_user_id: int, plain_token: str) -> None:
     async with async_session_factory() as session:
+        previous_chat_id = await telegram_link_service.chat_linked_before(session, plain_token)
         user = await telegram_link_service.consume_link_token(
             session, plain_token, telegram_user_id, message.chat.id
         )
@@ -86,6 +87,19 @@ async def _handle_link(message: Message, telegram_user_id: int, plain_token: str
     await message.answer(
         f"Your Telegram is now linked to {settings.app_name} as '{user.username}'."
     )
+    if previous_chat_id is not None and previous_chat_id != message.chat.id:
+        # The account moved to another Telegram: tell the old one, which can no longer
+        # log in with Telegram — if that wasn't its owner's doing, they need to know.
+        try:
+            await message.bot.send_message(  # type: ignore[union-attr]
+                previous_chat_id,
+                f"Your {settings.app_name} account '{user.username}' was just linked to a "
+                "different Telegram account, so this chat will no longer get reminders or "
+                "login requests. If you didn't do this, change your password and reconnect "
+                "Telegram in Settings.",
+            )
+        except Exception:
+            log.warning("bot.relink_notice_failed", user_id=str(user.id))
 
 
 async def _handle_login(message: Message, telegram_user_id: int, plain_token: str) -> None:
@@ -118,7 +132,9 @@ async def _handle_login(message: Message, telegram_user_id: int, plain_token: st
     )
     await message.answer(
         f"Someone is trying to log in to {settings.app_name} as '{user.username}' from:\n"
-        f"{device}\n{ip}\n\nConfirm it's you?",
+        f"{device}\n{ip}\n\n"
+        "Only confirm if you started this login yourself, just now. If someone sent you "
+        "this link, press Deny — confirming would give them access to your account.",
         reply_markup=keyboard,
     )
 

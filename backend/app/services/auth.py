@@ -6,25 +6,28 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.rate_limit import is_rate_limited, record_attempt, reset_attempts
-from app.core.security import verify_password
+from app.core.rate_limit import login_attempts, login_attempts_per_ip
+from app.core.security import verify_password_async
 from app.core.tokens import generate_token, hash_token
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 
 
 async def authenticate(session: AsyncSession, username: str, password: str, ip: str) -> User:
-    if is_rate_limited(username, ip):
+    # Counted before the password is checked (and reset on success below), so concurrent
+    # guesses can't slip past the limit while earlier ones are still being verified.
+    user_key = f"{username}:{ip}"
+    if not login_attempts.hit(user_key) or not login_attempts_per_ip.hit(ip):
         raise HTTPException(
             status.HTTP_429_TOO_MANY_REQUESTS, "Too many login attempts, try again later"
         )
 
     user = await session.scalar(select(User).where(User.username == username))
-    if user is None or not user.is_active or not verify_password(password, user.password_hash):
-        record_attempt(username, ip)
+    password_ok = await verify_password_async(password, user.password_hash if user else None)
+    if user is None or not user.is_active or not password_ok:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid username or password")
 
-    reset_attempts(username, ip)
+    login_attempts.reset(user_key)
     user.last_login_at = datetime.now(UTC)
     await session.commit()
     return user
@@ -54,7 +57,11 @@ async def rotate_refresh_token(
     """Validates and revokes the given refresh token, issuing a new one. Spec §5.4:
     refresh tokens rotate on every use."""
     token_hash = hash_token(plain)
-    token = await session.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
+    # Row lock: two concurrent refreshes with the same token are serialized, and the
+    # second sees it already revoked — a refresh token can't be spent twice.
+    token = await session.scalar(
+        select(RefreshToken).where(RefreshToken.token_hash == token_hash).with_for_update()
+    )
     now = datetime.now(UTC)
     if token is None or token.revoked_at is not None or token.expires_at < now:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired session")

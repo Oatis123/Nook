@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cookies import ACCESS_COOKIE, CSRF_COOKIE, CSRF_HEADER
 from app.core.db import get_db
+from app.core.errors import CodedHTTPException
 from app.core.jwt import decode_access_token
 from app.models.user import User, UserRole
 
@@ -28,6 +29,15 @@ async def get_current_user(request: Request, session: DbSession) -> User:
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+async def require_telegram_linked(user: CurrentUser) -> None:
+    """Spec §5.1: nothing but onboarding is usable until Telegram is linked. The frontend
+    gate alone isn't enforcement — this is, on every feature router."""
+    if user.telegram_user_id is None:
+        raise CodedHTTPException(
+            status.HTTP_403_FORBIDDEN, "telegram_not_linked", "Link your Telegram account first"
+        )
 
 
 async def require_admin(user: CurrentUser) -> User:

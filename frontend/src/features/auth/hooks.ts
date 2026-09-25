@@ -126,6 +126,7 @@ export function useCreateTelegramLinkToken() {
 export function useUnlinkTelegram() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { silent: true },
     mutationFn: authApi.unlinkTelegram,
     onSuccess: (user) => queryClient.setQueryData(meQueryKey, user),
   })

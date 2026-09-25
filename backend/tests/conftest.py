@@ -1,4 +1,5 @@
 import asyncio
+import itertools
 from collections.abc import AsyncIterator
 
 import asyncpg
@@ -114,10 +115,26 @@ async def second_client(client: AsyncClient) -> AsyncIterator[AsyncClient]:
         yield ac
 
 
+_telegram_ids = itertools.count(10_000)
+
+
 async def make_user(
-    session: AsyncSession, username: str = "alice", role: UserRole = UserRole.user
+    session: AsyncSession,
+    username: str = "alice",
+    role: UserRole = UserRole.user,
+    *,
+    linked: bool = True,
 ) -> User:
-    user = User(username=username, password_hash=hash_password(DEFAULT_PASSWORD), role=role)
+    """`linked`: Telegram already linked (the default — every feature endpoint requires
+    it, spec §5.1); pass False to test onboarding."""
+    telegram_id = next(_telegram_ids) if linked else None
+    user = User(
+        username=username,
+        password_hash=hash_password(DEFAULT_PASSWORD),
+        role=role,
+        telegram_user_id=telegram_id,
+        telegram_chat_id=telegram_id,
+    )
     session.add(user)
     await session.commit()
     await session.refresh(user)

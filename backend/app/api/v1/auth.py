@@ -13,6 +13,7 @@ from app.core.cookies import (
 from app.core.deps import CurrentUser, DbSession, require_csrf
 from app.core.isolation import get_owned_or_404
 from app.core.jwt import create_access_token
+from app.core.rate_limit import telegram_login_tokens_per_ip
 from app.core.tokens import hash_token
 from app.models.refresh_token import RefreshToken
 from app.schemas.auth import LoginRequest, SessionOut
@@ -110,6 +111,9 @@ async def consume_password_reset(
     "/telegram/login-token", response_model=TelegramTokenOut, dependencies=[Depends(require_csrf)]
 )
 async def create_telegram_login_token(request: Request, session: DbSession) -> TelegramTokenOut:
+    # Anonymous and stores a row per call: bounded per IP.
+    if not telegram_login_tokens_per_ip.hit(_client_ip(request)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many requests, try later")
     plain, expires_at = await telegram_link_service.create_login_token(
         session, request.headers.get("user-agent"), _client_ip(request)
     )

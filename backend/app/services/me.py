@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import hash_password, verify_password
+from app.core.rate_limit import password_checks_per_user
+from app.core.security import hash_password_async, verify_password_async
 from app.core.tokens import hash_token
 from app.core.validation import ValidationError, validate_password
 from app.models.user import User
@@ -27,6 +28,16 @@ async def update_profile(session: AsyncSession, user: User, data: MeUpdate) -> U
     return user
 
 
+async def check_current_password(user: User, current_password: str) -> None:
+    """Re-authentication for sensitive account changes; rate limited per user, so a stolen
+    session can't be used to brute-force the password through this endpoint."""
+    if not password_checks_per_user.hit(str(user.id)):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many attempts, try again later")
+    if not await verify_password_async(current_password, user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+    password_checks_per_user.reset(str(user.id))
+
+
 async def change_password(
     session: AsyncSession,
     user: User,
@@ -34,15 +45,14 @@ async def change_password(
     new_password: str,
     current_refresh_token: str | None,
 ) -> None:
-    if not verify_password(current_password, user.password_hash):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Current password is incorrect")
+    await check_current_password(user, current_password)
 
     try:
         validate_password(new_password)
     except ValidationError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
-    user.password_hash = hash_password(new_password)
+    user.password_hash = await hash_password_async(new_password)
     await session.commit()
 
     keep_hash = hash_token(current_refresh_token) if current_refresh_token else None

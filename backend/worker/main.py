@@ -12,6 +12,7 @@ from app.core.db import async_session_factory
 from app.core.heartbeat import WORKER_HEARTBEAT, beat
 from app.services.reminder_dispatch import ReminderBlocked, dispatch_due_reminders
 from app.services.reminders import purge_resolved_reminders
+from app.services.telegram_link import purge_expired_tokens
 from app.services.vault_import import (
     fail_interrupted_import_jobs,
     process_pending_import_jobs,
@@ -92,8 +93,9 @@ async def _maintenance_loop() -> None:
         try:
             async with async_session_factory() as session:
                 purged = await purge_resolved_reminders(session)
-            if purged:
-                log.info("worker.reminders_purged", count=purged)
+                tokens = await purge_expired_tokens(session)
+            if purged or tokens:
+                log.info("worker.purged", reminders=purged, tokens=tokens)
         except Exception:
             log.exception("worker.maintenance_failed")
         await _sleep(MAINTENANCE_SECONDS)

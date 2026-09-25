@@ -66,12 +66,13 @@ async function send(path: string, init: () => RequestInit): Promise<Response> {
   const response = await fetch(`/api/v1${path}`, { credentials: 'include', ...init() })
   if (response.status !== 401 || NO_REFRESH_PATH.test(path)) return response
 
-  if (await refreshSession()) {
-    // init() is re-evaluated so the retry picks up the CSRF cookie as it is now.
-    return fetch(`/api/v1${path}`, { credentials: 'include', ...init() })
-  }
-  sessionExpiredHandler?.()
-  return response
+  // Retried either way: after our own refresh, or — when that failed — because another
+  // tab may have rotated the refresh token (making ours stale) and set fresh cookies we
+  // now share. init() is re-evaluated so the retry picks up the CSRF cookie as it is now.
+  const refreshed = await refreshSession()
+  const retry = await fetch(`/api/v1${path}`, { credentials: 'include', ...init() })
+  if (!refreshed && retry.status === 401) sessionExpiredHandler?.()
+  return retry
 }
 
 async function parse<T>(response: Response): Promise<T> {

@@ -3,6 +3,8 @@ import { addDays, format } from 'date-fns'
 import { CalendarRange } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
+import { useToday } from '@/features/tasks/useToday'
+import { parseLocalDate } from '@/lib/dates'
 import { AddTaskButton } from '@/features/tasks/AddTaskButton'
 import { TaskGroupedList } from '@/features/tasks/TaskGroupedList'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
@@ -15,10 +17,11 @@ const UPCOMING_DAYS = 7
 export default function UpcomingView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const tasksQuery = useTasks({ view: 'upcoming' })
+  const todayYmd = useToday()
 
   if (!tasksQuery.data) return <QueryState query={tasksQuery} />
 
-  const today = new Date()
+  const today = parseLocalDate(todayYmd)
   const days = Array.from({ length: UPCOMING_DAYS }, (_, i) => addDays(today, i))
   const lastDay = format(days[days.length - 1], 'yyyy-MM-dd')
 

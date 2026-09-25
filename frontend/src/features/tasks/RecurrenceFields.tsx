@@ -34,11 +34,13 @@ export function RecurrenceFields({
           type="number"
           min={1}
           max={999}
+          aria-label="Repeat every"
           value={value.interval ?? 1}
           onChange={(e) => onChange({ ...value, interval: Number(e.target.value) || 1 })}
           className={clsx(selectClass, 'w-16')}
         />
         <select
+          aria-label="Repeat unit"
           value={value.freq}
           onChange={(e) => onChange({ ...value, freq: e.target.value as RecurrenceFreq })}
           className={selectClass}
@@ -83,6 +85,7 @@ export function RecurrenceFields({
               type="number"
               min={1}
               max={31}
+              aria-label="Day of month"
               value={value.by_month_day ?? 1}
               onChange={(e) =>
                 onChange({
@@ -102,6 +105,11 @@ export function RecurrenceFields({
             />
             Last day of month
           </label>
+          {!value.on_last_day && (value.by_month_day ?? 1) >= 29 && (
+            <p className="basis-full text-xs">
+              Months with fewer days are skipped. Pick “Last day of month” to repeat every month.
+            </p>
+          )}
         </div>
       )}
 
@@ -125,6 +133,7 @@ export function RecurrenceFields({
             On date
             <input
               type="date"
+              aria-label="End date"
               value={value.end_date ?? ''}
               onChange={(e) =>
                 onChange({ ...value, end_type: 'on_date', end_date: e.target.value })
@@ -142,6 +151,8 @@ export function RecurrenceFields({
             <input
               type="number"
               min={1}
+              max={1000}
+              aria-label="Number of times"
               value={value.end_count ?? 1}
               onChange={(e) =>
                 onChange({

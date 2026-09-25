@@ -4,18 +4,20 @@ import { Flag } from '@/design/icons'
 import { ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { useCompleteTask, useReopenTask } from '@/features/tasks/hooks'
+import { useToday } from '@/features/tasks/useToday'
 import { PRIORITY_COLOR_VAR } from '@/features/tasks/priority'
 import { CompleteSubtasksDialog } from '@/features/tasks/CompleteSubtasksDialog'
 import type { Task } from '@/lib/types'
 
-function isOverdue(task: Task): boolean {
+function isOverdue(task: Task, today: string): boolean {
   if (task.status === 'done' || !task.due_date) return false
-  return task.due_date < new Date().toISOString().slice(0, 10)
+  return task.due_date < today
 }
 
 export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => void }) {
   const completeTask = useCompleteTask()
   const reopenTask = useReopenTask()
+  const today = useToday()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const done = task.status === 'done'
 
@@ -72,7 +74,9 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => 
           )}
         </div>
         {task.due_date && (
-          <span className={clsx('text-xs', isOverdue(task) ? 'text-danger' : 'text-text-muted')}>
+          <span
+            className={clsx('text-xs', isOverdue(task, today) ? 'text-danger' : 'text-text-muted')}
+          >
             {formatDate(task.due_date)}
             {task.due_time && ` ${task.due_time.slice(0, 5)}`}
           </span>

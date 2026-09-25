@@ -8,6 +8,7 @@ import { TaskGroupedList } from '@/features/tasks/TaskGroupedList'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import type { TaskGroup } from '@/features/tasks/groupTasks'
 import type { Task } from '@/lib/types'
+import { QueryState } from '@/design/components/QueryState'
 
 const UPCOMING_DAYS = 7
 
@@ -15,7 +16,7 @@ export default function UpcomingView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const tasksQuery = useTasks({ view: 'upcoming' })
 
-  if (!tasksQuery.data) return null
+  if (!tasksQuery.data) return <QueryState query={tasksQuery} />
 
   const today = new Date()
   const days = Array.from({ length: UPCOMING_DAYS }, (_, i) => addDays(today, i))

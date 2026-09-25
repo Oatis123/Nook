@@ -19,6 +19,7 @@ import { ConflictDialog } from '@/features/notes/ConflictDialog'
 import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import { useUploadAttachment } from '@/features/attachments/hooks'
 import type { NoteDetail } from '@/lib/types'
+import { QueryState } from '@/design/components/QueryState'
 
 const SAVE_DEBOUNCE_MS = 800
 
@@ -210,11 +211,13 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     [notesQuery.data, tagsQuery.data, uploadAndInsert],
   )
 
-  if (noteQuery.isLoading || !draft) return null
-
   if (noteQuery.isError) {
-    return <EmptyState icon={Link2} title="This note doesn't exist or was deleted." />
+    if (noteQuery.error instanceof ApiError && noteQuery.error.status === 404) {
+      return <EmptyState icon={Link2} title="This note doesn't exist or was deleted." />
+    }
+    return <QueryState query={noteQuery} />
   }
+  if (noteQuery.isLoading || !draft) return null
 
   return (
     <div className="flex h-full flex-col">

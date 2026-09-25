@@ -24,6 +24,7 @@ import { Tooltip } from '@/design/components/Tooltip'
 import { DropdownMenu } from '@/design/components/DropdownMenu'
 import { CommandPalette } from '@/features/shell/CommandPalette'
 import { useCurrentUser, useLogout } from '@/features/auth/hooks'
+import { ConnectionBanner } from '@/features/shell/ConnectionBanner'
 import { FolderTree } from '@/features/notes/FolderTree'
 import { TagList } from '@/features/notes/TagList'
 import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
@@ -224,6 +225,8 @@ export function AppShell() {
             <PanelRight size={16} strokeWidth={1.5} />
           </IconButton>
         </header>
+
+        <ConnectionBanner />
 
         {user?.telegram_blocked && (
           <div className="flex shrink-0 items-center gap-2.5 border-b border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">

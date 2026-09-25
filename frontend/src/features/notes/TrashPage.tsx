@@ -7,6 +7,7 @@ import {
   usePermanentlyDeleteNote,
   useRestoreNote,
 } from '@/features/notes/hooks'
+import { QueryState } from '@/design/components/QueryState'
 
 export default function TrashPage() {
   const trashed = useNotes({ deleted: true })
@@ -14,7 +15,7 @@ export default function TrashPage() {
   const permanentlyDelete = usePermanentlyDeleteNote()
   const emptyTrash = useEmptyTrash()
 
-  if (!trashed.data) return null
+  if (!trashed.data) return <QueryState query={trashed} />
 
   if (trashed.data.length === 0) {
     return <EmptyState icon={Trash2} title="Trash is empty" />

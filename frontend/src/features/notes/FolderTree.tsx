@@ -29,6 +29,7 @@ import {
   useUpdateFolder,
   useUpdateNote,
 } from '@/features/notes/hooks'
+import { QueryState } from '@/design/components/QueryState'
 
 type DragPayload = { type: 'note' | 'folder'; id: string }
 const DRAG_MIME = 'application/x-nook-item'
@@ -46,7 +47,8 @@ export function FolderTree() {
   const updateFolder = useUpdateFolder()
   const deleteNoteMutation = useDeleteNote()
 
-  if (!foldersQuery.data || !notesQuery.data) return null
+  if (!foldersQuery.data) return <QueryState query={foldersQuery} compact />
+  if (!notesQuery.data) return <QueryState query={notesQuery} compact />
 
   const tree = buildTree(foldersQuery.data, notesQuery.data)
 

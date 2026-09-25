@@ -29,9 +29,8 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => 
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         setConfirmOpen(true)
-        return
       }
-      throw error
+      // Anything else is already reported by the global mutation error toast.
     }
   }
 

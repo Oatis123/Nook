@@ -4,56 +4,18 @@ import * as notesApi from '@/features/notes/api'
 import { noteKey } from '@/features/notes/hooks'
 import { ApiError } from '@/lib/api'
 import { toast } from '@/lib/toast'
+import { clearStoredDraft, readStoredDraft, writeStoredDraft } from '@/features/notes/draftStorage'
 import type { NoteDetail } from '@/lib/types'
 
 export const SAVE_DEBOUNCE_MS = 800
 const RETRY_DELAY_MS = 10_000
+const MAX_AUTO_RETRIES = 30
 
 export type SaveStatus = 'saved' | 'saving' | 'offline' | 'error'
 
 interface Draft {
   title: string
   content: string
-}
-
-/** Unsaved content, kept in localStorage until the server has it — survives a closed
- * tab, a crash, or a session that expired mid-edit. `baseVersion` is the server version
- * the edits started from, so a restore can tell whether the note changed meanwhile. */
-interface StoredDraft {
-  content: string
-  baseVersion: number
-}
-
-const storageKey = (noteId: string) => `nook:note-draft:${noteId}`
-
-export function readStoredDraft(noteId: string): StoredDraft | null {
-  try {
-    const raw = localStorage.getItem(storageKey(noteId))
-    if (!raw) return null
-    const value = JSON.parse(raw) as Partial<StoredDraft>
-    if (typeof value.content === 'string' && typeof value.baseVersion === 'number') {
-      return { content: value.content, baseVersion: value.baseVersion }
-    }
-  } catch {
-    // Unavailable or corrupt storage just means no local backup.
-  }
-  return null
-}
-
-function writeStoredDraft(noteId: string, draft: StoredDraft): void {
-  try {
-    localStorage.setItem(storageKey(noteId), JSON.stringify(draft))
-  } catch {
-    // Quota exceeded / storage disabled: autosave still works, only the backup is lost.
-  }
-}
-
-function clearStoredDraft(noteId: string): void {
-  try {
-    localStorage.removeItem(storageKey(noteId))
-  } catch {
-    // ignore
-  }
 }
 
 /**
@@ -111,6 +73,16 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
     retryRef.current = null
   }, [])
 
+  // Automatic retries after a failed save: bounded, and never after the editor for this
+  // note has unmounted (a leftover timer could otherwise race a newer editor instance).
+  const retriesRef = useRef(0)
+  const mountedRef = useRef(true)
+  const scheduleRetry = useCallback(() => {
+    if (!mountedRef.current || retriesRef.current >= MAX_AUTO_RETRIES) return
+    retriesRef.current += 1
+    retryRef.current = setTimeout(() => void saveNowRef.current(), RETRY_DELAY_MS)
+  }, [])
+
   const saveNow = useCallback(async () => {
     clearTimers()
     if (inFlightRef.current || conflictRef.current || fatalRef.current) return
@@ -145,7 +117,14 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
         predicate: (q) =>
           q.queryKey[0] === 'tags' || (q.queryKey[0] === 'notes' && q.queryKey[1] !== noteId),
       })
-      if (draftRef.current?.content === result.content) clearStoredDraft(noteId)
+      retriesRef.current = 0
+      if (draftRef.current?.content === result.content) {
+        clearStoredDraft(noteId)
+      } else if (draftRef.current) {
+        // Typing continued during the save: re-base the backup on the version just
+        // saved, or restoring it later would look like a conflict with our own save.
+        writeStoredDraft(noteId, { content: draftRef.current.content, baseVersion: result.version })
+      }
       saveAgain = isDirty()
       setStatus(saveAgain ? 'saving' : 'saved')
     } catch (error) {
@@ -154,6 +133,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
           // The title is rejected, but the content in the same request still needs saving.
           setTitleError(error.message)
           saveAgain = contentDirty
+          if (!contentDirty) setStatus('saved')
         } else if (error.code === 'note_in_trash') {
           fatalRef.current = true
           setFatalError('This note is in the trash. Restore it to keep editing.')
@@ -163,7 +143,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
           try {
             setConflict(await notesApi.getNote(noteId))
           } catch {
-            retryRef.current = setTimeout(() => void saveNowRef.current(), RETRY_DELAY_MS)
+            scheduleRetry()
           }
           setStatus('error')
         }
@@ -176,15 +156,21 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
       } else {
         // Network error, 5xx, expired session…: keep the edits (they're in localStorage
         // too) and try again shortly; the next keystroke or reconnect also retries.
+        // Other 4xx (the note is gone, access lost) won't fix themselves: no auto-retry.
         if (titleCommit) pendingTitleRef.current = titleCommit
         setStatus(navigator.onLine ? 'error' : 'offline')
-        retryRef.current = setTimeout(() => void saveNowRef.current(), RETRY_DELAY_MS)
+        const transient =
+          !(error instanceof ApiError) ||
+          error.status >= 500 ||
+          error.status === 408 ||
+          error.status === 429
+        if (transient) scheduleRetry()
       }
     } finally {
       inFlightRef.current = false
     }
     if (saveAgain) void saveNowRef.current()
-  }, [clearTimers, isDirty, noteId, queryClient, setConflict])
+  }, [clearTimers, isDirty, noteId, queryClient, scheduleRetry, setConflict])
 
   useEffect(() => {
     saveNowRef.current = saveNow
@@ -288,13 +274,14 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
 
   // Leaving the note (navigating to another one, closing the view): send what's pending
   // now instead of dropping the debounce timer.
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
       clearTimers()
       if (isDirty()) void saveNowRef.current()
-    },
-    [clearTimers, isDirty],
-  )
+    }
+  }, [clearTimers, isDirty])
 
   const setContent = useCallback(
     (content: string) => {
@@ -304,6 +291,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
       writeStoredDraft(noteId, { content, baseVersion: versionRef.current })
       if (fatalRef.current || conflictRef.current) return
       setStatus(navigator.onLine ? 'saving' : 'offline')
+      retriesRef.current = 0
       scheduleSave()
     },
     [noteId, scheduleSave, setDraft],

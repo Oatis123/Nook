@@ -6,6 +6,8 @@ import { parseQuickAdd } from '@/features/tasks/quickAddParser'
 import { computeDefaultRecurrenceStartDate } from '@/features/tasks/recurrencePhrase'
 import { describeRecurrenceInput } from '@/features/tasks/recurrenceLabel'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
+import { nowIn } from '@/lib/dates'
+import { useCurrentUser } from '@/features/auth/hooks'
 
 function isTypingInField(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
@@ -30,7 +32,13 @@ export function QuickAdd({ listId, parentId }: { listId?: string; parentId?: str
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const parsed = useMemo(() => (text.trim() ? parseQuickAdd(text) : null), [text])
+  // "today"/"tomorrow" in the profile's timezone, like the rest of the task views.
+  const { data: user } = useCurrentUser()
+  const timeZone = user?.timezone
+  const parsed = useMemo(
+    () => (text.trim() ? parseQuickAdd(text, nowIn(timeZone)) : null),
+    [text, timeZone],
+  )
   const matchedList = useMemo(() => {
     if (!parsed?.listName || !taskListsQuery.data) return undefined
     return taskListsQuery.data.find((l) => l.name.toLowerCase() === parsed.listName?.toLowerCase())
@@ -59,7 +67,9 @@ export function QuickAdd({ listId, parentId }: { listId?: string; parentId?: str
         priority: parsed?.priority ?? undefined,
         due_date:
           parsed?.dueDate ??
-          (parsed?.recurrence ? computeDefaultRecurrenceStartDate(parsed.recurrence) : undefined),
+          (parsed?.recurrence
+            ? computeDefaultRecurrenceStartDate(parsed.recurrence, nowIn(timeZone))
+            : undefined),
         due_time: parsed?.dueTime ?? undefined,
         recurrence: parsed?.recurrence ?? undefined,
       },

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { parseLocalDate, todayIn } from '@/lib/dates'
+import { nowIn, parseLocalDate, todayIn } from '@/lib/dates'
 import { formatDate } from '@/lib/format'
 
 const originalTz = process.env.TZ
@@ -30,5 +30,12 @@ describe('calendar dates west of UTC', () => {
     const date = parseLocalDate('2026-09-24')
     expect([date.getFullYear(), date.getMonth(), date.getDate()]).toEqual([2026, 8, 24])
     expect(formatDate('2026-09-24')).toBe('Sep 24, 2026')
+  })
+})
+
+describe('nowIn', () => {
+  it('gives the wall-clock time of the zone', () => {
+    const now = nowIn('Asia/Vladivostok', new Date('2026-09-24T15:30:00Z'))
+    expect([now.getDate(), now.getHours(), now.getMinutes()]).toEqual([25, 1, 30])
   })
 })

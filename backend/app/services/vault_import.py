@@ -1,6 +1,7 @@
+import re
 import uuid
 import zipfile
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO
 
@@ -128,16 +129,18 @@ INTERRUPTED_MESSAGE = (
 )
 
 
-async def fail_interrupted_import_jobs(session: AsyncSession) -> int:
-    """Called once when the worker starts: a job still `processing` then was cut off by a
-    restart (the worker is the only thing that processes imports) and would otherwise
-    show as in-progress forever. It's failed rather than re-queued, since re-running it
-    would duplicate the notes it had already imported."""
-    jobs = list(
-        await session.scalars(
-            select(ImportJob).where(ImportJob.status == ImportJobStatus.processing)
-        )
-    )
+async def fail_interrupted_import_jobs(
+    session: AsyncSession, older_than: timedelta | None = None
+) -> int:
+    """A job still `processing` when the worker starts was cut off by a restart (the
+    worker is the only thing that processes imports); with `older_than`, the worker's
+    periodic sweep also fails jobs stuck for that long (e.g. the database connection
+    dropped mid-import). Otherwise they'd show as in progress forever — and block new
+    imports. Failed rather than re-queued: re-running would duplicate imported notes."""
+    query = select(ImportJob).where(ImportJob.status == ImportJobStatus.processing)
+    if older_than is not None:
+        query = query.where(ImportJob.created_at < datetime.now(UTC) - older_than)
+    jobs = list(await session.scalars(query))
     for job in jobs:
         report = dict(job.report or {})
         report["errors"] = [*report.get("errors", []), INTERRUPTED_MESSAGE]
@@ -147,6 +150,25 @@ async def fail_interrupted_import_jobs(session: AsyncSession) -> int:
         _zip_path(job.id).unlink(missing_ok=True)
     await session.commit()
     return len(jobs)
+
+
+_EMBED_TARGET_RE = re.compile(r"!\[\[([^\[\]|#]+)([|#][^\[\]]*)?\]\]")
+
+
+def rewrite_embeds(content: str, names: dict[str, str]) -> str:
+    """Points `![[file]]` / `![[path/file|alias]]` at the name the file was actually
+    stored under. Obsidian may reference an attachment by bare name or by vault path."""
+    if not names:
+        return content
+
+    def replace(match: re.Match[str]) -> str:
+        target = match.group(1).strip()
+        new = names.get(target) or names.get(PurePosixPath(target).name)
+        if new is None or new == target:
+            return match.group(0)
+        return f"![[{new}{match.group(2) or ''}]]"
+
+    return _EMBED_TARGET_RE.sub(replace, content)
 
 
 def _is_safe_entry(name: str) -> bool:
@@ -250,6 +272,7 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                 )
 
             note_entries: list[zipfile.ZipInfo] = []
+            embed_names: dict[str, str] = {}
             folder_cache: dict[tuple[str, ...], uuid.UUID | None] = {(): None}
 
             for info in infos:
@@ -272,7 +295,23 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                     continue
                 try:
                     data = zf.read(info)
-                    await attachments_service.save_attachment(session, user_id, filename, data)
+                    existing = await attachments_service.find_identical(
+                        session, user_id, filename, data
+                    )
+                    if existing is not None:
+                        # Re-importing the same file (e.g. the same vault twice) reuses it
+                        # instead of piling up "image (2).png" copies.
+                        saved_name = existing.filename
+                    else:
+                        saved = await attachments_service.save_attachment(
+                            session, user_id, filename, data
+                        )
+                        saved_name = saved.filename
+                    # Notes embed attachments by name; if this one had to be renamed
+                    # (the user already has a different "image.png"), the vault's notes
+                    # are rewritten below to point at the renamed file, not the other one.
+                    embed_names.setdefault(filename, saved_name)
+                    embed_names.setdefault(info.filename, saved_name)
                     report["attachments_imported"] += 1
                 except HTTPException as exc:
                     report["errors"].append(f'"{info.filename}": {exc.detail}')
@@ -289,6 +328,7 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                         session, user_id, path.parent.parts, folder_cache
                     )
                     content = zf.read(info).decode("utf-8", errors="replace")
+                    content = rewrite_embeds(content.replace("\x00", ""), embed_names)
                     await _import_note(session, user_id, folder_id, path.stem, content, report)
                 except HTTPException as exc:
                     report["errors"].append(f'"{info.filename}": {exc.detail}')
@@ -305,10 +345,15 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
         await session.rollback()
         report["errors"].append("Unexpected error while importing the archive")
     finally:
-        job_row = await session.get(ImportJob, job_id)
-        if job_row is not None:
-            job_row.status = final_status
-            job_row.report = report
-            job_row.finished_at = datetime.now(UTC)
-            await session.commit()
         zip_path.unlink(missing_ok=True)
+        try:
+            job_row = await session.get(ImportJob, job_id)
+            if job_row is not None:
+                job_row.status = final_status
+                job_row.report = report
+                job_row.finished_at = datetime.now(UTC)
+                await session.commit()
+        except Exception:
+            # E.g. the database connection dropped: the job stays "processing" until the
+            # worker's periodic sweep (fail_interrupted_import_jobs) fails it.
+            log.exception("import.finalize_failed", job_id=str(job_id))

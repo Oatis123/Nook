@@ -119,8 +119,10 @@ export function parseRecurrencePhrase(text: string): {
 /** A recurring task needs a first-occurrence date (spec §7.4); when quick add's phrase
  * didn't pin one down itself (chrono found no date, e.g. bare "every monday"), this picks
  * the next matching day for a weekday-list rule, or today for anything else. */
-export function computeDefaultRecurrenceStartDate(recurrence: RecurrenceInput): string {
-  const today = new Date()
+export function computeDefaultRecurrenceStartDate(
+  recurrence: RecurrenceInput,
+  today: Date = new Date(),
+): string {
   if (recurrence.freq === 'weekly' && recurrence.by_weekday && recurrence.by_weekday.length > 0) {
     const isoToday = (today.getDay() + 6) % 7 // JS Sunday=0..Saturday=6 -> Monday=0..Sunday=6
     const sorted = [...recurrence.by_weekday].sort((a, b) => a - b)

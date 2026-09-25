@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as authApi from '@/features/auth/api'
 import { ApiError } from '@/lib/api'
+import { clearStoredDrafts } from '@/features/notes/draftStorage'
 
 export const meQueryKey = ['me'] as const
 
@@ -42,8 +43,11 @@ export function useLogout() {
   return useMutation({
     mutationFn: authApi.logout,
     onSuccess: () => {
+      // Nothing of this account may stay behind on a shared computer: cached API data
+      // and unsaved-draft backups.
+      clearStoredDrafts()
+      queryClient.clear()
       queryClient.setQueryData(meQueryKey, null)
-      queryClient.invalidateQueries()
     },
   })
 }
@@ -87,8 +91,9 @@ export function useRevokeAllSessions() {
   return useMutation({
     mutationFn: authApi.revokeAllSessions,
     onSuccess: () => {
+      clearStoredDrafts()
+      queryClient.clear()
       queryClient.setQueryData(meQueryKey, null)
-      queryClient.invalidateQueries()
     },
   })
 }

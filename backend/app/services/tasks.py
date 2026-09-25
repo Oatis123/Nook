@@ -312,7 +312,9 @@ def _advance_recurring_task(
         )
     )
 
-    next_occ = recurrence_service.next_occurrence(task.rrule, task.dtstart_local, occurrence_at)
+    next_occ = recurrence_service.next_occurrence(
+        task.rrule, task.dtstart_local, occurrence_at, anchor=occurrence_at
+    )
     if next_occ is None:
         task.status = TaskStatus.done
         task.completed_at = now
@@ -427,7 +429,12 @@ async def get_calendar_entries(
             if remaining <= 0:
                 break
             for occ in recurrence_service.occurrences_between(
-                task.rrule, task.dtstart_local, expand_from, range_end, limit=remaining
+                task.rrule,
+                task.dtstart_local,
+                expand_from,
+                range_end,
+                limit=remaining,
+                anchor=current_occurrence,
             ):
                 if occ == current_occurrence:
                     continue

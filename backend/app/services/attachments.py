@@ -1,3 +1,4 @@
+import re
 import uuid
 from pathlib import Path, PurePosixPath
 
@@ -102,6 +103,29 @@ async def _check_quota(session: AsyncSession, user_id: uuid.UUID, incoming: int)
             f"Your attachment storage is full ({quota_mb} MB). "
             "Delete unused attachments to free up space.",
         )
+
+
+async def find_identical(
+    session: AsyncSession, user_id: uuid.UUID, filename: str, data: bytes
+) -> Attachment | None:
+    """An existing attachment of this user with the same bytes, stored under this name or
+    a numbered copy of it ("image (2).png" — what an earlier import of it was renamed to)."""
+    path = PurePosixPath(_sanitize_filename(filename))
+    numbered = re.compile(rf"{re.escape(path.stem)}( \(\d+\))?{re.escape(path.suffix)}")
+    candidates = await session.scalars(
+        select(Attachment).where(
+            Attachment.user_id == user_id,
+            Attachment.size == len(data),
+            Attachment.filename.startswith(path.stem, autoescape=True),
+        )
+    )
+    for candidate in candidates:
+        if not numbered.fullmatch(candidate.filename):
+            continue
+        stored = Path(candidate.storage_path)
+        if stored.is_file() and await run_in_threadpool(stored.read_bytes) == data:
+            return candidate
+    return None
 
 
 async def save_attachment(

@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import signal
+from datetime import timedelta
 
 import structlog
 from aiogram import Bot
@@ -27,6 +28,9 @@ MAINTENANCE_SECONDS = 3600
 # After an unexpected error, back off a little so a persistent failure (DB down) doesn't
 # spin or flood the logs.
 ERROR_BACKOFF_SECONDS = 10
+# An import still "processing" after this long was cut off (e.g. a dropped DB connection
+# during its final write) — no real import takes hours.
+STUCK_IMPORT_AFTER = timedelta(hours=6)
 
 # Set on SIGTERM/SIGINT: each loop finishes its current iteration and exits, instead of
 # being SIGKILLed mid-send by `docker stop` after the grace period.
@@ -94,8 +98,9 @@ async def _maintenance_loop() -> None:
             async with async_session_factory() as session:
                 purged = await purge_resolved_reminders(session)
                 tokens = await purge_expired_tokens(session)
-            if purged or tokens:
-                log.info("worker.purged", reminders=purged, tokens=tokens)
+                stuck = await fail_interrupted_import_jobs(session, older_than=STUCK_IMPORT_AFTER)
+            if purged or tokens or stuck:
+                log.info("worker.purged", reminders=purged, tokens=tokens, stuck_imports=stuck)
         except Exception:
             log.exception("worker.maintenance_failed")
         await _sleep(MAINTENANCE_SECONDS)

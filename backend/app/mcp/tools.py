@@ -5,6 +5,7 @@ from typing import Any
 
 from fastapi import HTTPException
 from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import BaseModel, ValidationError
 
 from app.core.db import async_session_factory
 from app.mcp.auth import current_user_id
@@ -12,7 +13,7 @@ from app.mcp.instance import server
 from app.models.note import Note
 from app.models.task import Task
 from app.models.user import User
-from app.schemas.note import NoteUpdate
+from app.schemas.note import NoteCreate, NoteUpdate
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.services import folders as folders_service
 from app.services import notes as notes_service
@@ -29,11 +30,17 @@ def _uuid(value: str, field: str) -> uuid.UUID:
 
 
 def _date(value: str | None) -> date | None:
-    return date.fromisoformat(value) if value else None
+    try:
+        return date.fromisoformat(value) if value else None
+    except ValueError as exc:
+        raise ToolError(f"'{value}' is not a date (expected YYYY-MM-DD)") from exc
 
 
 def _time(value: str | None) -> time | None:
-    return time.fromisoformat(value) if value else None
+    try:
+        return time.fromisoformat(value) if value else None
+    except ValueError as exc:
+        raise ToolError(f"'{value}' is not a time (expected HH:MM)") from exc
 
 
 async def _run[T](coro: Coroutine[Any, Any, T]) -> T:
@@ -45,6 +52,18 @@ async def _run[T](coro: Coroutine[Any, Any, T]) -> T:
         return await coro
     except HTTPException as exc:
         raise ToolError(str(exc.detail)) from exc
+
+
+def _validated[M: BaseModel](model: type[M], **values: Any) -> M:
+    """Builds a request schema, reporting invalid input to the model as a clean
+    `ToolError` instead of an opaque crash."""
+    try:
+        return model(**values)
+    except ValidationError as exc:
+        problems = "; ".join(
+            f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}" for err in exc.errors()
+        )
+        raise ToolError(f"Invalid input — {problems}") from exc
 
 
 def _note_summary(note: Note) -> dict[str, Any]:
@@ -143,11 +162,16 @@ async def create_note(
     """Create a note. `content` is Markdown — use `[[Other Note Title]]` to link another
     note and `#tag` for tags, same as the editor. Leave `folder_id` unset for the root."""
     user_id = current_user_id()
+    # Same validation as the REST endpoint (title/content length, NUL characters).
+    data = _validated(
+        NoteCreate,
+        title=title,
+        content=content,
+        folder_id=_uuid(folder_id, "folder") if folder_id else None,
+    )
     async with async_session_factory() as session:
         note = await _run(
-            notes_service.create_note(
-                session, user_id, title, _uuid(folder_id, "folder") if folder_id else None, content
-            )
+            notes_service.create_note(session, user_id, data.title, data.folder_id, data.content)
         )
         return _note_summary(note)
 
@@ -166,7 +190,7 @@ async def update_note(
                 session,
                 user_id,
                 nid,
-                NoteUpdate(version=current.version, title=title, content=content),
+                _validated(NoteUpdate, version=current.version, title=title, content=content),
             )
         )
         return _note_summary(note)
@@ -256,11 +280,12 @@ async def create_task(
             tasks_service.create_task(
                 session,
                 user_id,
-                TaskCreate(
+                _validated(
+                    TaskCreate,
                     title=title,
                     description=description,
                     list_id=_uuid(list_id, "list") if list_id else None,
-                    priority=priority,  # type: ignore[arg-type]
+                    priority=priority,
                     due_date=_date(due_date),
                     due_time=_time(due_time),
                 ),
@@ -287,10 +312,11 @@ async def update_task(
                 session,
                 user_id,
                 _uuid(task_id, "task"),
-                TaskUpdate(
+                _validated(
+                    TaskUpdate,
                     title=title,
                     description=description,
-                    priority=priority,  # type: ignore[arg-type]
+                    priority=priority,
                     due_date=_date(due_date) if due_date else None,
                     due_time=_time(due_time) if due_time else None,
                     clear_due_date=due_date == "",

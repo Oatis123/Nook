@@ -22,6 +22,15 @@ from app.services.note_parsing import (
     frontmatter_tags,
 )
 
+# Per note, per kind (tags, aliases, links, embeds). Far beyond any real note, but it
+# keeps every lookup's bind parameters under Postgres' 32767 limit — a pasted list of
+# tens of thousands of [[links]] used to fail every save with a 500.
+MAX_ITEMS_PER_NOTE = 2000
+
+
+def _capped(items: set[str]) -> set[str]:
+    return items if len(items) <= MAX_ITEMS_PER_NOTE else set(sorted(items)[:MAX_ITEMS_PER_NOTE])
+
 
 @dataclass(frozen=True)
 class _Candidate:
@@ -133,7 +142,9 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
     frontmatter, body = extract_frontmatter(note.content)
     note.frontmatter = frontmatter
 
-    tag_names = {clip_name(t) for t in frontmatter_tags(frontmatter) | extract_inline_tags(body)}
+    tag_names = _capped(
+        {clip_name(t) for t in frontmatter_tags(frontmatter) | extract_inline_tags(body)}
+    )
     existing_tags: dict[str, Tag] = {}
     if tag_names:
         existing_tags = {
@@ -156,12 +167,12 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
     for tag_id in tag_ids:
         await session.execute(insert(NoteTag).values(note_id=note.id, tag_id=tag_id))
 
-    aliases = {clip_name(a) for a in frontmatter_aliases(frontmatter)}
+    aliases = _capped({clip_name(a) for a in frontmatter_aliases(frontmatter)})
     await session.execute(delete(NoteAlias).where(NoteAlias.note_id == note.id))
     for alias in aliases:
         session.add(NoteAlias(note_id=note.id, alias=alias))
 
-    wikilinks = _dedup_links(extract_wikilinks(body))
+    wikilinks = _dedup_links(extract_wikilinks(body))[:MAX_ITEMS_PER_NOTE]
     await session.execute(delete(NoteLink).where(NoteLink.source_note_id == note.id))
     candidates, folders = await _load_candidates(
         session, user_id, {_split_target(link.target)[1] for link in wikilinks}
@@ -177,7 +188,7 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
             )
         )
 
-    embed_filenames = extract_embeds(body)
+    embed_filenames = _capped(extract_embeds(body))
     await session.execute(delete(NoteAttachment).where(NoteAttachment.note_id == note.id))
     if embed_filenames:
         attachments = await session.execute(
@@ -189,10 +200,12 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
         for attachment_id, filename in attachments.all():
             by_filename.setdefault(filename, []).append(attachment_id)
         for filename in embed_filenames:
-            matches = by_filename.get(filename, [])
-            if len(matches) == 1:
+            # Every same-named attachment counts as used — the embed can't pick between
+            # them (duplicates predating unique names), but "delete unused" must not
+            # delete any of them either.
+            for attachment_id in by_filename.get(filename, []):
                 await session.execute(
-                    insert(NoteAttachment).values(note_id=note.id, attachment_id=matches[0])
+                    insert(NoteAttachment).values(note_id=note.id, attachment_id=attachment_id)
                 )
 
 

@@ -2,6 +2,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,7 @@ from app.services.reminders import (
 )
 
 settings = get_settings()
+log = structlog.get_logger()
 
 
 # Raised by a sender to signal the recipient has blocked the bot — the real Telegram sender
@@ -69,10 +71,31 @@ async def dispatch_due_reminders(
         if row is None:
             break
         seen.append(row.id)
-        await _dispatch_one(session, row, send, now)
-        await session.commit()
+        row_id = row.id
+        try:
+            await _dispatch_one(session, row, send, now)
+            await session.commit()
+        except Exception:
+            # One broken row must not stall everyone's reminders: it would be picked
+            # first again on every tick. Park it as failed and carry on.
+            log.exception("reminders.dispatch_failed", reminder_id=str(row_id))
+            await session.rollback()
+            await _mark_failed(session, row_id)
     await session.commit()
     return len(seen)
+
+
+async def _mark_failed(session: AsyncSession, row_id: uuid.UUID) -> None:
+    try:
+        failed = await session.get(ScheduledReminder, row_id)
+        if failed is not None and failed.status == ReminderStatus.pending:
+            failed.status = ReminderStatus.failed
+            failed.attempts += 1
+            failed.last_error = "internal error while dispatching"
+        await session.commit()
+    except Exception:
+        log.exception("reminders.mark_failed_failed", reminder_id=str(row_id))
+        await session.rollback()
 
 
 async def _dispatch_one(
@@ -132,4 +155,7 @@ async def _dispatch_one(
 
     row.status = ReminderStatus.sent
     user.telegram_blocked = False
+    # Record the send before anything else can fail: otherwise an error in scheduling the
+    # next occurrence would roll back "sent" and the message would go out again.
+    await session.commit()
     await schedule_next_occurrence_reminder(session, task, row.occurrence_at)

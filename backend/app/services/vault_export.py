@@ -17,7 +17,7 @@ from app.models.note import Note
 
 log = structlog.get_logger()
 
-_UNSAFE_CHARS_RE = re.compile(r'[\\/:*?"<>|]')
+_UNSAFE_CHARS_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f\x7f]')
 
 
 def _sanitize_path_segment(name: str) -> str:

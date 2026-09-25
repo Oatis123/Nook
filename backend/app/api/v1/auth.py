@@ -114,11 +114,14 @@ async def create_telegram_login_token(request: Request, session: DbSession) -> T
     # Anonymous and stores a row per call: bounded per IP.
     if not telegram_login_tokens_per_ip.hit(_client_ip(request)):
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many requests, try later")
+    code = telegram_link_service.new_confirm_code()
     plain, expires_at = await telegram_link_service.create_login_token(
-        session, request.headers.get("user-agent"), _client_ip(request)
+        session, request.headers.get("user-agent"), _client_ip(request), code
     )
     return TelegramTokenOut(
-        deep_link_url=telegram_link_service.deep_link_url("login", plain), expires_at=expires_at
+        deep_link_url=telegram_link_service.deep_link_url("login", plain),
+        expires_at=expires_at,
+        confirm_code=code,
     )
 
 

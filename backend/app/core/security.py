@@ -1,6 +1,9 @@
+import asyncio
+import weakref
+
+import anyio
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from starlette.concurrency import run_in_threadpool
 
 _hasher = PasswordHasher()
 
@@ -21,14 +24,32 @@ def verify_password(plain: str, hashed: str) -> bool:
 _DUMMY_HASH = _hasher.hash("nook-timing-equalizer-not-a-real-password")
 
 
+# argon2 is deliberately expensive: ~70 ms and 64 MiB of RAM per hash. It runs off the
+# event loop (so logins don't freeze other requests), but at most this many at once —
+# unbounded, a burst of anonymous login attempts ran dozens in parallel and pushed the
+# API past its memory limit. Extra attempts just queue.
+MAX_CONCURRENT_HASHES = 4
+_limiters: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, anyio.CapacityLimiter]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _hash_limiter() -> anyio.CapacityLimiter:
+    # One limiter per event loop (a limiter is bound to the loop it's created in).
+    loop = asyncio.get_running_loop()
+    limiter = _limiters.get(loop)
+    if limiter is None:
+        limiter = anyio.CapacityLimiter(MAX_CONCURRENT_HASHES)
+        _limiters[loop] = limiter
+    return limiter
+
+
 async def hash_password_async(plain: str) -> str:
-    """argon2 is deliberately slow (~70 ms, 64 MiB) — off the event loop, so a burst of
-    logins doesn't freeze every other request."""
-    return await run_in_threadpool(hash_password, plain)
+    return await anyio.to_thread.run_sync(hash_password, plain, limiter=_hash_limiter())
 
 
 async def verify_password_async(plain: str, hashed: str | None) -> bool:
     if hashed is None:
-        await run_in_threadpool(verify_password, plain, _DUMMY_HASH)
+        await anyio.to_thread.run_sync(verify_password, plain, _DUMMY_HASH, limiter=_hash_limiter())
         return False
-    return await run_in_threadpool(verify_password, plain, hashed)
+    return await anyio.to_thread.run_sync(verify_password, plain, hashed, limiter=_hash_limiter())

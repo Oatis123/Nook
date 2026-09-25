@@ -68,12 +68,33 @@ def compute_recurrence_end(rrule_string: str, dtstart: datetime) -> date | None:
     if "COUNT=" not in rrule_string and "UNTIL=" not in rrule_string:
         return None
     rule = rrulestr(rrule_string, dtstart=dtstart)
+    until = getattr(rule, "_until", None)
+    if until is not None:
+        last = rule.before(until, inc=True)
+        return last.date() if last is not None else dtstart.date()
+    # COUNT: new rules are limited to MAX_RECURRENCE_COUNT; the cap only bounds legacy ones.
     occurrences = list(islice(rule, MAX_EXPANDED_OCCURRENCES))
     return occurrences[-1].date() if occurrences else dtstart.date()
 
 
-def next_occurrence(rrule_string: str, dtstart: datetime, after: datetime) -> datetime | None:
-    rule = rrulestr(rrule_string, dtstart=dtstart)
+def _expansion_start(rrule_string: str, dtstart: datetime, anchor: datetime | None) -> datetime:
+    """dateutil always iterates from dtstart, so a series that started long ago (or with
+    an absurd start date) made every expansion walk its entire history. Any occurrence of
+    a rule without COUNT can stand in as its start — the series from there on is the same
+    — so expansion starts at the task's current occurrence (`anchor`) instead. COUNT
+    rules keep their real start (the count is relative to it) and are small anyway."""
+    if anchor is not None and anchor > dtstart and "COUNT=" not in rrule_string:
+        return anchor
+    return dtstart
+
+
+def next_occurrence(
+    rrule_string: str, dtstart: datetime, after: datetime, anchor: datetime | None = None
+) -> datetime | None:
+    """The first occurrence strictly after `after`. `anchor`: a known occurrence at or
+    before `after` (e.g. the task's current one) to start expanding from."""
+    start = _expansion_start(rrule_string, dtstart, anchor if anchor and anchor <= after else None)
+    rule = rrulestr(rrule_string, dtstart=start)
     return rule.after(after, inc=False)
 
 
@@ -83,10 +104,11 @@ def occurrences_between(
     start: datetime,
     end: datetime,
     limit: int = MAX_EXPANDED_OCCURRENCES,
+    anchor: datetime | None = None,
 ) -> list[datetime]:
     """Occurrences in [start, end], at most `limit` of them (generated lazily, so a huge
     range stops at the cap instead of materializing everything first)."""
-    rule = rrulestr(rrule_string, dtstart=dtstart)
+    rule = rrulestr(rrule_string, dtstart=_expansion_start(rrule_string, dtstart, anchor))
     result: list[datetime] = []
     for occurrence in rule.xafter(start, inc=True):
         if occurrence > end or len(result) >= limit:

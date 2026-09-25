@@ -109,7 +109,9 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     [notesQuery.data, tagsQuery.data, uploadAndInsert],
   )
 
-  if (noteQuery.isError) {
+  // Only when there's nothing to show: a failed *background* refetch (API restarting
+  // mid-deploy) must not replace an open editor, and its undo history, with an error.
+  if (noteQuery.isError && !noteQuery.data) {
     if (noteQuery.error instanceof ApiError && noteQuery.error.status === 404) {
       return <EmptyState icon={Link2} title="This note doesn't exist or was deleted." />
     }

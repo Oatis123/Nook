@@ -2,7 +2,6 @@
 #   COMPOSE_FILE=docker-compose.yml:docker-compose.caddy.yml
 #   DOMAIN=notes.example.com
 #   PUBLIC_URL=https://notes.example.com
-#   TRUSTED_PROXY_CIDR=172.30.0.10/32
 # See docs/DEPLOY.md.
 
 services:
@@ -37,6 +36,11 @@ services:
   web:
     # Only Caddy talks to nginx now; the plain-HTTP port is not published.
     ports: !reset []
+    environment:
+      # Caddy's fixed address below: nginx takes the client IP from its X-Forwarded-For.
+      # Set here rather than left to .env, because forgetting it makes every visitor look
+      # like 172.30.0.10 — one shared login rate limit for everyone.
+      TRUSTED_PROXY_CIDR: 172.30.0.10/32
 
 networks:
   default:

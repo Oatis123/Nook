@@ -121,7 +121,7 @@ export function TaskListSidebar() {
               <Icon size={14} strokeWidth={1.5} style={{ color: listColorVar(list.color) }} />
               <span className="truncate">{list.name}</span>
             </NavLink>
-            <span className="opacity-0 group-hover:opacity-100">
+            <span className="reveal-on-hover">
               <DropdownMenu
                 items={items}
                 trigger={

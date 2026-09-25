@@ -53,6 +53,21 @@ export function AppShell() {
   const { data: user } = useCurrentUser()
   const logout = useLogout()
   const isDesktop = useMediaQuery('(min-width: 768px)')
+  // On phones the sidebar is a drawer over the page: while it's open the page behind it
+  // is inert (no focus, no screen reader), and Esc closes it.
+  const drawerOpen = sidebarOpen && !isDesktop
+  const sheetOpen = rightPanelOpen && !isDesktop
+
+  useEffect(() => {
+    if (!drawerOpen && !sheetOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      if (drawerOpen) toggleSidebar()
+      else if (sheetOpen) toggleRightPanel()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [drawerOpen, sheetOpen, toggleSidebar, toggleRightPanel])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -90,6 +105,8 @@ export function AppShell() {
       )}
       <aside
         data-open={sidebarOpen || undefined}
+        inert={!sidebarOpen}
+        aria-label="Sidebar"
         className={clsx(
           'ui-sidebar fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface',
           'transition-transform duration-150 md:relative md:inset-auto md:transition-[width]',
@@ -208,7 +225,7 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col" inert={drawerOpen || sheetOpen}>
         <header className="ui-topbar flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
           <IconButton
             label="Open menu"

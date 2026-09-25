@@ -12,10 +12,12 @@ import {
   Plus,
   Search,
   Settings,
+  Shield,
   Trash2,
 } from '@/design/icons'
 import { useUIStore } from '@/lib/ui-store'
 import { fuzzyFilter } from '@/lib/fuzzy'
+import { useCurrentUser } from '@/features/auth/hooks'
 import { useCreateNote, useNotes } from '@/features/notes/hooks'
 import { uniqueNoteTitle } from '@/features/notes/tree'
 import { useTasks } from '@/features/tasks/hooks'
@@ -35,6 +37,7 @@ export function CommandPalette() {
   const notesQuery = useNotes()
   const tasksQuery = useTasks({})
   const createNote = useCreateNote()
+  const { data: user } = useCurrentUser()
   const [query, setQuery] = useState('')
   const [lastQuery, setLastQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -113,6 +116,9 @@ export function CommandPalette() {
       icon: Settings,
       onSelect: () => go('/settings'),
     },
+    ...(user?.role === 'admin'
+      ? [{ key: 'cmd-admin', label: 'Go to Admin', icon: Shield, onSelect: () => go('/admin') }]
+      : []),
   ]
 
   const noteEntries: Entry[] = (notesQuery.data ?? []).map((note) => ({
@@ -141,6 +147,12 @@ export function CommandPalette() {
     setLastQuery(query)
     if (activeIndex !== 0) setActiveIndex(0)
   }
+
+  // Keep the keyboard-selected result visible when arrowing past the list's scroll area.
+  useEffect(() => {
+    if (!open) return
+    document.getElementById(`palette-option-${activeIndex}`)?.scrollIntoView({ block: 'nearest' })
+  }, [activeIndex, open])
 
   function handleKeyDown(e: ReactKeyboardEvent) {
     if (e.key === 'ArrowDown') {
@@ -172,18 +184,35 @@ export function CommandPalette() {
             <Search size={16} strokeWidth={1.5} className="text-text-muted" />
             <input
               autoFocus
+              role="combobox"
+              aria-label="Search notes, tasks, commands"
+              aria-expanded={results.length > 0}
+              aria-controls="palette-results"
+              aria-activedescendant={
+                results.length > 0 ? `palette-option-${activeIndex}` : undefined
+              }
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search notes, tasks, commands…"
               className="w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
             />
           </div>
-          <ul role="listbox" aria-label="Results" className="max-h-80 overflow-y-auto py-1.5">
+          <ul
+            id="palette-results"
+            role="listbox"
+            aria-label="Results"
+            className="max-h-80 overflow-y-auto py-1.5"
+          >
             {results.length === 0 && (
               <li className="px-4 py-6 text-center text-sm text-text-muted">No matches</li>
             )}
             {results.map((entry, i) => (
-              <li key={entry.key} role="option" aria-selected={i === activeIndex}>
+              <li
+                key={entry.key}
+                id={`palette-option-${i}`}
+                role="option"
+                aria-selected={i === activeIndex}
+              >
                 <button
                   type="button"
                   onClick={entry.onSelect}

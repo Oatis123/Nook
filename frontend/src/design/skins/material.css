@@ -430,3 +430,10 @@
 :root[data-theme-skin='material'] :focus-visible {
   outline-width: 3px;
 }
+
+/* The larger Material dialog padding must keep the bottom sheet's safe-area inset. */
+@media (max-width: 639px) {
+  :root[data-theme-skin='material'] .ui-dialog {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+}

@@ -11,7 +11,7 @@ export const SAVE_DEBOUNCE_MS = 800
 const RETRY_DELAY_MS = 10_000
 const MAX_AUTO_RETRIES = 30
 
-export type SaveStatus = 'saved' | 'saving' | 'offline' | 'error'
+export type SaveStatus = 'saved' | 'saving' | 'offline' | 'retrying' | 'conflict' | 'error'
 
 interface Draft {
   title: string
@@ -77,10 +77,11 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
   // note has unmounted (a leftover timer could otherwise race a newer editor instance).
   const retriesRef = useRef(0)
   const mountedRef = useRef(true)
-  const scheduleRetry = useCallback(() => {
-    if (!mountedRef.current || retriesRef.current >= MAX_AUTO_RETRIES) return
+  const scheduleRetry = useCallback((): boolean => {
+    if (!mountedRef.current || retriesRef.current >= MAX_AUTO_RETRIES) return false
     retriesRef.current += 1
     retryRef.current = setTimeout(() => void saveNowRef.current(), RETRY_DELAY_MS)
+    return true
   }, [])
 
   const saveNow = useCallback(async () => {
@@ -141,11 +142,22 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
         } else {
           if (titleCommit) pendingTitleRef.current = titleCommit
           try {
-            setConflict(await notesApi.getNote(noteId))
+            const fresh = await notesApi.getNote(noteId)
+            if (fresh.content === savedRef.current.content) {
+              // Only metadata changed meanwhile (moved/renamed from the sidebar): the text
+              // we based our edit on is intact, so adopt the new version and save again.
+              versionRef.current = fresh.version
+              savedRef.current = { title: fresh.title, content: fresh.content }
+              queryClient.setQueryData(noteKey(noteId), fresh)
+              saveAgain = true
+            } else {
+              setConflict(fresh)
+              setStatus('conflict')
+            }
           } catch {
+            setStatus('retrying')
             scheduleRetry()
           }
-          setStatus('error')
         }
       } else if (error instanceof ApiError && error.status === 422) {
         // Rejected as invalid (in practice: over the size limit). Retrying the same text
@@ -158,13 +170,13 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
         // too) and try again shortly; the next keystroke or reconnect also retries.
         // Other 4xx (the note is gone, access lost) won't fix themselves: no auto-retry.
         if (titleCommit) pendingTitleRef.current = titleCommit
-        setStatus(navigator.onLine ? 'error' : 'offline')
         const transient =
           !(error instanceof ApiError) ||
           error.status >= 500 ||
           error.status === 408 ||
           error.status === 429
-        if (transient) scheduleRetry()
+        if (!navigator.onLine) setStatus('offline')
+        else setStatus(transient && scheduleRetry() ? 'retrying' : 'error')
       }
     } finally {
       inFlightRef.current = false
@@ -200,6 +212,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
       } else {
         // Local unsaved edits *and* newer changes on the server: let the user choose.
         setConflict(server)
+        setStatus('conflict')
       }
     } else {
       if (stored) clearStoredDraft(noteId)
@@ -221,6 +234,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
       savedRef.current = { title: server.title, content: server.content }
     } else if (isDirty()) {
       setConflict(server)
+      setStatus('conflict')
     } else {
       versionRef.current = server.version
       savedRef.current = { title: server.title, content: server.content }

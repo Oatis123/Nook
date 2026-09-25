@@ -30,14 +30,14 @@
   --text-muted: light-dark(#6b6860, #9c998f);
   --accent: light-dark(#a65635, #d9805a);
   --accent-text: light-dark(#ffffff, #1c1b19);
-  --danger: light-dark(#b5483a, #d0685a);
+  --danger: light-dark(#b5483a, #d67a6e);
   --danger-text: light-dark(#ffffff, #1c1b19);
 
   /* Priority markers — muted, fixed palette, AA contrast (4.5:1) on --surface, since
      they're also used as text colors */
   --priority-low: light-dark(#56735b, #86ab8c);
-  --priority-medium: light-dark(#c2953f, #d9ac5a);
-  --priority-high: light-dark(#b5483a, #d0685a);
+  --priority-medium: light-dark(#87672b, #d9ac5a);
+  --priority-high: light-dark(#b5483a, #d67a6e);
 
   /* List/tag color palette (choose N) — muted, warm-neutral compatible. Shared by all
      skins: users pick these per list, so they must mean the same color everywhere. */

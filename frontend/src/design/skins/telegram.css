@@ -8,7 +8,7 @@
   --surface-raised: light-dark(#ffffff, #1f2936);
   --border: light-dark(#dfe2e5, #243140);
   --text: light-dark(#0f0f0f, #f5f5f5);
-  --text-muted: light-dark(#6a6f72, #7d8b99);
+  --text-muted: light-dark(#6a6f72, #8693a0);
   /* Light values darkened from Telegram's brand colors to reach WCAG AA (4.5:1) for
      text and white-on-accent buttons. */
   --accent: light-dark(#136ec8, #5ea9eb);
@@ -17,8 +17,8 @@
   --danger-text: light-dark(#ffffff, #0e1621);
 
   --priority-low: light-dark(#387b37, #6fbd6a);
-  --priority-medium: light-dark(#e3a33b, #e0b563);
-  --priority-high: light-dark(#e53935, #e2685b);
+  --priority-medium: light-dark(#946315, #e0b563);
+  --priority-high: light-dark(#d8201c, #e2685b);
 
   --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
   --overlay: rgb(0 0 0 / 0.4);

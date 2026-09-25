@@ -215,6 +215,9 @@ export function CommandPalette() {
               >
                 <button
                   type="button"
+                  // Options are chosen with the arrow keys from the search field
+                  // (aria-activedescendant), not tabbed through one by one.
+                  tabIndex={-1}
                   onClick={entry.onSelect}
                   onMouseEnter={() => setActiveIndex(i)}
                   className={[

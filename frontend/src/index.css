@@ -353,9 +353,7 @@
 
 /* iOS Safari zooms the page when a focused field's text is under 16px. */
 @media (max-width: 767px) {
-  input:not([type='checkbox']):not([type='radio']),
-  select,
-  textarea {
+  :where(input, select, textarea):is(.text-xs, .text-sm) {
     font-size: 16px;
   }
 }

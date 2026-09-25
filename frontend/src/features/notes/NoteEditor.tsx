@@ -10,7 +10,7 @@ import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { getRenameImpact, noteExportUrl } from '@/features/notes/api'
-import { editorTheme } from '@/features/notes/editorTheme'
+import { editorHighlighting, editorTheme } from '@/features/notes/editorTheme'
 import { useNote, useNotes, useTags } from '@/features/notes/hooks'
 import { type SaveStatus, useNoteAutosave } from '@/features/notes/useNoteAutosave'
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
@@ -98,6 +98,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       markdown(),
       EditorView.lineWrapping,
       editorTheme,
+      editorHighlighting,
       createAttachmentDropHandler(uploadAndInsert),
       autocompletion({
         override: [
@@ -179,7 +180,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               label="Toggle preview"
               active={previewEnabled}
               onClick={() => updateProfile.mutate({ editor_preview_enabled: !previewEnabled })}
-              className="hidden md:inline-flex"
+              className="max-md:hidden"
             >
               {previewEnabled ? (
                 <Eye size={16} strokeWidth={1.5} />
@@ -265,16 +266,23 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 }
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
-  const label = {
-    saved: 'Saved',
-    saving: 'Saving…',
-    offline: 'Offline — saved on this device',
-    error: 'Couldn’t save — retrying',
+  // Short labels on phones, where the status shares the header row with the title.
+  const [short, long] = {
+    saved: ['Saved', 'Saved'],
+    saving: ['Saving…', 'Saving…'],
+    offline: ['Offline', 'Offline — saved on this device'],
+    retrying: ['Retrying', 'Couldn’t save — retrying'],
+    conflict: ['Conflict', 'Changed elsewhere — choose a version'],
+    error: ['Not saved', 'Couldn’t save'],
   }[status]
-  const color = status === 'error' ? 'text-danger' : 'text-text-muted'
+  const color =
+    status === 'error' || status === 'retrying' || status === 'conflict'
+      ? 'text-danger'
+      : 'text-text-muted'
   return (
-    <span role="status" className={`text-xs ${color}`}>
-      {label}
+    <span role="status" className={`shrink-0 text-xs ${color}`}>
+      <span className="md:hidden">{short}</span>
+      <span className="hidden md:inline">{long}</span>
     </span>
   )
 }

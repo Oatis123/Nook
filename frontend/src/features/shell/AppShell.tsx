@@ -117,11 +117,7 @@ export function AppShell() {
       >
         <div className="flex items-center justify-between px-3 py-3">
           <span className="font-serif text-base">{APP_NAME}</span>
-          <IconButton
-            label="Collapse sidebar"
-            onClick={toggleSidebar}
-            className="hidden md:inline-flex"
-          >
+          <IconButton label="Collapse sidebar" onClick={toggleSidebar} className="max-md:hidden">
             <PanelLeft size={16} strokeWidth={1.5} />
           </IconButton>
         </div>

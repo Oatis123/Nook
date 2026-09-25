@@ -35,3 +35,8 @@ export const toast = {
   success: (message: string) => useToastStore.getState().push('success', message),
   info: (message: string) => useToastStore.getState().push('info', message),
 }
+
+/** Pointer presses that landed on a toast. Dialogs check this to ignore them as "clicks
+ * outside": Radix reports the outside press only after it's over, by when a dismissed
+ * toast is already gone from the DOM (so its target can't be inspected any more). */
+export const toastPointerEvents = new WeakSet<Event>()

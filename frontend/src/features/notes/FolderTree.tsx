@@ -239,7 +239,7 @@ function MoveDialog({
         <label className="flex flex-col gap-1.5 text-sm text-text-muted">
           Destination
           <select
-            autoFocus
+            data-autofocus
             value={target}
             onChange={(e) => setTarget(e.target.value)}
             className="h-10 rounded-md border border-border bg-surface-raised px-2 text-sm text-text outline-none focus-visible:border-accent"
@@ -373,7 +373,15 @@ function FolderRow({
         )}
         style={{ paddingLeft: depth * 14 + 4 }}
       >
-        <button type="button" onClick={() => onToggle(node.folder.id)} className="shrink-0">
+        {/* Mouse shortcut only: the folder name button next to it is the accessible,
+            larger toggle (with aria-expanded), so this one stays out of the tab order. */}
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-hidden="true"
+          onClick={() => onToggle(node.folder.id)}
+          className="shrink-0"
+        >
           <ChevronRight
             size={14}
             strokeWidth={1.5}
@@ -395,6 +403,7 @@ function FolderRow({
           <button
             type="button"
             onClick={() => onToggle(node.folder.id)}
+            aria-expanded={isOpen}
             className="flex-1 truncate text-left"
           >
             {node.folder.name}

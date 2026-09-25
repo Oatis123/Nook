@@ -5,7 +5,11 @@ const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const selectClass =
   'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
-export const DEFAULT_RECURRENCE: RecurrenceInput = { freq: 'weekly', interval: 1, end_type: 'never' }
+export const DEFAULT_RECURRENCE: RecurrenceInput = {
+  freq: 'weekly',
+  interval: 1,
+  end_type: 'never',
+}
 
 /** The interval/frequency/weekday/monthly/end-condition fields shared by the inline
  * recurring-mode form (TaskCreateDialog) and the edit popup (RecurrencePicker). */
@@ -122,7 +126,9 @@ export function RecurrenceFields({
             <input
               type="date"
               value={value.end_date ?? ''}
-              onChange={(e) => onChange({ ...value, end_type: 'on_date', end_date: e.target.value })}
+              onChange={(e) =>
+                onChange({ ...value, end_type: 'on_date', end_date: e.target.value })
+              }
               className={selectClass}
             />
           </label>
@@ -138,7 +144,11 @@ export function RecurrenceFields({
               min={1}
               value={value.end_count ?? 1}
               onChange={(e) =>
-                onChange({ ...value, end_type: 'after_count', end_count: Number(e.target.value) || 1 })
+                onChange({
+                  ...value,
+                  end_type: 'after_count',
+                  end_count: Number(e.target.value) || 1,
+                })
               }
               className={clsx(selectClass, 'w-16')}
             />

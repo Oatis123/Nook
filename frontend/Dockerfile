@@ -6,7 +6,7 @@ ENV APP_NAME=$APP_NAME
 WORKDIR /app
 
 COPY frontend/package.json frontend/pnpm-lock.yaml ./
-RUN corepack enable && corepack prepare pnpm@latest --activate \
+RUN corepack enable && corepack prepare pnpm@10.33.0 --activate \
     && pnpm install --frozen-lockfile
 
 COPY frontend/ .

@@ -1,7 +1,11 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_SECRET_KEY = "dev-secret-key-change-me-0000000000"
+MIN_SECRET_KEY_BYTES = 32
 
 
 class Settings(BaseSettings):
@@ -9,7 +13,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Nook"
     public_url: str = "http://localhost:8080"
-    secret_key: str = "dev-secret-key-change-me-0000000000"
+    secret_key: str = DEFAULT_SECRET_KEY
 
     postgres_user: str = "nook"
     postgres_password: str = "nook"
@@ -37,6 +41,28 @@ class Settings(BaseSettings):
     telegram_link_token_ttl_minutes: int = 10
     invite_default_ttl_days: int = 7
     password_reset_ttl_minutes: int = 60
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Refuse to start in production with a missing, default or short SECRET_KEY —
+        anyone who knows the key can forge a session JWT for any user — or with empty
+        Postgres credentials. Development and test keep working with the defaults."""
+        if self.environment != "production":
+            return self
+        problems = []
+        if self.secret_key == DEFAULT_SECRET_KEY:
+            problems.append("SECRET_KEY is not set (still the built-in development default)")
+        elif len(self.secret_key.encode()) < MIN_SECRET_KEY_BYTES:
+            problems.append(
+                f"SECRET_KEY must be at least {MIN_SECRET_KEY_BYTES} bytes "
+                "(generate one with `openssl rand -hex 32`)"
+            )
+        for name in ("postgres_user", "postgres_password", "postgres_db"):
+            if not getattr(self, name):
+                problems.append(f"{name.upper()} must not be empty")
+        if problems:
+            raise ValueError("Invalid production configuration: " + "; ".join(problems))
+        return self
 
     @property
     def imports_dir(self) -> str:

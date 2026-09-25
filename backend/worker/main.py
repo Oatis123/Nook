@@ -7,6 +7,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.config import get_settings
 from app.core.db import async_session_factory
+from app.core.heartbeat import WORKER_HEARTBEAT, beat
 from app.services.reminder_dispatch import ReminderBlocked, dispatch_due_reminders
 from app.services.vault_import import process_pending_import_jobs
 
@@ -42,6 +43,7 @@ async def tick(bot: Bot | None) -> None:
 async def _reminder_loop(bot: Bot | None) -> None:
     while True:
         await tick(bot)
+        beat(WORKER_HEARTBEAT)
         await asyncio.sleep(TICK_SECONDS)
 
 

@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -27,7 +30,7 @@ jobs:
       POSTGRES_DB: nook
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      SECRET_KEY: ci-secret-key
+      SECRET_KEY: ci-secret-key-0123456789abcdef0123456789
       ENVIRONMENT: test
     defaults:
       run:
@@ -96,7 +99,7 @@ jobs:
           cat > .env <<EOF
           APP_NAME=Nook
           PUBLIC_URL=${E2E_BASE_URL}
-          SECRET_KEY=ci-secret-key
+          SECRET_KEY=ci-secret-key-0123456789abcdef0123456789
           POSTGRES_USER=${POSTGRES_USER}
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           POSTGRES_DB=${POSTGRES_DB}

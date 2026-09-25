@@ -1,9 +1,18 @@
 name: nook
 
+# Every service: bounded json-file logs, so a chatty container can't fill the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: postgres:16
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: ${DB_MEM_LIMIT:-512m}
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -19,7 +28,16 @@ services:
   api:
     build: ./backend
     restart: unless-stopped
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    init: true
+    logging: *default-logging
+    mem_limit: ${API_MEM_LIMIT:-1g}
+    # `exec` so uvicorn replaces the shell and receives SIGTERM directly (graceful
+    # shutdown). --proxy-headers takes the client IP from nginx's X-Forwarded-For —
+    # trusting any sender is safe only because this port is never published: nginx
+    # (which overwrites the header with the real peer address) is the only client.
+    command: >-
+      sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+      --proxy-headers --forwarded-allow-ips '*'"
     env_file: .env
     environment:
       POSTGRES_HOST: db
@@ -40,6 +58,9 @@ services:
   worker:
     build: ./backend
     restart: unless-stopped
+    init: true
+    logging: *default-logging
+    mem_limit: ${WORKER_MEM_LIMIT:-1g}
     command: python worker/main.py
     env_file: .env
     environment:
@@ -51,10 +72,20 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      # worker/main.py touches this file after every reminder tick (every 30s).
+      test: ["CMD", "python", "-m", "app.core.heartbeat", "/tmp/nook-worker.heartbeat", "180"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   bot:
     build: ./backend
     restart: unless-stopped
+    init: true
+    logging: *default-logging
+    mem_limit: ${BOT_MEM_LIMIT:-256m}
     command: python bot/main.py
     env_file: .env
     environment:
@@ -64,6 +95,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.core.heartbeat", "/tmp/nook-bot.heartbeat", "120"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   web:
     build:
@@ -72,8 +109,12 @@ services:
       args:
         APP_NAME: ${APP_NAME:-Nook}
     restart: unless-stopped
+    logging: *default-logging
+    mem_limit: ${WEB_MEM_LIMIT:-128m}
     environment:
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
+      MAX_IMPORT_MB: ${MAX_IMPORT_MB:-500}
+      TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR:-127.0.0.1/32}
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:

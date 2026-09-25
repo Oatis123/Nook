@@ -263,7 +263,9 @@ export default function CalendarPage() {
       <TaskCreateDialog
         open={quickCreateDate !== null}
         onOpenChange={(open) => !open && setQuickCreateDate(null)}
-        title={quickCreateDate ? `New task on ${format(quickCreateDate, 'MMM d, yyyy')}` : 'New task'}
+        title={
+          quickCreateDate ? `New task on ${format(quickCreateDate, 'MMM d, yyyy')}` : 'New task'
+        }
         defaultDate={quickCreateDate ? format(quickCreateDate, 'yyyy-MM-dd') : null}
       />
     </div>

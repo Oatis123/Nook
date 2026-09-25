@@ -1,8 +1,17 @@
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
+from itertools import islice
 from typing import Literal
 
 from dateutil.rrule import rrulestr
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# Hard caps on RRULE expansion. Expanding a rule is synchronous CPU work on the API's
+# event loop, so an unbounded COUNT/UNTIL/range (COUNT=10^9, a 9999-year calendar) used
+# to stall every request for seconds and eat memory. The input limits below keep new
+# rules small; these caps also bound rules stored before the limits existed.
+MAX_RECURRENCE_COUNT = 1000
+MAX_RECURRENCE_END_YEARS = 10
+MAX_EXPANDED_OCCURRENCES = 5000
 
 _WEEKDAY_CODES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"]
 
@@ -20,7 +29,16 @@ class RecurrenceInput(BaseModel):
     on_last_day: bool = False  # monthly only — last day of the month
     end_type: Literal["never", "on_date", "after_count"] = "never"
     end_date: date | None = None
-    end_count: int | None = Field(default=None, ge=1)
+    end_count: int | None = Field(default=None, ge=1, le=MAX_RECURRENCE_COUNT)
+
+    @field_validator("end_date")
+    @classmethod
+    def _end_date_not_too_far(cls, value: date | None) -> date | None:
+        if value is not None and value > date.today() + timedelta(
+            days=365 * MAX_RECURRENCE_END_YEARS
+        ):
+            raise ValueError(f"end_date must be within {MAX_RECURRENCE_END_YEARS} years from today")
+        return value
 
 
 def build_rrule(rec: RecurrenceInput) -> str:
@@ -50,7 +68,7 @@ def compute_recurrence_end(rrule_string: str, dtstart: datetime) -> date | None:
     if "COUNT=" not in rrule_string and "UNTIL=" not in rrule_string:
         return None
     rule = rrulestr(rrule_string, dtstart=dtstart)
-    occurrences = list(rule)
+    occurrences = list(islice(rule, MAX_EXPANDED_OCCURRENCES))
     return occurrences[-1].date() if occurrences else dtstart.date()
 
 
@@ -60,7 +78,18 @@ def next_occurrence(rrule_string: str, dtstart: datetime, after: datetime) -> da
 
 
 def occurrences_between(
-    rrule_string: str, dtstart: datetime, start: datetime, end: datetime
+    rrule_string: str,
+    dtstart: datetime,
+    start: datetime,
+    end: datetime,
+    limit: int = MAX_EXPANDED_OCCURRENCES,
 ) -> list[datetime]:
+    """Occurrences in [start, end], at most `limit` of them (generated lazily, so a huge
+    range stops at the cap instead of materializing everything first)."""
     rule = rrulestr(rrule_string, dtstart=dtstart)
-    return list(rule.between(start, end, inc=True))
+    result: list[datetime] = []
+    for occurrence in rule.xafter(start, inc=True):
+        if occurrence > end or len(result) >= limit:
+            break
+        result.append(occurrence)
+    return result

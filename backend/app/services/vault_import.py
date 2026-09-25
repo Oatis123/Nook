@@ -1,15 +1,17 @@
-import io
 import uuid
 import zipfile
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from typing import BinaryIO
 
 import structlog
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
+from app.core.errors import CodedHTTPException
 from app.models.folder import Folder
 from app.models.import_job import ImportJob, ImportJobStatus
 from app.services import attachments as attachments_service
@@ -24,6 +26,10 @@ MAX_IMPORTED_NAME_LENGTH = 240
 # Zip-bomb protection (spec §13): an archive is rejected outright rather than partially
 # processed if it exceeds either limit.
 MAX_IMPORT_ENTRIES = 20_000
+COPY_CHUNK_BYTES = 1024 * 1024
+# A note is text; anything bigger than this isn't one (and Postgres' full-text index
+# can't hold it anyway).
+MAX_NOTE_BYTES = 1024 * 1024
 MAX_IMPORT_UNCOMPRESSED_MB = 1000
 
 
@@ -35,23 +41,58 @@ def _zip_path(job_id: uuid.UUID) -> Path:
     return Path(get_settings().imports_dir) / f"{job_id}.zip"
 
 
-async def create_import_job(session: AsyncSession, user_id: uuid.UUID, data: bytes) -> ImportJob:
+def _store_upload(upload: BinaryIO, dest: Path, max_bytes: int) -> bool:
+    """Copies the uploaded archive to disk in chunks (it can be hundreds of MB — never
+    held in memory) and checks it's a zip. Returns False if it's too large."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+    with dest.open("wb") as out:
+        while chunk := upload.read(COPY_CHUNK_BYTES):
+            written += len(chunk)
+            if written > max_bytes:
+                return False
+            out.write(chunk)
+    return True
+
+
+async def create_import_job(
+    session: AsyncSession, user_id: uuid.UUID, upload: UploadFile
+) -> ImportJob:
     settings = get_settings()
-    max_bytes = settings.max_import_mb * 1024 * 1024
-    if len(data) > max_bytes:
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, f"Archive exceeds the {settings.max_import_mb} MB limit"
+    active = await session.scalar(
+        select(ImportJob.id).where(
+            ImportJob.user_id == user_id,
+            ImportJob.status.in_([ImportJobStatus.pending, ImportJobStatus.processing]),
         )
-    if not zipfile.is_zipfile(io.BytesIO(data)):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is not a valid .zip archive")
+    )
+    if active is not None:
+        raise CodedHTTPException(
+            status.HTTP_409_CONFLICT,
+            "import_in_progress",
+            "An import is already running — wait for it to finish first.",
+        )
 
     job = ImportJob(user_id=user_id, status=ImportJobStatus.pending)
     session.add(job)
     await session.flush()
 
-    imports_dir = Path(settings.imports_dir)
-    imports_dir.mkdir(parents=True, exist_ok=True)
-    _zip_path(job.id).write_bytes(data)
+    dest = _zip_path(job.id)
+    try:
+        fits = await run_in_threadpool(
+            _store_upload, upload.file, dest, settings.max_import_mb * 1024 * 1024
+        )
+        if not fits:
+            raise CodedHTTPException(
+                status.HTTP_413_CONTENT_TOO_LARGE,
+                "file_too_large",
+                f"Archive exceeds the {settings.max_import_mb} MB limit",
+            )
+        if not await run_in_threadpool(zipfile.is_zipfile, dest):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "File is not a valid .zip archive")
+    except BaseException:
+        await session.rollback()
+        dest.unlink(missing_ok=True)
+        raise
 
     await session.commit()
     await session.refresh(job)
@@ -220,6 +261,15 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                 filename = PurePosixPath(info.filename).name
                 if not filename:
                     continue
+                # Checked before reading: the entry is decompressed fully into memory,
+                # so a small archive of highly compressible data could otherwise
+                # balloon the worker by up to the archive's whole uncompressed size.
+                if info.file_size > attachments_service.max_upload_bytes():
+                    report["errors"].append(
+                        f'"{info.filename}": larger than the '
+                        f"{get_settings().max_upload_mb} MB attachment limit, skipped"
+                    )
+                    continue
                 try:
                     data = zf.read(info)
                     await attachments_service.save_attachment(session, user_id, filename, data)
@@ -231,6 +281,9 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
 
             for info in note_entries:
                 path = PurePosixPath(info.filename)
+                if info.file_size > MAX_NOTE_BYTES:
+                    report["errors"].append(f'"{info.filename}": larger than 1 MB, skipped')
+                    continue
                 try:
                     folder_id = await _folder_id_for_path(
                         session, user_id, path.parent.parts, folder_cache

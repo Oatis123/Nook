@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     max_upload_mb: int = 25
     max_import_mb: int = 500
+    # Total attachment storage per user; 0 disables the quota.
+    max_storage_mb: int = 2048
     web_port: int = 8080
 
     environment: Literal["development", "production", "test"] = "development"

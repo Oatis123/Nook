@@ -33,7 +33,9 @@ async def list_attachments(user: CurrentUser, session: DbSession) -> list[Attach
 async def upload_attachment(
     user: CurrentUser, session: DbSession, file: UploadFile = File(...)
 ) -> AttachmentOut:
-    data = await file.read()
+    # Read at most one byte past the limit: enough to reject an oversized file without
+    # pulling all of it into memory.
+    data = await file.read(attachments_service.max_upload_bytes() + 1)
     attachment = await attachments_service.save_attachment(
         session, user.id, file.filename or "file", data
     )

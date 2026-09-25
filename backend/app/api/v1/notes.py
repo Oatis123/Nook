@@ -1,6 +1,8 @@
 import uuid
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app.core.deps import CurrentUser, DbSession, require_csrf
 from app.schemas.note import NoteCreate, NoteDetail, NoteSummary, NoteUpdate
@@ -45,12 +47,13 @@ async def create_note(body: NoteCreate, user: CurrentUser, session: DbSession) -
 
 
 @router.get("/export")
-async def export_vault(user: CurrentUser, session: DbSession) -> Response:
-    data = await vault_export_service.build_vault_zip(session, user.id)
-    return Response(
-        content=data,
+async def export_vault(user: CurrentUser, session: DbSession) -> FileResponse:
+    path = await vault_export_service.build_vault_zip_file(session, user.id)
+    return FileResponse(
+        path,
         media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="vault.zip"'},
+        filename="vault.zip",
+        background=BackgroundTask(path.unlink, missing_ok=True),
     )
 
 

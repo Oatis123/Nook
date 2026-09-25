@@ -3,7 +3,10 @@ import { ApiError } from '@/lib/api'
 /** A user-facing sentence for any error a request can throw. */
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 413) return 'That file is too large to upload.'
+    // The API's own 413s explain themselves (size limit, storage quota); nginx's don't.
+    if (error.status === 413) {
+      return error.code !== 'error' ? error.message : 'That file is too large to upload.'
+    }
     if (error.status === 429) return 'Too many requests — wait a minute and try again.'
     if (error.status === 502 || error.status === 503 || error.status === 504) {
       return 'The server is unavailable right now. Please try again in a moment.'

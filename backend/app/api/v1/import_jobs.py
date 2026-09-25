@@ -14,8 +14,7 @@ Csrf = Depends(require_csrf)
 async def upload_import(
     user: CurrentUser, session: DbSession, file: UploadFile = File(...)
 ) -> ImportJobOut:
-    data = await file.read()
-    job = await vault_import_service.create_import_job(session, user.id, data)
+    job = await vault_import_service.create_import_job(session, user.id, file)
     return ImportJobOut.model_validate(job)
 
 

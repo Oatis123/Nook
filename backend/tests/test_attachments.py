@@ -66,7 +66,7 @@ async def test_upload_over_size_limit_rejected(
         files={"file": ("big.bin", oversized, "application/octet-stream")},
         headers={"x-csrf-token": csrf},
     )
-    assert response.status_code == 400
+    assert response.status_code == 413
 
 
 async def test_download_attachment(client: AsyncClient, db_session: AsyncSession) -> None:

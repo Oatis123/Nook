@@ -11,8 +11,11 @@ import {
   useUploadAttachment,
 } from '@/features/attachments/hooks'
 import { QueryState } from '@/design/components/QueryState'
+import { confirmAction } from '@/lib/confirm'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function AttachmentsPage() {
+  useDocumentTitle('Attachments')
   const attachments = useAttachments()
   const upload = useUploadAttachment()
   const deleteAttachment = useDeleteAttachment()
@@ -37,15 +40,28 @@ export default function AttachmentsPage() {
           {unusedCount > 0 && (
             <button
               type="button"
-              onClick={() => cleanup.mutate()}
+              onClick={async () => {
+                const ok = await confirmAction({
+                  title: `Delete ${unusedCount} unused attachment${unusedCount === 1 ? '' : 's'}?`,
+                  description:
+                    'Files not embedded in any note are deleted permanently. This cannot be undone.',
+                  confirmLabel: 'Delete',
+                  danger: true,
+                })
+                if (ok) cleanup.mutate()
+              }}
               className="text-sm text-text-muted hover:text-danger"
             >
               Delete {unusedCount} unused
             </button>
           )}
-          <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+          <Button
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={upload.isPending}
+          >
             <Upload size={14} strokeWidth={1.5} />
-            Upload
+            {upload.isPending ? 'Uploading…' : 'Upload'}
           </Button>
           <input
             ref={fileInputRef}
@@ -81,14 +97,18 @@ export default function AttachmentsPage() {
               </a>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   const usedNote =
                     attachment.used_by.length > 0
-                      ? ` It's used in ${attachment.used_by.join(', ')}.`
+                      ? ` It's used in ${attachment.used_by.join(', ')} — those embeds will break.`
                       : ''
-                  if (confirm(`Delete "${attachment.filename}"?${usedNote}`)) {
-                    deleteAttachment.mutate(attachment.id)
-                  }
+                  const ok = await confirmAction({
+                    title: 'Delete attachment?',
+                    description: `"${attachment.filename}" will be deleted permanently.${usedNote}`,
+                    confirmLabel: 'Delete',
+                    danger: true,
+                  })
+                  if (ok) deleteAttachment.mutate(attachment.id)
                 }}
                 className="shrink-0 text-text-muted hover:text-danger"
               >

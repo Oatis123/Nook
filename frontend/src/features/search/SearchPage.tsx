@@ -5,6 +5,7 @@ import { EmptyState } from '@/design/components/EmptyState'
 import { useUIStore } from '@/lib/ui-store'
 import { useFolders } from '@/features/notes/hooks'
 import { useSearch } from '@/features/search/hooks'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const SNIPPET_MARK_RE = /<mark>(.*?)<\/mark>/g
 
@@ -37,6 +38,7 @@ function renderSnippet(snippet: string) {
 }
 
 export default function SearchPage() {
+  useDocumentTitle('Search')
   const navigate = useNavigate()
   const foldersQuery = useFolders()
   const focusToken = useUIStore((s) => s.searchFocusToken)
@@ -71,8 +73,7 @@ export default function SearchPage() {
         />
       </div>
       <p className="mb-6 text-xs text-text-muted">
-        Filters: <code>tag:name</code>, <code>path:folder</code>, <code>in:notes</code>,{' '}
-        <code>in:tasks</code>
+        Filters: <code>tag:name</code>, <code>path:folder</code>
       </p>
 
       {query.trim().length === 0 ? (

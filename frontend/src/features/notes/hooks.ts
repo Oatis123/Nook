@@ -115,7 +115,7 @@ export function useEmptyTrash() {
 }
 
 export function useUploadVaultImport() {
-  return useMutation({ mutationFn: notesApi.uploadVaultImport })
+  return useMutation({ meta: { silent: true }, mutationFn: notesApi.uploadVaultImport })
 }
 
 export function useImportJob(jobId: string | null) {

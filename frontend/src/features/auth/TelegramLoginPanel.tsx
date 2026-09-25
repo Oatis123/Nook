@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { QrCode } from '@/design/components/QrCode'
+import { errorMessage } from '@/lib/errors'
 import {
   meQueryKey,
   useCreateTelegramLoginToken,
@@ -66,6 +67,15 @@ export function TelegramLoginPanel({ onBack }: { onBack: () => void }) {
 
       {createToken.isPending && (
         <div className="h-[200px] w-[200px] animate-pulse rounded-md bg-surface" />
+      )}
+
+      {createToken.isError && (
+        <div role="alert" className="flex flex-col items-center gap-2">
+          <p className="text-sm text-danger">{errorMessage(createToken.error)}</p>
+          <Button variant="secondary" onClick={requestNewToken}>
+            Try again
+          </Button>
+        </div>
       )}
 
       {status.data?.status === 'denied' && (

@@ -251,7 +251,7 @@ export function AppShell() {
           <div className="flex shrink-0 items-center gap-2.5 border-b border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
             <TriangleAlert size={15} strokeWidth={1.5} className="shrink-0" />
             <span className="flex-1">
-              Nook can't send Telegram reminders — you've blocked the bot.
+              {APP_NAME} can't send Telegram reminders — you've blocked the bot.
             </span>
             <button
               type="button"

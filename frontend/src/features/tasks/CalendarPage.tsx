@@ -22,6 +22,7 @@ import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
 import { useToday } from '@/features/tasks/useToday'
 import { parseLocalDate } from '@/lib/dates'
 import type { CalendarEntry } from '@/lib/types'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 type ViewMode = 'month' | 'week'
 const DRAG_MIME = 'application/x-nook-calendar-entry'
@@ -93,6 +94,7 @@ export default function CalendarPage() {
     typeof window !== 'undefined' && window.innerWidth < 768 ? 'week' : 'month',
   )
   const today = useToday()
+  useDocumentTitle('Calendar')
   const [anchorDate, setAnchorDate] = useState(() => parseLocalDate(today))
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [dragOverDate, setDragOverDate] = useState<string | null>(null)

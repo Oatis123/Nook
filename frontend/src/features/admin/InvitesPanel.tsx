@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { Check, Copy, Mail, Plus } from '@/design/icons'
+import { Mail, Plus } from '@/design/icons'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
@@ -7,6 +7,8 @@ import { EmptyState } from '@/design/components/EmptyState'
 import type { Invite, InviteStatus } from '@/lib/types'
 import { formatDate } from '@/lib/format'
 import { useCreateInvite, useInvites, useRevokeInvite } from '@/features/admin/hooks'
+import { confirmAction } from '@/lib/confirm'
+import { CopyField } from '@/design/components/CopyField'
 
 const STATUS_STYLES: Record<InviteStatus, string> = {
   active: 'text-priority-low',
@@ -20,15 +22,7 @@ function NewInviteDialog() {
   const [comment, setComment] = useState('')
   const [expiresInDays, setExpiresInDays] = useState('7')
   const [createdUrl, setCreatedUrl] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const createInvite = useCreateInvite()
-
-  function handleCopy() {
-    if (!createdUrl) return
-    navigator.clipboard.writeText(createdUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
-  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -47,7 +41,6 @@ function NewInviteDialog() {
       setComment('')
       setExpiresInDays('7')
       setCreatedUrl(null)
-      setCopied(false)
       createInvite.reset()
     }
   }
@@ -70,24 +63,7 @@ function NewInviteDialog() {
           <p className="text-sm text-text-muted">
             Share this link with the person you're inviting. It's shown only once.
           </p>
-          <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-            <span className="flex-1 truncate text-sm">{createdUrl}</span>
-            <button
-              type="button"
-              aria-label="Copy invite link"
-              onClick={handleCopy}
-              className={clsx(
-                'transition-colors duration-150',
-                copied ? 'text-priority-low' : 'text-text-muted hover:text-text',
-              )}
-            >
-              {copied ? (
-                <Check key="check" size={15} strokeWidth={1.5} className="animate-fade-in" />
-              ) : (
-                <Copy key="copy" size={15} strokeWidth={1.5} />
-              )}
-            </button>
-          </div>
+          <CopyField value={createdUrl} label="Invite link" />
           <Button variant="secondary" onClick={() => handleOpenChange(false)}>
             Done
           </Button>
@@ -167,7 +143,15 @@ export function InvitesPanel() {
                     {invite.status === 'active' && (
                       <button
                         type="button"
-                        onClick={() => revokeInvite.mutate(invite.id)}
+                        onClick={async () => {
+                          const ok = await confirmAction({
+                            title: 'Revoke invite?',
+                            description: 'The link stops working immediately.',
+                            confirmLabel: 'Revoke',
+                            danger: true,
+                          })
+                          if (ok) revokeInvite.mutate(invite.id)
+                        }}
                         className="text-text-muted hover:text-danger"
                       >
                         Revoke

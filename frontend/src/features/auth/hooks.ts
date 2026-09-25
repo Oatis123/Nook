@@ -133,7 +133,7 @@ export function useUnlinkTelegram() {
 }
 
 export function useCreateTelegramLoginToken() {
-  return useMutation({ mutationFn: authApi.createTelegramLoginToken })
+  return useMutation({ meta: { silent: true }, mutationFn: authApi.createTelegramLoginToken })
 }
 
 export function useTelegramLoginStatus(token: string | null) {

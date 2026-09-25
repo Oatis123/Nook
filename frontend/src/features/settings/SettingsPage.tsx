@@ -1,6 +1,6 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Copy, Download, Plus, Upload } from '@/design/icons'
+import { Download, Plus, Upload } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
 import { ThemeSkinPicker } from '@/design/components/ThemeSkinPicker'
@@ -22,6 +22,9 @@ import {
 } from '@/features/auth/hooks'
 import { useImportJob, useUploadVaultImport } from '@/features/notes/hooks'
 import { vaultExportUrl } from '@/features/notes/api'
+import { confirmAction } from '@/lib/confirm'
+import { CopyField } from '@/design/components/CopyField'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 function timezoneOptions(): string[] {
   try {
@@ -184,17 +187,7 @@ function NewApiTokenDialog() {
       {createdToken ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-text-muted">Copy this token now — it won't be shown again.</p>
-          <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-            <span className="flex-1 truncate text-sm">{createdToken}</span>
-            <button
-              type="button"
-              aria-label="Copy token"
-              onClick={() => navigator.clipboard.writeText(createdToken)}
-              className="text-text-muted hover:text-text"
-            >
-              <Copy size={15} strokeWidth={1.5} />
-            </button>
-          </div>
+          <CopyField value={createdToken} label="API token" />
           <Button variant="secondary" onClick={() => handleOpenChange(false)}>
             Done
           </Button>
@@ -257,7 +250,15 @@ function ApiTokensSection() {
               </div>
               <button
                 type="button"
-                onClick={() => revokeToken.mutate(token.id)}
+                onClick={async () => {
+                  const ok = await confirmAction({
+                    title: `Revoke "${token.name}"?`,
+                    description: 'Clients using this token lose access immediately.',
+                    confirmLabel: 'Revoke',
+                    danger: true,
+                  })
+                  if (ok) revokeToken.mutate(token.id)
+                }}
                 className="text-text-muted hover:text-danger"
               >
                 Revoke
@@ -319,7 +320,7 @@ function VaultSection() {
             disabled={uploadImport.isPending || status === 'pending' || status === 'processing'}
           >
             <Upload size={14} strokeWidth={1.5} />
-            Import vault
+            {uploadImport.isPending ? 'Uploading…' : 'Import vault'}
           </Button>
           <input
             ref={fileInputRef}
@@ -331,8 +332,16 @@ function VaultSection() {
           />
         </div>
 
+        {uploadImport.isError && (
+          <p role="alert" className="text-sm text-danger">
+            {errorMessage(uploadImport.error)}
+          </p>
+        )}
+
         {(status === 'pending' || status === 'processing') && (
-          <p className="text-sm text-text-muted">Importing…</p>
+          <p role="status" className="text-sm text-text-muted">
+            Importing… this can take a few minutes for a large vault.
+          </p>
         )}
 
         {status === 'done' && report && (
@@ -449,7 +458,16 @@ function SessionsSection() {
         {(sessions.data?.length ?? 0) > 1 && (
           <button
             type="button"
-            onClick={() => revokeAll.mutate()}
+            onClick={async () => {
+              const ok = await confirmAction({
+                title: 'Log out everywhere?',
+                description:
+                  'Every browser and device signed in to your account, including this one, is signed out.',
+                confirmLabel: 'Log out everywhere',
+                danger: true,
+              })
+              if (ok) revokeAll.mutate()
+            }}
             className="text-sm text-danger hover:underline"
           >
             Log out everywhere
@@ -490,6 +508,7 @@ function SessionsSection() {
 }
 
 export default function SettingsPage() {
+  useDocumentTitle('Settings')
   return (
     <div className="mx-auto max-w-xl px-6 py-8">
       <h1 className="mb-2 font-serif text-2xl text-text">Settings</h1>

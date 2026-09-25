@@ -37,6 +37,11 @@ export function getHighlighter(): Promise<HighlighterCore> {
     themes: [import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark.mjs')],
     langs: langLoaders.map((load) => load()),
     engine: createOnigurumaEngine(import('shiki/wasm')),
+  }).catch((error: unknown) => {
+    // Don't cache a failed load (e.g. a network blip mid-deploy) forever — the next
+    // caller retries.
+    highlighterPromise = null
+    throw error
   })
   return highlighterPromise
 }

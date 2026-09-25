@@ -6,6 +6,10 @@ import { defineConfig } from 'vite'
 
 const rootDir = import.meta.dirname
 
+// index.html uses %APP_NAME%; without a value (a local build with no .env) Vite would
+// leave the placeholder in the page title verbatim.
+process.env.APP_NAME ||= 'Nook'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],

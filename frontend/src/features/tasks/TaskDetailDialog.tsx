@@ -25,6 +25,7 @@ import { QuickAdd } from '@/features/tasks/QuickAdd'
 import { RecurrencePicker } from '@/features/tasks/RecurrencePicker'
 import { describeRrule } from '@/features/tasks/recurrenceLabel'
 import type { RecurrenceInput, Task, TaskDetail, TaskPriority } from '@/lib/types'
+import { confirmAction } from '@/lib/confirm'
 
 const selectClass =
   'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
@@ -386,8 +387,14 @@ export function TaskDetailDialog({
         <div className="flex justify-end border-t border-border pt-3">
           <button
             type="button"
-            onClick={() => {
-              if (confirm(`Delete "${task.title}"?`)) {
+            onClick={async () => {
+              const ok = await confirmAction({
+                title: 'Delete task?',
+                description: `"${task.title}" and its subtasks will be deleted.`,
+                confirmLabel: 'Delete',
+                danger: true,
+              })
+              if (ok) {
                 deleteTask.mutate(task.id)
                 onOpenChange(false)
               }

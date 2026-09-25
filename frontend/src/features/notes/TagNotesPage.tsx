@@ -3,9 +3,11 @@ import { FileText, Hash } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useNotes } from '@/features/notes/hooks'
 import { QueryState } from '@/design/components/QueryState'
+import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function TagNotesPage() {
   const { name } = useParams<{ name: string }>()
+  useDocumentTitle(name ? `#${name}` : 'Tags')
   const navigate = useNavigate()
   const notes = useNotes({ tag: name })
 

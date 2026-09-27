@@ -71,8 +71,13 @@ def compute_desired_reminders(
             (occurrence_at, _local_to_utc(day_before_local, tz), ReminderKind.day_before)
         )
         if task.due_time is not None:
-            hour_before = _local_to_utc(occurrence_at, tz) - timedelta(hours=1)
-            results.append((occurrence_at, hour_before, ReminderKind.hour_before))
+            due_at = _local_to_utc(occurrence_at, tz)
+            results.append((occurrence_at, due_at - timedelta(hours=1), ReminderKind.hour_before))
+            # At the due moment itself too: without it a task due in under an hour got no
+            # reminder at all, since both earlier ones were already in the past. Sending
+            # it never chains a next one — schedule_next_occurrence_reminder only acts on
+            # recurring tasks.
+            results.append((occurrence_at, due_at, ReminderKind.occurrence))
 
     return [
         (occ, remind_at, kind)

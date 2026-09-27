@@ -88,7 +88,7 @@ async def test_date_only_schedules_day_before_reminder(
     assert pending[0].remind_at == datetime(2026, 1, 31, 9, 0, tzinfo=UTC)
 
 
-async def test_date_and_time_schedules_day_before_and_hour_before(
+async def test_date_and_time_schedules_day_before_hour_before_and_at_due_time(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
     with freeze_time("2026-01-01T00:00:00+00:00"):
@@ -97,9 +97,30 @@ async def test_date_and_time_schedules_day_before_and_hour_before(
         task = await _create_task(client, "Dentist", due_date="2026-02-01", due_time="15:00:00")
 
     by_kind = {r.kind: r for r in await _pending(db_session, task["id"])}
-    assert set(by_kind) == {ReminderKind.day_before, ReminderKind.hour_before}
+    assert set(by_kind) == {
+        ReminderKind.day_before,
+        ReminderKind.hour_before,
+        ReminderKind.occurrence,
+    }
     assert by_kind[ReminderKind.day_before].remind_at == datetime(2026, 1, 31, 9, 0, tzinfo=UTC)
     assert by_kind[ReminderKind.hour_before].remind_at == datetime(2026, 2, 1, 14, 0, tzinfo=UTC)
+    assert by_kind[ReminderKind.occurrence].remind_at == datetime(2026, 2, 1, 15, 0, tzinfo=UTC)
+
+
+async def test_task_due_within_the_hour_still_gets_at_due_time_reminder(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    with freeze_time("2026-02-01T14:30:00+00:00"):
+        await make_user(db_session, "alice")
+        await login(client, "alice")
+        # Due in 30 minutes: day_before and hour_before are already past, but the
+        # reminder at the due moment itself is still ahead.
+        task = await _create_task(client, "Call back", due_date="2026-02-01", due_time="15:00:00")
+
+    pending = await _pending(db_session, task["id"])
+    assert [(r.kind, r.remind_at) for r in pending] == [
+        (ReminderKind.occurrence, datetime(2026, 2, 1, 15, 0, tzinfo=UTC))
+    ]
 
 
 async def test_recurring_task_schedules_single_occurrence_reminder(
@@ -131,8 +152,8 @@ async def test_reminder_already_in_past_is_not_scheduled(
     with freeze_time("2026-02-01T10:00:00+00:00"):
         await make_user(db_session, "alice")
         await login(client, "alice")
-        # Due today at 9am: hour_before (8am) and day_before (yesterday 9am) are both
-        # already in the past relative to "now" (10am today) -> neither is scheduled.
+        # Due today at 9am: the due moment itself, hour_before (8am) and day_before
+        # (yesterday 9am) are all in the past relative to "now" (10am) -> none scheduled.
         task = await _create_task(client, "Already due", due_date="2026-02-01", due_time="09:00:00")
 
     assert await _pending(db_session, task["id"]) == []
@@ -488,3 +509,22 @@ async def test_sending_recurring_occurrence_reminder_schedules_next_one(
     assert len(pending) == 1
     assert pending[0].kind == ReminderKind.occurrence
     assert pending[0].remind_at == datetime(2026, 1, 3, 9, 0, tzinfo=UTC)
+
+
+async def test_sending_one_off_at_due_time_reminder_does_not_chain_another(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    with freeze_time("2026-02-01T14:30:00+00:00"):
+        user = await make_user(db_session, "alice")
+        user.telegram_chat_id = 12345
+        await db_session.commit()
+        await login(client, "alice")
+        task = await _create_task(client, "Call back", due_date="2026-02-01", due_time="15:00:00")
+
+    sender = _FakeSender()
+    await dispatch_due_reminders(db_session, sender, now=datetime(2026, 2, 1, 15, 0, tzinfo=UTC))
+
+    assert len(sender.calls) == 1
+    assert sender.calls[0][1].startswith("Now: Call back")
+    rows = await _reminders(db_session, task["id"])
+    assert [(r.kind, r.status) for r in rows] == [(ReminderKind.occurrence, ReminderStatus.sent)]

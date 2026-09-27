@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 import structlog
 from aiogram import Bot
-from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramNetworkError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.config import get_settings
@@ -33,6 +33,13 @@ ERROR_BACKOFF_SECONDS = 10
 # during its final write) — no real import takes hours.
 STUCK_IMPORT_AFTER = timedelta(hours=6)
 
+# On networks that filter Telegram, some fresh connections hang until they time out while
+# an immediate retry goes straight through (measured ~10% on a live install). A short
+# per-request timeout plus quick retries delivers within seconds, instead of waiting out
+# aiogram's 60 s default and then dispatch's minute-long backoff.
+SEND_TIMEOUT_SECONDS = 10
+SEND_ATTEMPTS = 3
+
 # Set on SIGTERM/SIGINT: each loop finishes its current iteration and exits, instead of
 # being SIGKILLed mid-send by `docker stop` after the grace period.
 _stop = asyncio.Event()
@@ -47,24 +54,42 @@ def _button_url_accepted(url: str) -> bool:
     return host is not None and "." in host
 
 
+async def _send_message(
+    bot: Bot, chat_id: int, text: str, reply_markup: InlineKeyboardMarkup | None = None
+) -> None:
+    """send_message with SEND_TIMEOUT_SECONDS and up to SEND_ATTEMPTS tries on network
+    errors; anything else (bad request, blocked bot) is raised on the first try. The last
+    network error propagates, so dispatch's own backoff still takes over after that."""
+    for attempt in range(1, SEND_ATTEMPTS + 1):
+        try:
+            await bot.send_message(
+                chat_id, text, reply_markup=reply_markup, request_timeout=SEND_TIMEOUT_SECONDS
+            )
+            return
+        except TelegramNetworkError as exc:
+            if attempt == SEND_ATTEMPTS:
+                raise
+            log.warning("worker.reminder_send_retry", attempt=attempt, error=exc.message)
+
+
 def _make_sender(bot: Bot):
     async def send(chat_id: int, text: str, url: str) -> None:
         try:
             if not _button_url_accepted(url):
-                await bot.send_message(chat_id, text)
+                await _send_message(bot, chat_id, text)
                 return
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[[InlineKeyboardButton(text="Open", url=url)]]
             )
             try:
-                await bot.send_message(chat_id, text, reply_markup=keyboard)
+                await _send_message(bot, chat_id, text, keyboard)
             except TelegramBadRequest as exc:
                 # Telegram's URL rules aren't documented — if it still rejects the button,
                 # deliver the text alone rather than failing the reminder.
                 if "button URL" not in exc.message:
                     raise
                 log.warning("worker.reminder_button_rejected", url=url, error=exc.message)
-                await bot.send_message(chat_id, text)
+                await _send_message(bot, chat_id, text)
         except TelegramForbiddenError as exc:
             raise ReminderBlocked from exc
 

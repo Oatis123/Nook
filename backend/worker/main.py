@@ -2,10 +2,11 @@ import asyncio
 import contextlib
 import signal
 from datetime import timedelta
+from urllib.parse import urlparse
 
 import structlog
 from aiogram import Bot
-from aiogram.exceptions import TelegramForbiddenError
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from app.core.config import get_settings
@@ -37,13 +38,33 @@ STUCK_IMPORT_AFTER = timedelta(hours=6)
 _stop = asyncio.Event()
 
 
+def _button_url_accepted(url: str) -> bool:
+    """Telegram rejects inline-button URLs whose host is a single label ("localhost",
+    "mypc") with 400 "Wrong HTTP URL", while IPs and dotted names (127.0.0.1, 192.168.x.x,
+    nook.local) pass — so a local-only install on the default PUBLIC_URL=http://localhost:8080
+    must send reminders without the Open button, or every one of them fails outright."""
+    host = urlparse(url).hostname
+    return host is not None and "." in host
+
+
 def _make_sender(bot: Bot):
     async def send(chat_id: int, text: str, url: str) -> None:
-        keyboard = InlineKeyboardMarkup(
-            inline_keyboard=[[InlineKeyboardButton(text="Open", url=url)]]
-        )
         try:
-            await bot.send_message(chat_id, text, reply_markup=keyboard)
+            if not _button_url_accepted(url):
+                await bot.send_message(chat_id, text)
+                return
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(text="Open", url=url)]]
+            )
+            try:
+                await bot.send_message(chat_id, text, reply_markup=keyboard)
+            except TelegramBadRequest as exc:
+                # Telegram's URL rules aren't documented — if it still rejects the button,
+                # deliver the text alone rather than failing the reminder.
+                if "button URL" not in exc.message:
+                    raise
+                log.warning("worker.reminder_button_rejected", url=url, error=exc.message)
+                await bot.send_message(chat_id, text)
         except TelegramForbiddenError as exc:
             raise ReminderBlocked from exc
 

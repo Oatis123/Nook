@@ -18,6 +18,9 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
 COPY . .
+# .gitattributes keeps this LF, but a tree that didn't come from git (a zip download, an
+# editor that rewrote it) may still have CRLF, which breaks the shebang.
+RUN sed -i 's/\r$//' docker-entrypoint.sh
 RUN uv sync --frozen --no-dev
 
 ENV PATH="/srv/.venv/bin:${PATH}"

@@ -7,6 +7,35 @@ for implementation decisions left to the agent's discretion by the spec.
 "Nook" is a working name, configured via the single `APP_NAME` environment variable
 (see `.env.example`) so it can be renamed without touching code.
 
+## Screenshots
+
+Markdown notes with `[[wikilinks]]`, tags and a live preview:
+
+![Note editor with live preview](docs/screenshots/notes.png)
+
+Tasks — Today and the month calendar:
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/tasks-today.png" alt="Today view"></td>
+    <td><img src="docs/screenshots/tasks-calendar.png" alt="Calendar view"></td>
+  </tr>
+</table>
+
+The note graph, colored by folder (dark mode):
+
+![Note graph](docs/screenshots/graph.png)
+
+Theme skins — Telegram, GitHub and Material, each with light and dark modes:
+
+<table>
+  <tr>
+    <td><img src="docs/screenshots/theme-telegram.png" alt="Telegram skin, dark"></td>
+    <td><img src="docs/screenshots/theme-github.png" alt="GitHub skin, light"></td>
+    <td><img src="docs/screenshots/theme-material.png" alt="Material skin, light"></td>
+  </tr>
+</table>
+
 ## Stack
 
 - **Backend**: Python 3.12+, FastAPI, SQLAlchemy 2 (async) + PostgreSQL 16, Alembic, aiogram 3

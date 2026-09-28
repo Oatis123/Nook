@@ -67,6 +67,30 @@ async def test_update_task_list(client: AsyncClient, db_session: AsyncSession) -
     assert update.json()["icon"] == "code"
 
 
+async def test_hyphenated_colors_and_icons_round_trip(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """Enum values whose member name differs from the value (palette_12 / "palette-12")
+    are stored by name; migration 79c1667a7e2f added them by value, so they 500'd."""
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+
+    for icon in ("gamepad-2", "paw-print", "book-open", "shopping-cart", "graduation-cap"):
+        task_list = await _create_list(client, f"List {icon}", color="palette-12", icon=icon)
+        assert task_list["color"] == "palette-12"
+        assert task_list["icon"] == icon
+
+    csrf = client.cookies.get("csrf_token")
+    update = await client.patch(
+        f"/api/v1/task-lists/{task_list['id']}",
+        json={"color": "palette-7", "icon": "gamepad-2"},
+        headers={"x-csrf-token": csrf},
+    )
+    assert update.status_code == 200, update.text
+    assert update.json()["color"] == "palette-7"
+    assert update.json()["icon"] == "gamepad-2"
+
+
 async def test_archive_task_list(client: AsyncClient, db_session: AsyncSession) -> None:
     await make_user(db_session, "alice")
     await login(client, "alice")

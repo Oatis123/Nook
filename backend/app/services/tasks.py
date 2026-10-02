@@ -11,6 +11,7 @@ from app.core.isolation import get_owned_or_404
 from app.models.task import Task, TaskStatus
 from app.models.task_completion import TaskCompletion
 from app.models.task_list import TaskList
+from app.models.user import User
 from app.schemas.task import CalendarEntryOut, TaskCreate, TaskUpdate
 from app.services import recurrence as recurrence_service
 from app.services import reminders as reminders_service
@@ -286,7 +287,7 @@ async def complete_task(
         await reminders_service.recompute_reminders_for_task(session, subtask, now=now)
 
     if _is_recurring(task):
-        _advance_recurring_task(session, task, now, skipped=False)
+        await _advance_recurring_task(session, task, now, skipped=False)
     else:
         task.status = TaskStatus.done
         task.completed_at = now
@@ -301,23 +302,52 @@ def _is_recurring(task: Task) -> bool:
     return bool(task.is_recurring and task.rrule and task.dtstart_local and task.due_date)
 
 
-def _advance_recurring_task(
+async def _advance_recurring_task(
     session: AsyncSession, task: Task, now: datetime, *, skipped: bool
 ) -> None:
+    """Records the current occurrence as done (or skipped) and moves the task to its next one.
+
+    Completing or skipping an overdue task acts on the latest occurrence that has already
+    come round and jumps to the first one still ahead; the ones missed in between are
+    recorded as skipped. Before, the task only moved one occurrence forward — often still in
+    the past — so it stayed overdue until ticked once per missed occurrence, and since its
+    next reminder was then in the past, its reminders stopped until it caught up."""
     assert task.rrule and task.dtstart_local and task.due_date  # narrows for mypy
+    user = await session.get(User, task.user_id)
+    assert user is not None
+    now_local = now.astimezone(ZoneInfo(user.timezone)).replace(tzinfo=None)
     occurrence_at = datetime.combine(task.due_date, task.due_time or time(0, 0))
+
+    come_round = [occurrence_at]
+    if occurrence_at < now_local:
+        # Capped by occurrences_between's limit; past it only the history is incomplete,
+        # the jump below goes by `now_local` either way.
+        come_round += [
+            occ
+            for occ in recurrence_service.occurrences_between(
+                task.rrule, task.dtstart_local, occurrence_at, now_local, anchor=occurrence_at
+            )
+            if occ > occurrence_at
+        ]
+    for occ in come_round[:-1]:
+        session.add(
+            TaskCompletion(task_id=task.id, occurrence_at=occ, completed_at=now, skipped=True)
+        )
     session.add(
         TaskCompletion(
-            task_id=task.id, occurrence_at=occurrence_at, completed_at=now, skipped=skipped
+            task_id=task.id, occurrence_at=come_round[-1], completed_at=now, skipped=skipped
         )
     )
 
     next_occ = recurrence_service.next_occurrence(
-        task.rrule, task.dtstart_local, occurrence_at, anchor=occurrence_at
+        task.rrule, task.dtstart_local, max(occurrence_at, now_local), anchor=come_round[-1]
     )
     if next_occ is None:
+        # The series is over: the task closes on the occurrence just recorded, which after
+        # a late tick can be a later one than its due date.
         task.status = TaskStatus.done
         task.completed_at = now
+        task.due_date = come_round[-1].date()
     else:
         task.due_date = next_occ.date()
         task.due_time = next_occ.time()
@@ -333,7 +363,7 @@ async def skip_task_occurrence(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Task is not recurring")
 
     now = datetime.now(UTC)
-    _advance_recurring_task(session, task, now, skipped=True)
+    await _advance_recurring_task(session, task, now, skipped=True)
 
     await reminders_service.recompute_reminders_for_task(session, task, now=now)
     await session.commit()

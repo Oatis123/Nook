@@ -1,5 +1,7 @@
+import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as notesApi from '@/features/notes/api'
+import type { NoteSummary } from '@/lib/types'
 
 export const foldersKey = ['folders'] as const
 export const notesKey = (deleted = false) => ['notes', { deleted }] as const
@@ -48,6 +50,27 @@ export function useNotes(params: { deleted?: boolean; tag?: string } = {}) {
   })
 }
 
+export type NoteLinkTarget = Pick<NoteSummary, 'id' | 'title' | 'folder_id'>
+
+/** The note list reduced to what [[wikilinks]] resolve and complete against. Every autosave
+ * refetches the list (the saved note's updated_at changes), which used to rebuild the
+ * preview's markdown pipeline and reconfigure the editor each time; this keeps the same
+ * array until an id, title or folder actually changes. */
+export function useNoteLinkTargets(): NoteLinkTarget[] {
+  const { data } = useNotes()
+  const signature = useMemo(
+    () => JSON.stringify((data ?? []).map((n) => [n.id, n.title, n.folder_id])),
+    [data],
+  )
+  return useMemo(
+    () =>
+      (JSON.parse(signature) as [string, string, string | null][]).map(
+        ([id, title, folder_id]) => ({ id, title, folder_id }),
+      ),
+    [signature],
+  )
+}
+
 export function useTags() {
   return useQuery({ queryKey: ['tags'], queryFn: notesApi.listTags })
 }
@@ -66,6 +89,21 @@ export function useNote(id: string | undefined) {
     enabled: id !== undefined,
     retry: false,
   })
+}
+
+/** Warms what opening a note needs — its data and the lazily loaded editor route — so a
+ * click on a hovered or focused note renders at once. A fresh cached copy (the client's
+ * staleTime) isn't fetched again, so repeated hovers cost nothing. */
+export function usePrefetchNote() {
+  const queryClient = useQueryClient()
+  return (id: string) => {
+    void import('@/features/notes/NoteEditorRoute')
+    void queryClient.prefetchQuery({
+      queryKey: noteKey(id),
+      queryFn: () => notesApi.getNote(id),
+      retry: false,
+    })
+  }
 }
 
 function useInvalidateNotesAndTags() {

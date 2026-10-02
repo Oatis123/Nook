@@ -4,9 +4,11 @@ import {
   type ReactNode,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
+import type { Root as HastRoot } from 'hast'
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime'
 import { unified, type Processor } from 'unified'
 import remarkParse from 'remark-parse'
@@ -20,7 +22,7 @@ import { useResolvedTheme } from '@/lib/theme'
 import { getHighlighter } from '@/features/notes/shiki'
 import { remarkWikilinks } from '@/features/notes/remarkWikilinks'
 import { remarkCallouts } from '@/features/notes/remarkCallouts'
-import { useFolders, useCreateNote, useNotes } from '@/features/notes/hooks'
+import { useFolders, useCreateNote, useNoteLinkTargets } from '@/features/notes/hooks'
 import { buildWikilinkIndex } from '@/features/notes/wikilinkIndex'
 import { buildAttachmentIndex } from '@/features/notes/attachmentIndex'
 import { useAttachments } from '@/features/attachments/hooks'
@@ -66,6 +68,46 @@ const sanitizeSchema = {
   },
 }
 
+/** While typing, the preview re-renders this long after the last change rather than on
+ * every keystroke: a long note's render blocks the main thread, which made typing stutter. */
+const PREVIEW_DEBOUNCE_MS = 200
+
+/** Small LRU map: typing inside a code block makes a new cache key per keystroke, so the
+ * cache has to forget old entries. */
+class LruCache<V> {
+  private readonly map = new Map<string, V>()
+  private readonly max: number
+
+  constructor(max: number) {
+    this.max = max
+  }
+
+  get(key: string): V | undefined {
+    const value = this.map.get(key)
+    if (value !== undefined) {
+      this.map.delete(key)
+      this.map.set(key, value)
+    }
+    return value
+  }
+
+  set(key: string, value: V): this {
+    this.map.delete(key)
+    this.map.set(key, value)
+    if (this.map.size > this.max) this.map.delete(this.map.keys().next().value as string)
+    return this
+  }
+}
+
+/** Highlighted code blocks, so a re-render only re-highlights the block being edited —
+ * Shiki was most of the cost of each render. One per theme: Shiki's cache key is just
+ * language + code. Cached fragments are safe to reuse because rehype-sanitize builds a
+ * new tree rather than mutating them. */
+const highlightCaches = {
+  light: new LruCache<HastRoot>(300),
+  dark: new LruCache<HastRoot>(300),
+}
+
 function buildProcessor(
   highlighter: HighlighterCore,
   theme: 'light' | 'dark',
@@ -81,6 +123,7 @@ function buildProcessor(
     .use(rehypeShikiFromHighlighter, highlighter, {
       theme: theme === 'dark' ? 'github-dark' : 'github-light',
       fallbackLanguage: 'text',
+      cache: highlightCaches[theme],
     })
     .use(rehypeSanitize, sanitizeSchema)
     .use(rehypeReact, { Fragment, jsx, jsxs, components: { img: PreviewImage } })
@@ -111,7 +154,7 @@ function PreviewImage(props: ImgHTMLAttributes<HTMLImageElement>) {
 export function MarkdownPreview({ content }: { content: string }) {
   const resolvedTheme = useResolvedTheme()
   const navigate = useNavigate()
-  const notesQuery = useNotes()
+  const linkTargets = useNoteLinkTargets()
   const foldersQuery = useFolders()
   const attachmentsQuery = useAttachments()
   const createNote = useCreateNote()
@@ -135,8 +178,8 @@ export function MarkdownPreview({ content }: { content: string }) {
   }, [highlighterAttempt])
 
   const wikilinkIndex = useMemo(
-    () => buildWikilinkIndex(notesQuery.data ?? [], foldersQuery.data ?? []),
-    [notesQuery.data, foldersQuery.data],
+    () => buildWikilinkIndex(linkTargets, foldersQuery.data ?? []),
+    [linkTargets, foldersQuery.data],
   )
 
   const attachmentIndex = useMemo(
@@ -152,19 +195,26 @@ export function MarkdownPreview({ content }: { content: string }) {
     [highlighter, resolvedTheme, wikilinkIndex, attachmentIndex],
   )
 
+  // The first render of a note shows at once; after that, edits re-render once typing pauses.
+  const renderedRef = useRef(false)
   useEffect(() => {
     if (!processor) return
     let cancelled = false
-    ;(processor as Processor)
-      .process(content)
-      .then((file: Awaited<ReturnType<Processor['process']>>) => {
-        if (!cancelled) setTree(file.result as ReactNode)
-      })
-      .catch(() => {
-        if (!cancelled) setTree(<p className="text-danger">Couldn't render this note.</p>)
-      })
+    const render = () =>
+      (processor as Processor)
+        .process(content)
+        .then((file: Awaited<ReturnType<Processor['process']>>) => {
+          if (cancelled) return
+          renderedRef.current = true
+          setTree(file.result as ReactNode)
+        })
+        .catch(() => {
+          if (!cancelled) setTree(<p className="text-danger">Couldn't render this note.</p>)
+        })
+    const timer = setTimeout(render, renderedRef.current ? PREVIEW_DEBOUNCE_MS : 0)
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
   }, [content, processor])
 

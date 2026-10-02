@@ -1,4 +1,5 @@
-import type { Folder, NoteSummary } from '@/lib/types'
+import type { Folder } from '@/lib/types'
+import type { NoteLinkTarget } from '@/features/notes/hooks'
 
 export interface WikilinkIndex {
   resolve(target: string): { id: string; title: string } | 'ambiguous' | null
@@ -9,7 +10,7 @@ export interface WikilinkIndex {
  * plain title match. Alias matching is intentionally skipped here — it only affects
  * live-preview link styling, not what gets persisted, and keeping this index cheap to
  * rebuild on every keystroke matters more than alias completeness. */
-export function buildWikilinkIndex(notes: NoteSummary[], folders: Folder[]): WikilinkIndex {
+export function buildWikilinkIndex(notes: NoteLinkTarget[], folders: Folder[]): WikilinkIndex {
   const folderNameById = new Map(folders.map((f) => [f.id, f.name]))
 
   return {

@@ -1,8 +1,9 @@
 import type { CompletionContext, CompletionSource } from '@codemirror/autocomplete'
-import type { NoteSummary, Tag } from '@/lib/types'
+import type { Tag } from '@/lib/types'
+import type { NoteLinkTarget } from '@/features/notes/hooks'
 
 /** After `[[`, suggest note titles (and close the brackets on accept) — spec §6.2. */
-export function createWikilinkCompletion(notes: NoteSummary[]): CompletionSource {
+export function createWikilinkCompletion(notes: NoteLinkTarget[]): CompletionSource {
   return (context: CompletionContext) => {
     const match = context.matchBefore(/\[\[[^[\]]*/)
     if (!match) return null

@@ -11,7 +11,7 @@ import { ApiError } from '@/lib/api'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { getRenameImpact, noteExportUrl } from '@/features/notes/api'
 import { editorHighlighting, editorTheme } from '@/features/notes/editorTheme'
-import { useNote, useNotes, useTags } from '@/features/notes/hooks'
+import { useNote, useNoteLinkTargets, useTags } from '@/features/notes/hooks'
 import { type SaveStatus, useNoteAutosave } from '@/features/notes/useNoteAutosave'
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
 import { createAttachmentDropHandler } from '@/features/notes/attachmentDrop'
@@ -22,11 +22,18 @@ import { useUploadAttachment } from '@/features/attachments/hooks'
 import { QueryState } from '@/design/components/QueryState'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
+// Module-level so its identity is stable: @uiw/react-codemirror reconfigures the whole
+// editor whenever this prop (or `extensions`) changes identity, and an inline object
+// literal did that on every render — i.e. on every keystroke.
+const EDITOR_BASIC_SETUP = { lineNumbers: false, foldGutter: false, highlightActiveLine: false }
+
 export function NoteEditor({ noteId }: { noteId: string }) {
   const noteQuery = useNote(noteId)
   const { data: user } = useCurrentUser()
   const updateProfile = useUpdateProfile()
-  const uploadAttachment = useUploadAttachment()
+  // Only the (stable) mutateAsync: useMutation returns a new object every render, and
+  // depending on it rebuilt the editor's extensions — a full reconfigure — per keystroke.
+  const { mutateAsync: uploadAttachment } = useUploadAttachment()
   const viewRef = useRef<EditorView | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autosave = useNoteAutosave(noteId, noteQuery.data)
@@ -36,7 +43,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [renamePrompt, setRenamePrompt] = useState<{ affectedNotes: number } | null>(null)
 
-  const notesQuery = useNotes()
+  const linkTargets = useNoteLinkTargets()
   const tagsQuery = useTags()
 
   const previewEnabled = user?.editor_preview_enabled ?? true
@@ -78,9 +85,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const uploadAndInsert = useCallback(
     async (files: File[], pos: number | 'cursor', view: EditorView) => {
       // A failed upload is already reported by the global mutation error toast.
-      const uploaded = await Promise.all(files.map((f) => uploadAttachment.mutateAsync(f))).catch(
-        () => null,
-      )
+      const uploaded = await Promise.all(files.map((f) => uploadAttachment(f))).catch(() => null)
       if (!uploaded) return
       const insertPos = pos === 'cursor' ? view.state.selection.main.from : pos
       const embedText = uploaded.map((a) => `![[${a.filename}]]`).join(' ')
@@ -102,12 +107,12 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       createAttachmentDropHandler(uploadAndInsert),
       autocompletion({
         override: [
-          createWikilinkCompletion(notesQuery.data ?? []),
+          createWikilinkCompletion(linkTargets),
           createTagCompletion(tagsQuery.data ?? []),
         ],
       }),
     ],
-    [notesQuery.data, tagsQuery.data, uploadAndInsert],
+    [linkTargets, tagsQuery.data, uploadAndInsert],
   )
 
   // Only when there's nothing to show: a failed *background* refetch (API restarting
@@ -229,7 +234,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               viewRef.current = view
             }}
             extensions={editorExtensions}
-            basicSetup={{ lineNumbers: false, foldGutter: false, highlightActiveLine: false }}
+            basicSetup={EDITOR_BASIC_SETUP}
             theme="none"
             height="100%"
             className="h-full"

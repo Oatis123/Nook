@@ -2,6 +2,7 @@ import asyncio
 
 import structlog
 from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand
 
 from app.core.config import get_settings
 from app.core.heartbeat import BOT_HEARTBEAT, beat
@@ -15,6 +16,23 @@ dp.include_router(router)
 
 
 HEARTBEAT_SECONDS = 30
+
+COMMANDS_MENU = [
+    BotCommand(command="new", description="Новая задача"),
+    BotCommand(command="cancel", description="Отменить создание задачи"),
+    BotCommand(command="lists", description="Мои списки"),
+    BotCommand(command="help", description="Справка"),
+    BotCommand(command="unlink", description="Отвязать Telegram"),
+]
+
+
+async def _set_commands_menu(bot: Bot) -> None:
+    """Fills Telegram's "Menu" button with the bot's commands. Best effort: a failure
+    (Telegram unreachable for a moment) mustn't keep the bot from starting."""
+    try:
+        await bot.set_my_commands(COMMANDS_MENU, request_timeout=10)
+    except Exception:
+        log.warning("bot.set_commands_failed")
 
 
 async def _heartbeat_loop() -> None:
@@ -33,6 +51,7 @@ async def main() -> None:
 
         bot = Bot(token=settings.telegram_bot_token)
         log.info("bot.startup", mode=settings.bot_mode)
+        await _set_commands_menu(bot)
         await dp.start_polling(bot)
     finally:
         heartbeat.cancel()

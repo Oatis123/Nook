@@ -1,12 +1,10 @@
 """Reminder dispatch, recurrence and profile edge cases found in the pre-deploy review."""
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
 
 import pytest
 from freezegun import freeze_time
 from httpx import AsyncClient
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.import_job import ImportJob, ImportJobStatus
@@ -14,7 +12,6 @@ from app.models.scheduled_reminder import ReminderKind, ReminderStatus
 from app.services import vault_import as vault_import_service
 from app.services.reminder_dispatch import dispatch_due_reminders
 from app.services.reminders import purge_resolved_reminders
-from bot import handlers as bot_handlers
 from tests.conftest import login, make_user
 from tests.test_reminders import _create_task, _FakeSender, _patch, _pending, _post, _reminders
 
@@ -204,30 +201,3 @@ async def test_interrupted_import_is_failed_on_worker_start(
     assert job.status == ImportJobStatus.failed
     assert job.report is not None
     assert "interrupted" in job.report["errors"][0]
-
-
-async def test_bot_replies_when_quick_add_has_no_title(db_session: AsyncSession) -> None:
-    user = await make_user(db_session, "alice")
-    message = AsyncMock()
-
-    async def boom(*_args: object) -> None:
-        from app.schemas.task import TaskCreate
-
-        TaskCreate(title="")
-
-    original = bot_handlers._create_task_from_parsed
-    bot_handlers._create_task_from_parsed = boom  # type: ignore[assignment]
-    try:
-        await bot_handlers._create_and_reply(message, user, None)  # type: ignore[arg-type]
-    finally:
-        bot_handlers._create_task_from_parsed = original
-    message.answer.assert_awaited_once()
-    assert "title" in message.answer.await_args.args[0]
-
-
-def test_validation_hint_for_interval() -> None:
-    from app.services.recurrence import RecurrenceInput
-
-    with pytest.raises(ValidationError) as exc_info:
-        RecurrenceInput(freq="daily", interval=0)
-    assert "repeat rule" in bot_handlers._validation_hint(exc_info.value)

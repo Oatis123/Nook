@@ -9,6 +9,7 @@ from app.models.task import Task, TaskStatus
 from app.models.task_list import TaskList
 from app.models.user import User
 from app.services import recurrence as recurrence_service
+from app.services.telegram_format import PRIORITY_LABELS, format_due
 
 # spec §8.2: a newly computed reminder whose remind_at is already at-or-before "now" is
 # dropped rather than scheduled (no catch-up messages at task/profile change time) — kept
@@ -23,17 +24,11 @@ MAX_ATTEMPTS = 3
 # Delay before retrying after the Nth failed attempt (exponential backoff, spec §8.4).
 RETRY_BACKOFF_MINUTES = [1, 2, 4]
 
+# Reminders go out through the bot, which speaks Russian (spec §8.3, §9).
 REMINDER_KIND_LABEL: dict[ReminderKind, str] = {
-    ReminderKind.day_before: "Tomorrow:",
-    ReminderKind.hour_before: "In 1 hour:",
-    ReminderKind.occurrence: "Now:",
-}
-
-_PRIORITY_LABEL: dict[str, str] = {
-    "none": "No priority",
-    "low": "Low",
-    "medium": "Medium",
-    "high": "High",
+    ReminderKind.day_before: "Завтра:",
+    ReminderKind.hour_before: "Через час:",
+    ReminderKind.occurrence: "Сейчас:",
 }
 
 
@@ -152,16 +147,13 @@ async def recompute_reminders_for_user(
 
 
 def format_reminder_text(kind: ReminderKind, task: Task, task_list: TaskList) -> str:
-    lines = [f"{REMINDER_KIND_LABEL[kind]} {task.title}", f"List: {task_list.name}"]
+    lines = [f"{REMINDER_KIND_LABEL[kind]} {task.title}", f"Список: {task_list.name}"]
 
     if task.due_date is not None:
-        due = f"Due: {task.due_date:%b %d, %Y}"
-        if task.due_time is not None:
-            due += f", {task.due_time:%I:%M %p}".replace(" 0", " ")
-        lines.append(due)
+        lines.append(f"Срок: {format_due(task.due_date, task.due_time)}")
 
     if task.priority != "none":
-        lines.append(f"Priority: {_PRIORITY_LABEL[task.priority]}")
+        lines.append(f"Приоритет: {PRIORITY_LABELS[task.priority]}")
 
     return "\n".join(lines)
 

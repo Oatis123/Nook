@@ -79,7 +79,7 @@ def _make_sender(bot: Bot):
                 await _send_message(bot, chat_id, text)
                 return
             keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(text="Open", url=url)]]
+                inline_keyboard=[[InlineKeyboardButton(text="Открыть", url=url)]]
             )
             try:
                 await _send_message(bot, chat_id, text, keyboard)

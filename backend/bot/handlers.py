@@ -1,6 +1,12 @@
+import base64
+import calendar
+import contextlib
+import re
+import time as monotonic_clock
 import uuid
-from dataclasses import dataclass
-from datetime import date, datetime, time
+from dataclasses import dataclass, field
+from datetime import date, datetime, time, timedelta
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 import dateparser
@@ -9,6 +15,7 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     CallbackQuery,
+    ErrorEvent,
     InaccessibleMessage,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -16,7 +23,6 @@ from aiogram.types import (
 )
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.db import async_session_factory
@@ -28,21 +34,21 @@ from app.services import admin as admin_service
 from app.services import task_lists as task_lists_service
 from app.services import tasks as tasks_service
 from app.services import telegram_link as telegram_link_service
-from app.services.quick_add import (
-    DEFAULT_LANGUAGES,
-    ParsedQuickAdd,
-    default_recurrence_start_date,
-    parse_quick_add,
+from app.services.telegram_format import (
+    MONTHS,
+    PRIORITY_LABELS,
+    WEEKDAYS_TITLE,
+    format_day,
+    format_due,
 )
-from app.services.recurrence import RecurrenceInput
 
 router = Router()
 settings = get_settings()
 log = structlog.get_logger()
 
 NOT_LINKED_TEXT = (
-    "This bot works only with a linked account.\n"
-    f"Open {settings.public_url} and connect Telegram from Settings first."
+    "Этот бот работает только с привязанным аккаунтом.\n"
+    f"Откройте {settings.public_url} и подключите Telegram в настройках."
 )
 
 
@@ -56,7 +62,7 @@ async def handle_start_deep_link(message: Message, command: CommandObject) -> No
     elif payload.startswith("login_"):
         await _handle_login(message, message.from_user.id, payload.removeprefix("login_"))
     else:
-        await message.answer(f"Welcome to {settings.app_name}.\n\n{NOT_LINKED_TEXT}")
+        await message.answer(f"Добро пожаловать в {settings.app_name}.\n\n{NOT_LINKED_TEXT}")
 
 
 @router.message(CommandStart())
@@ -66,9 +72,12 @@ async def handle_start_plain(message: Message) -> None:
     async with async_session_factory() as session:
         user = await telegram_link_service.get_user_by_telegram_id(session, message.from_user.id)
     if user is None:
-        await message.answer(f"Welcome to {settings.app_name}.\n\n{NOT_LINKED_TEXT}")
+        await message.answer(f"Добро пожаловать в {settings.app_name}.\n\n{NOT_LINKED_TEXT}")
     else:
-        await message.answer(f"Welcome back, {user.username}.")
+        await message.answer(
+            f"С возвращением, {user.username}.\n\n"
+            "Чтобы создать задачу, просто напишите её текст. Справка — /help."
+        )
 
 
 async def _handle_link(message: Message, telegram_user_id: int, plain_token: str) -> None:
@@ -79,24 +88,22 @@ async def _handle_link(message: Message, telegram_user_id: int, plain_token: str
         )
     if user is None:
         await message.answer(
-            "This link is invalid, expired, or this Telegram account is already linked "
-            "to a different account."
+            "Ссылка недействительна или устарела, либо этот Telegram уже привязан "
+            "к другому аккаунту."
         )
         return
     log.info("bot.telegram_linked", user_id=str(user.id))
-    await message.answer(
-        f"Your Telegram is now linked to {settings.app_name} as '{user.username}'."
-    )
+    await message.answer(f"Telegram привязан к {settings.app_name} как «{user.username}».")
     if previous_chat_id is not None and previous_chat_id != message.chat.id:
         # The account moved to another Telegram: tell the old one, which can no longer
         # log in with Telegram — if that wasn't its owner's doing, they need to know.
         try:
             await message.bot.send_message(  # type: ignore[union-attr]
                 previous_chat_id,
-                f"Your {settings.app_name} account '{user.username}' was just linked to a "
-                "different Telegram account, so this chat will no longer get reminders or "
-                "login requests. If you didn't do this, change your password and reconnect "
-                "Telegram in Settings.",
+                f"Ваш аккаунт {settings.app_name} «{user.username}» только что привязали "
+                "к другому Telegram, поэтому сюда больше не будут приходить напоминания и "
+                "запросы на вход. Если это были не вы, смените пароль и заново подключите "
+                "Telegram в настройках.",
             )
         except Exception:
             log.warning("bot.relink_notice_failed", user_id=str(user.id))
@@ -111,15 +118,15 @@ async def _handle_login(message: Message, telegram_user_id: int, plain_token: st
 
         token = await telegram_link_service.find_login_token_by_plain(session, plain_token)
         if token is None or token.used_at is not None:
-            await message.answer("This login link is invalid or has expired.")
+            await message.answer("Ссылка для входа недействительна или устарела.")
             return
 
         await telegram_link_service.attach_login_requester(session, token, user.id)
         meta = token.meta or {}
         token_id = token.id
 
-    device = meta.get("user_agent") or "an unknown device"
-    ip = meta.get("ip") or "an unknown location"
+    device = meta.get("user_agent") or "неизвестное устройство"
+    ip = meta.get("ip") or "неизвестный адрес"
     code = meta.get("code")
     if code:
         # The user must pick the code their browser shows; see new_confirm_code().
@@ -130,31 +137,34 @@ async def _handle_login(message: Message, telegram_user_id: int, plain_token: st
                     InlineKeyboardButton(text=c, callback_data=f"tglogin:code:{token_id}:{c}")
                     for c in choices
                 ],
-                [InlineKeyboardButton(text="Deny", callback_data=f"tglogin:deny:{token_id}")],
+                [InlineKeyboardButton(text="Отклонить", callback_data=f"tglogin:deny:{token_id}")],
             ]
         )
         prompt = (
-            "To confirm, tap the code shown in your browser. If you didn't start this "
-            "login yourself just now — for example, someone sent you this link — press Deny."
+            "Чтобы подтвердить, нажмите код, который показан в браузере. Если вы не начинали "
+            "этот вход сами только что — например, кто-то прислал вам эту ссылку, — "
+            "нажмите «Отклонить»."
         )
     else:
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
                     InlineKeyboardButton(
-                        text="Confirm login", callback_data=f"tglogin:confirm:{token_id}"
+                        text="Подтвердить вход", callback_data=f"tglogin:confirm:{token_id}"
                     ),
-                    InlineKeyboardButton(text="Deny", callback_data=f"tglogin:deny:{token_id}"),
+                    InlineKeyboardButton(
+                        text="Отклонить", callback_data=f"tglogin:deny:{token_id}"
+                    ),
                 ]
             ]
         )
         prompt = (
-            "Only confirm if you started this login yourself, just now. If someone sent you "
-            "this link, press Deny — confirming would give them access to your account."
+            "Подтверждайте, только если вы сами начали этот вход только что. Если кто-то "
+            "прислал вам эту ссылку, нажмите «Отклонить» — подтверждение даст ему доступ "
+            "к вашему аккаунту."
         )
     await message.answer(
-        f"Someone is trying to log in to {settings.app_name} as '{user.username}' from:\n"
-        f"{device}\n{ip}\n\n{prompt}",
+        f"Кто-то входит в {settings.app_name} как «{user.username}»:\n{device}\n{ip}\n\n{prompt}",
         reply_markup=keyboard,
     )
 
@@ -174,18 +184,18 @@ async def handle_login_callback(callback: CallbackQuery) -> None:
     try:
         token_id = uuid.UUID(parts[2])
     except (ValueError, IndexError):
-        await callback.answer("This request is no longer valid.", show_alert=True)
+        await callback.answer("Этот запрос больше недействителен.", show_alert=True)
         return
 
     async with async_session_factory() as session:
         token = await telegram_link_service.find_login_token_by_id(session, token_id)
         if token is None or token.user_id is None:
-            await callback.answer("This request is no longer valid.", show_alert=True)
+            await callback.answer("Этот запрос больше недействителен.", show_alert=True)
             return
 
         user = await telegram_link_service.get_user_by_telegram_id(session, callback.from_user.id)
         if user is None or user.id != token.user_id:
-            await callback.answer("This isn't your login request.", show_alert=True)
+            await callback.answer("Это не ваш запрос на вход.", show_alert=True)
             return
 
         expected_code = (token.meta or {}).get("code")
@@ -200,14 +210,14 @@ async def handle_login_callback(callback: CallbackQuery) -> None:
         log.info("bot.telegram_login_answered", user_id=str(user.id), confirmed=confirmed)
 
     if confirmed:
-        text = "Login confirmed. You can return to the browser."
+        text = "Вход подтверждён. Можно вернуться в браузер."
     elif action == "code":
         text = (
-            "That code doesn't match, so the login was denied. If you didn't start this "
-            "login, someone may be trying to get into your account — change your password."
+            "Код не совпадает, поэтому вход отклонён. Если вы не начинали этот вход, "
+            "возможно, кто-то пытается попасть в ваш аккаунт — смените пароль."
         )
     else:
-        text = "Login denied."
+        text = "Вход отклонён."
     await callback.message.edit_text(text)
     await callback.answer()
 
@@ -215,15 +225,13 @@ async def handle_login_callback(callback: CallbackQuery) -> None:
 @router.message(Command("help"))
 async def handle_help(message: Message) -> None:
     await message.answer(
-        f"{settings.app_name} bot commands:\n\n"
-        "/new <text> — create a task (or just send text with no command)\n"
-        "/lists — show your task lists\n"
-        "/help — this message\n"
-        "/unlink — disconnect your Telegram from your account\n\n"
-        "Task text understands the same syntax as quick add on the web: a date/time "
-        '("tomorrow 6pm", or in Russian, "завтра в 18:00"), !low/!medium/!high for '
-        'priority, #ListName to file it into a list, and "every ..." for a repeat '
-        '(e.g. "every monday", "every 3 days", "daily").'
+        "Чтобы создать задачу, просто напишите её текст — бот спросит описание, дату и "
+        "время. Задачи из бота получают средний приоритет.\n\n"
+        "/new <текст> — то же самое\n"
+        "/cancel — отменить создание задачи\n"
+        "/lists — ваши списки\n"
+        "/help — эта справка\n"
+        "/unlink — отвязать Telegram от аккаунта"
     )
 
 
@@ -239,88 +247,193 @@ async def handle_lists(message: Message) -> None:
         lists = await task_lists_service.list_task_lists(session, user.id)
 
     if not lists:
-        await message.answer("You have no lists yet.")
+        await message.answer("У вас пока нет списков.")
         return
-    await message.answer("Your lists:\n" + "\n".join(f"• {task_list.name}" for task_list in lists))
+    await message.answer("Ваши списки:\n" + "\n".join(f"• {task_list.name}" for task_list in lists))
+
+
+# --- New task: text → description → date → time -------------------------------------
+#
+# The task's text arrives as a plain message; the bot then asks for an optional
+# description, a date (buttons, a month calendar, or typed) and a time (buttons or typed),
+# and creates the task with medium priority. The draft lives in memory, keyed by Telegram
+# user id: a bot restart mid-conversation just drops it, which the user notices right away.
+
+DRAFT_TTL_SECONDS = 30 * 60
+TIME_PRESETS = [time(9, 0), time(12, 0), time(18, 0)]
+BOT_TASK_PRIORITY = TaskPriority.medium
+MAX_TITLE_LENGTH = 500  # TaskCreate.title's limit
+
+Step = Literal["description", "date", "time"]
 
 
 @dataclass
-class _PendingQuickAdd:
+class _Draft:
     title: str
-    list_name: str | None
-    priority: str | None
-    recurrence: RecurrenceInput
-    due_date: date  # a recurring task always needs one (spec §7.4)
+    step: Step = "description"
+    description: str | None = None
+    due_date: date | None = None
+    # The message whose buttons drive the current step: its keyboard is removed when the
+    # step is answered by typing instead, so stale buttons don't linger in the chat.
+    prompt: Message | None = None
+    started: float = field(default_factory=lambda: monotonic_clock.monotonic())
 
 
-# Recurring tasks need a time (spec §7.4); quick add's parser can infer everything else
-# but not that, so a draft waits here, keyed by Telegram user id, until the next message
-# or button tap supplies one. In-memory and per-process is an accepted trade-off (spec's
-# own "не усложнять" spirit) — a bot restart mid-conversation just drops the draft, which
-# the user notices immediately by re-sending their text.
-_pending_time_requests: dict[int, _PendingQuickAdd] = {}
+_drafts: dict[int, _Draft] = {}
+
+
+def _get_draft(telegram_user_id: int) -> _Draft | None:
+    """The user's draft, unless it was abandoned long enough ago that their next message
+    is far more likely a new task than the answer to an old question."""
+    draft = _drafts.get(telegram_user_id)
+    if draft is not None and monotonic_clock.monotonic() - draft.started > DRAFT_TTL_SECONDS:
+        del _drafts[telegram_user_id]
+        return None
+    return draft
 
 
 def _local_now(user: User) -> datetime:
     return datetime.now(ZoneInfo(user.timezone)).replace(tzinfo=None)
 
 
-def _time_preset_keyboard() -> InlineKeyboardMarkup:
-    presets = [("9:00 AM", "09:00"), ("12:00 PM", "12:00"), ("6:00 PM", "18:00")]
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text=label, callback_data=f"qa:time:{value}")
-                for label, value in presets
-            ]
-        ]
+def _button(text: str, data: str) -> InlineKeyboardButton:
+    return InlineKeyboardButton(text=text, callback_data=data)
+
+
+CANCEL_BUTTON = _button("Отмена", "nt:cancel")
+
+DESCRIPTION_PROMPT = (
+    "📝 Добавить описание?\nНапишите его следующим сообщением или нажмите «Пропустить»."
+)
+DESCRIPTION_KEYBOARD = InlineKeyboardMarkup(
+    inline_keyboard=[[_button("Пропустить", "nt:skip"), CANCEL_BUTTON]]
+)
+
+DATE_PROMPT = "📅 Когда?\nВыберите день или напишите его, например «пятница» или «12.10»."
+DATE_KEYBOARD = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [_button("Сегодня", "nt:today"), _button("Завтра", "nt:tomorrow")],
+        [_button("📆 Выбрать дату", "nt:calendar"), _button("Без срока", "nt:nodate")],
+        [CANCEL_BUTTON],
+    ]
+)
+
+_DAY_MONTH_RE = re.compile(r"^\s*(\d{1,2})[./](\d{1,2})(?:[./](\d{2}|\d{4}))?\s*$")
+_TIME_RE = re.compile(r"^\s*(?:в\s+)?(\d{1,2})(?:\s*[:.\s]\s*(\d{2}))?\s*$")
+
+
+def parse_day(text: str, today: date) -> date | None:
+    """A typed date: "12.10", "12.10.2027", or words dateparser understands ("завтра",
+    "в пятницу", "12 октября"). DD.MM is handled here because dateparser reads "12.10" as
+    the time 12:10. A day-and-month already past this year means next year's."""
+    match = _DAY_MONTH_RE.match(text)
+    if match:
+        day, month, year_raw = match.groups()
+        if year_raw is None:
+            year = today.year
+        elif len(year_raw) == 2:
+            year = 2000 + int(year_raw)  # "12.10.27"
+        else:
+            year = int(year_raw)
+        try:
+            parsed = date(year, int(month), int(day))
+        except ValueError:
+            return None
+        if year_raw is None and parsed < today:
+            with contextlib.suppress(ValueError):
+                parsed = parsed.replace(year=today.year + 1)
+        return parsed
+
+    parsed_dt = dateparser.parse(
+        text,
+        languages=["ru", "en"],
+        settings={
+            "RELATIVE_BASE": datetime.combine(today, time(12, 0)),
+            "PREFER_DATES_FROM": "future",
+            "DATE_ORDER": "DMY",
+            "RETURN_AS_TIMEZONE_AWARE": False,
+        },
+    )
+    return parsed_dt.date() if parsed_dt is not None else None
+
+
+def parse_time(text: str) -> time | None:
+    """A typed time: "19:30", "19.30", "19 30", "9", "в 9"."""
+    match = _TIME_RE.match(text)
+    if not match:
+        return None
+    hour, minute = int(match.group(1)), int(match.group(2) or 0)
+    if hour > 23 or minute > 59:
+        return None
+    return time(hour, minute)
+
+
+def _calendar_keyboard(year: int, month: int, today: date) -> InlineKeyboardMarkup:
+    """A month grid: days before today can't be picked; ‹ › page through months."""
+    prev_year, prev_month = (year, month - 1) if month > 1 else (year - 1, 12)
+    next_year, next_month = (year, month + 1) if month < 12 else (year + 1, 1)
+    can_go_back = (year, month) > (today.year, today.month)
+    rows = [
+        [
+            _button("‹", f"nt:cal:{prev_year}-{prev_month:02d}")
+            if can_go_back
+            else _button(" ", "nt:noop"),
+            _button(f"{MONTHS[month - 1]} {year}", "nt:noop"),
+            _button("›", f"nt:cal:{next_year}-{next_month:02d}"),
+        ],
+        [_button(name, "nt:noop") for name in WEEKDAYS_TITLE],
+    ]
+    for week in calendar.monthcalendar(year, month):
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(_button(" ", "nt:noop"))
+                continue
+            current = date(year, month, day)
+            if current < today:
+                row.append(_button("·", "nt:noop"))
+            else:
+                label = f"•{day}•" if current == today else str(day)
+                row.append(_button(label, f"nt:day:{current.isoformat()}"))
+        rows.append(row)
+    rows.append([_button("« Назад", "nt:back"), CANCEL_BUTTON])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def _time_prompt(draft: _Draft) -> str:
+    assert draft.due_date is not None
+    return (
+        f"🕒 Во сколько? ({format_day(draft.due_date)})\n"
+        "Выберите время или напишите его, например «19:30»."
     )
 
 
-_WEEKDAY_LABEL = {
-    "MO": "Mon",
-    "TU": "Tue",
-    "WE": "Wed",
-    "TH": "Thu",
-    "FR": "Fri",
-    "SA": "Sat",
-    "SU": "Sun",
-}
-_FREQ_UNIT_LABEL = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}
-
-
-def _describe_rrule(rrule: str) -> str:
-    parts = dict(p.split("=", 1) for p in rrule.split(";"))
-    freq = parts.get("FREQ", "DAILY").lower()
-    interval = int(parts.get("INTERVAL", "1"))
-    unit = _FREQ_UNIT_LABEL.get(freq, freq)
-    label = f"Every {interval} {unit}s" if interval > 1 else f"Every {unit}"
-    if freq == "weekly" and "BYDAY" in parts:
-        days = [_WEEKDAY_LABEL.get(d, d) for d in parts["BYDAY"].split(",")]
-        label += " on " + ", ".join(days)
-    if freq == "monthly" and "BYMONTHDAY" in parts:
-        label += (
-            " on the last day" if parts["BYMONTHDAY"] == "-1" else f" on day {parts['BYMONTHDAY']}"
-        )
-    if "COUNT" in parts:
-        label += f", {parts['COUNT']}×"
-    if "UNTIL" in parts:
-        u = parts["UNTIL"]
-        label += f" until {u[:4]}-{u[4:6]}-{u[6:8]}"
-    return label
+def _time_keyboard(draft: _Draft, now: datetime) -> InlineKeyboardMarkup:
+    # For today, only times still ahead are offered.
+    presets = [
+        preset
+        for preset in TIME_PRESETS
+        if draft.due_date != now.date() or datetime.combine(now.date(), preset) > now
+    ]
+    rows = []
+    if presets:
+        rows.append([_button(f"{preset:%H:%M}", f"nt:time:{preset:%H%M}") for preset in presets])
+    rows.append([_button("Без времени", "nt:notime"), CANCEL_BUTTON])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _summary_text(task: Task, list_name: str) -> str:
-    lines = [f"Created: {task.title}", f"List: {list_name}"]
+    lines = [f"✅ Задача создана: {task.title}", f"Список: {list_name}"]
     if task.due_date is not None:
-        due = f"Due: {task.due_date:%b %d, %Y}"
-        if task.due_time is not None:
-            due += f", {task.due_time:%I:%M %p}".replace(" 0", " ")
-        lines.append(due)
-    if task.priority != TaskPriority.none:
-        lines.append(f"Priority: {task.priority.value.capitalize()}")
-    if task.is_recurring and task.rrule:
-        lines.append(f"Repeats: {_describe_rrule(task.rrule)}")
+        lines.append(f"Срок: {format_due(task.due_date, task.due_time)}")
+    else:
+        lines.append("Срок: без срока")
+    lines.append(f"Приоритет: {PRIORITY_LABELS[task.priority]}")
+    if task.description:
+        description = task.description
+        if len(description) > 300:
+            description = description[:300].rstrip() + "…"
+        lines.append(f"Описание: {description}")
     return "\n".join(lines)
 
 
@@ -328,171 +441,249 @@ def _result_keyboard(task_id: uuid.UUID) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Change list", callback_data=f"qa:list:{task_id}"),
-                InlineKeyboardButton(text="Undo", callback_data=f"qa:undo:{task_id}"),
+                _button("Сменить список", f"qa:list:{task_id}"),
+                _button("Удалить", f"qa:undo:{task_id}"),
             ]
         ]
     )
 
 
-async def _create_task_from_parsed(
-    session: AsyncSession, user: User, parsed: ParsedQuickAdd
-) -> tuple[Task, str]:
-    lists = await task_lists_service.list_task_lists(session, user.id)
-    matched = next(
-        (
-            candidate
-            for candidate in lists
-            if parsed.list_name and candidate.name.lower() == parsed.list_name.lower()
-        ),
-        None,
-    )
-    title = parsed.title
-    if parsed.list_name is not None and matched is None:
-        title = f"{title} #{parsed.list_name}".strip()
+async def _linked_user(telegram_user_id: int) -> User | None:
+    async with async_session_factory() as session:
+        return await telegram_link_service.get_user_by_telegram_id(session, telegram_user_id)
 
-    due_date = parsed.due_date
-    if parsed.recurrence is not None and due_date is None:
-        due_date = default_recurrence_start_date(parsed.recurrence, _local_now(user).date())
 
-    task = await tasks_service.create_task(
-        session,
-        user.id,
-        TaskCreate(
-            title=title,
-            list_id=matched.id if matched else None,
-            priority=TaskPriority(parsed.priority) if parsed.priority else TaskPriority.none,
-            due_date=due_date,
-            due_time=parsed.due_time,
-            recurrence=parsed.recurrence,
-        ),
-    )
-    task_list = await session.get(TaskList, task.list_id)
+async def _drop_prompt_buttons(draft: _Draft) -> None:
+    """The step was answered by typing: take the buttons off the previous prompt."""
+    if draft.prompt is not None:
+        with contextlib.suppress(Exception):
+            await draft.prompt.edit_reply_markup(reply_markup=None)
+
+
+async def _prompt_by_reply(
+    message: Message, draft: _Draft, text: str, keyboard: InlineKeyboardMarkup
+) -> None:
+    await _drop_prompt_buttons(draft)
+    draft.prompt = await message.answer(text, reply_markup=keyboard)
+
+
+async def _prompt_by_edit(
+    callback_message: Message, draft: _Draft, text: str, keyboard: InlineKeyboardMarkup
+) -> None:
+    await callback_message.edit_text(text, reply_markup=keyboard)
+    draft.prompt = callback_message
+
+
+async def _start_draft(message: Message, telegram_user_id: int, text: str) -> None:
+    title = text.strip()
+    if not title:
+        await message.answer("Напишите текст задачи.")
+        return
+    if len(title) > MAX_TITLE_LENGTH:
+        await message.answer(
+            f"Слишком длинно для названия задачи — максимум {MAX_TITLE_LENGTH} символов. "
+            "Подробности можно будет добавить в описание на следующем шаге."
+        )
+        return
+    draft = _Draft(title=title)
+    _drafts[telegram_user_id] = draft
+    draft.prompt = await message.answer(DESCRIPTION_PROMPT, reply_markup=DESCRIPTION_KEYBOARD)
+
+
+async def _create_task(user: User, draft: _Draft, due_time: time | None) -> tuple[Task, str]:
+    async with async_session_factory() as session:
+        task = await tasks_service.create_task(
+            session,
+            user.id,
+            TaskCreate(
+                title=draft.title,
+                description=draft.description,
+                priority=BOT_TASK_PRIORITY,
+                due_date=draft.due_date,
+                due_time=due_time if draft.due_date is not None else None,
+            ),
+        )
+        task_list = await session.get(TaskList, task.list_id)
     return task, task_list.name if task_list is not None else "Inbox"
 
 
-def _validation_hint(exc: ValidationError) -> str:
-    fields = {str(part) for error in exc.errors() for part in error["loc"]}
-    if "title" in fields:
-        return (
-            "I couldn't find a task title in that (it must be 1–500 characters). "
-            'Try something like "Buy milk tomorrow 18:00".'
-        )
-    if fields & {"interval", "recurrence", "end_count", "end_date", "by_weekday"}:
-        return 'That repeat rule is out of range — try e.g. "every 2 days" or "every week".'
-    return "I couldn't turn that into a task — try rephrasing it."
-
-
-async def _create_and_reply(message: Message, user: User, parsed: ParsedQuickAdd) -> None:
-    # Invalid input used to raise out of the handler: aiogram logged it and the user got
-    # no reply at all.
+async def _finish(
+    telegram_user_id: int,
+    user: User,
+    draft: _Draft,
+    due_time: time | None,
+    *,
+    reply_to: Message | None = None,
+    edit: Message | None = None,
+) -> None:
+    """Creates the task and shows its summary — by editing the prompt when a button
+    finished the draft, or as a new message when it was typed."""
     try:
-        async with async_session_factory() as session:
-            task, list_name = await _create_task_from_parsed(session, user, parsed)
-    except ValidationError as exc:
-        await message.answer(_validation_hint(exc))
+        task, list_name = await _create_task(user, draft, due_time)
+    except (ValidationError, HTTPException):
+        log.warning("bot.task_create_failed", user_id=str(user.id))
+        text = "Не получилось создать задачу. Попробуйте ещё раз."
+        _drafts.pop(telegram_user_id, None)
+        if edit is not None:
+            await edit.edit_text(text)
+        elif reply_to is not None:
+            await _drop_prompt_buttons(draft)
+            await reply_to.answer(text)
         return
-    except HTTPException as exc:
-        await message.answer(f"Couldn't create the task: {exc.detail}")
-        return
-    await message.answer(_summary_text(task, list_name), reply_markup=_result_keyboard(task.id))
+
+    _drafts.pop(telegram_user_id, None)
+    summary, keyboard = _summary_text(task, list_name), _result_keyboard(task.id)
+    if edit is not None:
+        await edit.edit_text(summary, reply_markup=keyboard)
+    elif reply_to is not None:
+        await _drop_prompt_buttons(draft)
+        await reply_to.answer(summary, reply_markup=keyboard)
 
 
-async def _handle_quick_add_text(message: Message, user: User, text: str) -> None:
+async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: str) -> None:
     assert message.from_user is not None
-    parsed = parse_quick_add(text, now=_local_now(user), languages=DEFAULT_LANGUAGES)
-
-    if parsed.recurrence is not None and parsed.due_time is None:
-        due_date = parsed.due_date or default_recurrence_start_date(
-            parsed.recurrence, _local_now(user).date()
-        )
-        _pending_time_requests[message.from_user.id] = _PendingQuickAdd(
-            title=parsed.title,
-            list_name=parsed.list_name,
-            priority=parsed.priority,
-            recurrence=parsed.recurrence,
-            due_date=due_date,
-        )
-        await message.answer(
-            "This is a recurring task and needs a time — pick one or send it as a message.",
-            reply_markup=_time_preset_keyboard(),
-        )
-        return
-
-    await _create_and_reply(message, user, parsed)
-
-
-async def _resolve_pending_time(message: Message, user: User, pending: _PendingQuickAdd) -> None:
-    assert message.from_user is not None
-    parsed_dt = dateparser.parse(
-        message.text or "",
-        languages=DEFAULT_LANGUAGES,
-        settings={"RELATIVE_BASE": _local_now(user), "RETURN_AS_TIMEZONE_AWARE": False},
-    )
-    if parsed_dt is None:
-        await message.answer('Sorry, I didn\'t catch a time — try something like "6pm" or "18:00".')
-        return
-
-    _pending_time_requests.pop(message.from_user.id, None)
-    parsed = ParsedQuickAdd(
-        title=pending.title,
-        due_date=pending.due_date,
-        due_time=parsed_dt.time(),
-        priority=pending.priority,
-        list_name=pending.list_name,
-        recurrence=pending.recurrence,
-    )
-    await _create_and_reply(message, user, parsed)
+    if draft.step == "description":
+        draft.description = text.strip() or None
+        draft.step = "date"
+        await _prompt_by_reply(message, draft, DATE_PROMPT, DATE_KEYBOARD)
+    elif draft.step == "date":
+        now = _local_now(user)
+        day = parse_day(text, now.date())
+        if day is None:
+            await message.answer(
+                "Не понял дату. Выберите её кнопкой или напишите, например, «завтра», "
+                "«в пятницу» или «12.10»."
+            )
+            return
+        draft.due_date = day
+        draft.step = "time"
+        await _prompt_by_reply(message, draft, _time_prompt(draft), _time_keyboard(draft, now))
+    else:
+        parsed = parse_time(text)
+        if parsed is None:
+            await message.answer(
+                "Не понял время. Выберите его кнопкой или напишите, например, «19:30»."
+            )
+            return
+        await _finish(message.from_user.id, user, draft, parsed, reply_to=message)
 
 
 @router.message(Command("new"))
 async def handle_new_command(message: Message, command: CommandObject) -> None:
     if message.from_user is None:
         return
-    text = (command.args or "").strip()
-    if not text:
-        await message.answer("Usage: /new <task description>")
-        return
-    async with async_session_factory() as session:
-        user = await telegram_link_service.get_user_by_telegram_id(session, message.from_user.id)
-    if user is None:
+    if await _linked_user(message.from_user.id) is None:
         await message.answer(NOT_LINKED_TEXT)
         return
-    await _handle_quick_add_text(message, user, text)
-
-
-@router.callback_query(F.data.startswith("qa:time:"))
-async def handle_time_preset(callback: CallbackQuery) -> None:
-    if callback.data is None or callback.from_user is None:
+    text = (command.args or "").strip()
+    if not text:
+        await message.answer("Напишите текст задачи одним сообщением.")
         return
-    pending = _pending_time_requests.pop(callback.from_user.id, None)
-    if pending is None:
-        await callback.answer("This request has expired.", show_alert=True)
+    old = _drafts.pop(message.from_user.id, None)
+    if old is not None:
+        await _drop_prompt_buttons(old)
+    await _start_draft(message, message.from_user.id, text)
+
+
+@router.message(Command("cancel"))
+async def handle_cancel_command(message: Message) -> None:
+    if message.from_user is None:
+        return
+    draft = _drafts.pop(message.from_user.id, None)
+    if draft is None:
+        await message.answer("Сейчас нечего отменять.")
+        return
+    await _drop_prompt_buttons(draft)
+    await message.answer("Создание задачи отменено.")
+
+
+@router.callback_query(F.data.startswith("nt:"))
+async def handle_new_task_callback(callback: CallbackQuery) -> None:
+    if (
+        callback.data is None
+        or callback.from_user is None
+        or not isinstance(callback.message, Message)
+    ):
+        return
+    action, _, arg = callback.data.removeprefix("nt:").partition(":")
+    if action == "noop":
+        await callback.answer()
         return
 
-    _, _, value = callback.data.split(":", 2)
-    hour, minute = (int(part) for part in value.split(":"))
+    telegram_user_id = callback.from_user.id
+    draft = _get_draft(telegram_user_id)
+    if (
+        draft is None
+        or draft.prompt is None
+        or draft.prompt.message_id != callback.message.message_id
+    ):
+        await callback.answer("Эта задача уже создана или отменена.", show_alert=True)
+        with contextlib.suppress(Exception):
+            await callback.message.edit_reply_markup(reply_markup=None)
+        return
 
-    parsed = ParsedQuickAdd(
-        title=pending.title,
-        due_date=pending.due_date,
-        due_time=time(hour, minute),
-        priority=pending.priority,
-        list_name=pending.list_name,
-        recurrence=pending.recurrence,
-    )
-    async with async_session_factory() as session:
-        user = await telegram_link_service.get_user_by_telegram_id(session, callback.from_user.id)
-        if user is None:
-            await callback.answer()
-            return
-        task, list_name = await _create_task_from_parsed(session, user, parsed)
+    if action == "cancel":
+        _drafts.pop(telegram_user_id, None)
+        await callback.message.edit_text("Создание задачи отменено.")
+        await callback.answer()
+        return
 
-    if isinstance(callback.message, Message):
-        await callback.message.edit_text(
-            _summary_text(task, list_name), reply_markup=_result_keyboard(task.id)
+    user = await _linked_user(telegram_user_id)
+    if user is None:
+        _drafts.pop(telegram_user_id, None)
+        await callback.answer()
+        return
+    now = _local_now(user)
+
+    if draft.step == "description" and action == "skip":
+        draft.step = "date"
+        await _prompt_by_edit(callback.message, draft, DATE_PROMPT, DATE_KEYBOARD)
+    elif draft.step == "date" and action in ("today", "tomorrow", "day"):
+        if action == "day":
+            try:
+                draft.due_date = date.fromisoformat(arg)
+            except ValueError:
+                await callback.answer()
+                return
+        else:
+            draft.due_date = now.date() + timedelta(days=1 if action == "tomorrow" else 0)
+        draft.step = "time"
+        await _prompt_by_edit(
+            callback.message, draft, _time_prompt(draft), _time_keyboard(draft, now)
         )
+    elif draft.step == "date" and action in ("calendar", "cal"):
+        year, month = now.year, now.month
+        if action == "cal":
+            try:
+                year, month = (int(part) for part in arg.split("-"))
+            except ValueError:
+                await callback.answer()
+                return
+        await _prompt_by_edit(
+            callback.message,
+            draft,
+            "📆 Выберите дату:",
+            _calendar_keyboard(year, month, now.date()),
+        )
+    elif draft.step == "date" and action == "back":
+        await _prompt_by_edit(callback.message, draft, DATE_PROMPT, DATE_KEYBOARD)
+    elif draft.step == "date" and action == "nodate":
+        await _finish(telegram_user_id, user, draft, None, edit=callback.message)
+    elif draft.step == "time" and action in ("time", "notime"):
+        chosen = time(int(arg[:2]), int(arg[2:])) if action == "time" else None
+        await _finish(telegram_user_id, user, draft, chosen, edit=callback.message)
     await callback.answer()
+
+
+def _short_id(value: uuid.UUID) -> str:
+    """A UUID in 22 characters instead of 36. Telegram rejects a keyboard whose
+    callback_data exceeds 64 bytes (BUTTON_DATA_INVALID), and the list picker's buttons
+    carry two ids — written out in full they took 84 bytes, so the picker never appeared."""
+    return base64.urlsafe_b64encode(value.bytes).rstrip(b"=").decode()
+
+
+def _from_short_id(value: str) -> uuid.UUID:
+    return uuid.UUID(bytes=base64.urlsafe_b64decode(value + "=="))
 
 
 @router.callback_query(F.data.startswith("qa:list:"))
@@ -500,6 +691,11 @@ async def handle_change_list(callback: CallbackQuery) -> None:
     if callback.data is None or callback.from_user is None:
         return
     _, _, task_id_raw = callback.data.split(":", 2)
+    try:
+        task_id = uuid.UUID(task_id_raw)
+    except ValueError:
+        await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+        return
 
     async with async_session_factory() as session:
         user = await telegram_link_service.get_user_by_telegram_id(session, callback.from_user.id)
@@ -511,15 +707,31 @@ async def handle_change_list(callback: CallbackQuery) -> None:
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(
-                    text=task_list.name, callback_data=f"qa:setlist:{task_id_raw}:{task_list.id}"
+                _button(
+                    task_list.name,
+                    f"qa:setlist:{_short_id(task_id)}:{_short_id(task_list.id)}",
                 )
             ]
             for task_list in lists
         ]
+        # Keeping the list is a choice too: back to the summary's own buttons.
+        + [[_button("« Назад", f"qa:back:{task_id}")]]
     )
     if isinstance(callback.message, Message):
         await callback.message.edit_reply_markup(reply_markup=keyboard)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("qa:back:"))
+async def handle_list_picker_back(callback: CallbackQuery) -> None:
+    if callback.data is None or not isinstance(callback.message, Message):
+        return
+    try:
+        task_id = uuid.UUID(callback.data.removeprefix("qa:back:"))
+    except ValueError:
+        await callback.answer()
+        return
+    await callback.message.edit_reply_markup(reply_markup=_result_keyboard(task_id))
     await callback.answer()
 
 
@@ -532,7 +744,12 @@ async def handle_set_list(callback: CallbackQuery) -> None:
         or isinstance(callback.message, InaccessibleMessage)
     ):
         return
-    _, _, task_id_raw, list_id_raw = callback.data.split(":", 3)
+    try:
+        _, _, task_id_raw, list_id_raw = callback.data.split(":", 3)
+        task_id, list_id = _from_short_id(task_id_raw), _from_short_id(list_id_raw)
+    except ValueError:
+        await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+        return
 
     async with async_session_factory() as session:
         user = await telegram_link_service.get_user_by_telegram_id(session, callback.from_user.id)
@@ -541,10 +758,10 @@ async def handle_set_list(callback: CallbackQuery) -> None:
             return
         try:
             task = await tasks_service.update_task(
-                session, user.id, uuid.UUID(task_id_raw), TaskUpdate(list_id=uuid.UUID(list_id_raw))
+                session, user.id, task_id, TaskUpdate(list_id=list_id)
             )
         except HTTPException:
-            await callback.answer("Not found.", show_alert=True)
+            await callback.answer("Задача не найдена.", show_alert=True)
             return
         task_list = await session.get(TaskList, task.list_id)
 
@@ -552,7 +769,7 @@ async def handle_set_list(callback: CallbackQuery) -> None:
         _summary_text(task, task_list.name if task_list is not None else "Inbox"),
         reply_markup=_result_keyboard(task.id),
     )
-    await callback.answer("List updated.")
+    await callback.answer("Список изменён.")
 
 
 @router.callback_query(F.data.startswith("qa:undo:"))
@@ -574,10 +791,10 @@ async def handle_undo(callback: CallbackQuery) -> None:
         try:
             await tasks_service.delete_task(session, user.id, uuid.UUID(task_id_raw))
         except HTTPException:
-            await callback.answer("Not found.", show_alert=True)
+            await callback.answer("Задача не найдена.", show_alert=True)
             return
 
-    await callback.message.edit_text("Task deleted.")
+    await callback.message.edit_text("Задача удалена.")
     await callback.answer()
 
 
@@ -594,12 +811,14 @@ async def handle_unlink(message: Message) -> None:
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="Yes, unlink", callback_data=f"unlink:confirm:{user.id}"),
-                InlineKeyboardButton(text="Cancel", callback_data="unlink:cancel"),
+                InlineKeyboardButton(
+                    text="Да, отвязать", callback_data=f"unlink:confirm:{user.id}"
+                ),
+                InlineKeyboardButton(text="Отмена", callback_data="unlink:cancel"),
             ]
         ]
     )
-    await message.answer("Disconnect Telegram from your account?", reply_markup=keyboard)
+    await message.answer("Отвязать Telegram от вашего аккаунта?", reply_markup=keyboard)
 
 
 @router.callback_query(F.data.startswith("unlink:"))
@@ -612,7 +831,7 @@ async def handle_unlink_callback(callback: CallbackQuery) -> None:
     ):
         return
     if callback.data == "unlink:cancel":
-        await callback.message.edit_text("Cancelled.")
+        await callback.message.edit_text("Отменено.")
         await callback.answer()
         return
 
@@ -620,28 +839,47 @@ async def handle_unlink_callback(callback: CallbackQuery) -> None:
     async with async_session_factory() as session:
         user = await telegram_link_service.get_user_by_telegram_id(session, callback.from_user.id)
         if user is None or str(user.id) != user_id:
-            await callback.answer("This isn't your account.", show_alert=True)
+            await callback.answer("Это не ваш аккаунт.", show_alert=True)
             return
         await admin_service.unlink_telegram(session, user.id)
         log.info("bot.telegram_unlinked", user_id=str(user.id))
 
-    await callback.message.edit_text("Telegram disconnected.")
+    await callback.message.edit_text("Telegram отвязан.")
     await callback.answer()
+
+
+@router.errors()
+async def handle_error(event: ErrorEvent) -> bool:
+    """Any handler failure (a Telegram API error, a bug): log it and tell the user,
+    instead of leaving a button tap spinning or a message unanswered."""
+    log.error("bot.handler_failed", exc_info=event.exception)
+    text = "Что-то пошло не так. Попробуйте ещё раз."
+    with contextlib.suppress(Exception):
+        if event.update.callback_query is not None:
+            await event.update.callback_query.answer(text, show_alert=True)
+        elif event.update.message is not None:
+            await event.update.message.answer(text)
+    return True
+
+
+@router.callback_query()
+async def handle_stale_callback(callback: CallbackQuery) -> None:
+    """Buttons from older bot versions (e.g. the previous quick-add time picker) — answer
+    so the client stops spinning instead of leaving the tap hanging."""
+    await callback.answer("Эта кнопка больше не работает.", show_alert=True)
 
 
 @router.message()
 async def handle_plain_message(message: Message) -> None:
     if message.from_user is None or message.text is None:
         return
-    async with async_session_factory() as session:
-        user = await telegram_link_service.get_user_by_telegram_id(session, message.from_user.id)
+    user = await _linked_user(message.from_user.id)
     if user is None:
         await message.answer(NOT_LINKED_TEXT)
         return
 
-    pending = _pending_time_requests.get(message.from_user.id)
-    if pending is not None:
-        await _resolve_pending_time(message, user, pending)
+    draft = _get_draft(message.from_user.id)
+    if draft is not None:
+        await _answer_typed_step(message, user, draft, message.text)
         return
-
-    await _handle_quick_add_text(message, user, message.text)
+    await _start_draft(message, message.from_user.id, message.text)

@@ -369,7 +369,7 @@ async def test_dispatch_sends_due_reminder_and_marks_sent(
 
     assert count == 1
     assert len(sender.calls) == 1
-    assert "Tomorrow:" in sender.calls[0][1]
+    assert "Завтра:" in sender.calls[0][1]
     assert (await _reminders(db_session, task["id"]))[0].status == ReminderStatus.sent
 
 
@@ -525,6 +525,6 @@ async def test_sending_one_off_at_due_time_reminder_does_not_chain_another(
     await dispatch_due_reminders(db_session, sender, now=datetime(2026, 2, 1, 15, 0, tzinfo=UTC))
 
     assert len(sender.calls) == 1
-    assert sender.calls[0][1].startswith("Now: Call back")
+    assert sender.calls[0][1].startswith("Сейчас: Call back")
     rows = await _reminders(db_session, task["id"])
     assert [(r.kind, r.status) for r in rows] == [(ReminderKind.occurrence, ReminderStatus.sent)]

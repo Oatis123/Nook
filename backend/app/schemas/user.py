@@ -20,6 +20,7 @@ class UserPublic(BaseModel):
     notifications_enabled: bool
     theme: Theme
     editor_preview_enabled: bool
+    ideas_note_hidden: bool
     telegram_linked: bool
     telegram_blocked: bool
     created_at: datetime
@@ -37,6 +38,7 @@ class UserPublic(BaseModel):
             notifications_enabled=user.notifications_enabled,
             theme=user.theme,
             editor_preview_enabled=user.editor_preview_enabled,
+            ideas_note_hidden=user.ideas_note_hidden,
             telegram_linked=user.telegram_user_id is not None,
             telegram_blocked=user.telegram_blocked,
             created_at=user.created_at,
@@ -56,6 +58,7 @@ class MeUpdate(BaseModel):
     notifications_enabled: bool | None = None
     theme: Theme | None = None
     editor_preview_enabled: bool | None = None
+    ideas_note_hidden: bool | None = None
 
 
 class PasswordChange(BaseModel):

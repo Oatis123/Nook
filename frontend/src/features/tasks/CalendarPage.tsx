@@ -21,6 +21,7 @@ import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
 import { useToday } from '@/features/tasks/useToday'
 import { parseLocalDate } from '@/lib/dates'
+import { isClickDrag } from '@/lib/dragClick'
 import type { CalendarEntry } from '@/lib/types'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
@@ -120,6 +121,8 @@ export default function CalendarPage() {
   function handleDrop(e: DragEvent, day: Date) {
     e.preventDefault()
     setDragOverDate(null)
+    // A click that moved the pointer a little (see lib/dragClick), not a reschedule.
+    if (isClickDrag()) return
     const taskId = e.dataTransfer.getData(DRAG_MIME)
     if (taskId) updateTask.mutate({ id: taskId, due_date: format(day, 'yyyy-MM-dd') })
   }

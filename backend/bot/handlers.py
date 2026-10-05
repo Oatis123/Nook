@@ -31,6 +31,7 @@ from app.models.task_list import TaskList
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.services import admin as admin_service
+from app.services import ideas as ideas_service
 from app.services import task_lists as task_lists_service
 from app.services import tasks as tasks_service
 from app.services import telegram_link as telegram_link_service
@@ -228,6 +229,8 @@ async def handle_help(message: Message) -> None:
         "Чтобы создать задачу, просто напишите её текст — бот спросит описание, дату и "
         "время. Задачи из бота получают средний приоритет.\n\n"
         "/new <текст> — то же самое\n"
+        "/idea <текст> — записать идею в заметку «Идеи» (или кнопка «💡 Это идея» "
+        "после текста)\n"
         "/cancel — отменить создание задачи\n"
         "/lists — ваши списки\n"
         "/help — эта справка\n"
@@ -264,7 +267,7 @@ TIME_PRESETS = [time(9, 0), time(12, 0), time(18, 0)]
 BOT_TASK_PRIORITY = TaskPriority.medium
 MAX_TITLE_LENGTH = 500  # TaskCreate.title's limit
 
-Step = Literal["description", "date", "time"]
+Step = Literal["description", "date", "time", "idea"]
 
 
 @dataclass
@@ -306,7 +309,10 @@ DESCRIPTION_PROMPT = (
     "📝 Добавить описание?\nНапишите его следующим сообщением или нажмите «Пропустить»."
 )
 DESCRIPTION_KEYBOARD = InlineKeyboardMarkup(
-    inline_keyboard=[[_button("Пропустить", "nt:skip"), CANCEL_BUTTON]]
+    inline_keyboard=[
+        [_button("Пропустить", "nt:skip"), _button("💡 Это идея", "nt:idea")],
+        [CANCEL_BUTTON],
+    ]
 )
 
 DATE_PROMPT = "📅 Когда?\nВыберите день или напишите его, например «пятница» или «12.10»."
@@ -542,7 +548,11 @@ async def _finish(
 
 async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: str) -> None:
     assert message.from_user is not None
-    if draft.step == "description":
+    if draft.step == "idea":
+        _drafts.pop(message.from_user.id, None)
+        await _drop_prompt_buttons(draft)
+        await _save_idea_and_reply(message, message.from_user.id, user, text)
+    elif draft.step == "description":
         draft.description = text.strip() or None
         draft.step = "date"
         await _prompt_by_reply(message, draft, DATE_PROMPT, DATE_KEYBOARD)
@@ -624,7 +634,9 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
 
     if action == "cancel":
         _drafts.pop(telegram_user_id, None)
-        await callback.message.edit_text("Создание задачи отменено.")
+        await callback.message.edit_text(
+            "Отменено." if draft.step == "idea" else "Создание задачи отменено."
+        )
         await callback.answer()
         return
 
@@ -635,7 +647,14 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
         return
     now = _local_now(user)
 
-    if draft.step == "description" and action == "skip":
+    if draft.step == "description" and action == "idea":
+        _drafts.pop(telegram_user_id, None)
+        block = await _save_idea(user, draft.title)
+        await callback.message.edit_text(
+            _idea_saved_text(draft.title), reply_markup=IDEA_UNDO_KEYBOARD
+        )
+        _remember_idea(telegram_user_id, callback.message.message_id, block)
+    elif draft.step == "description" and action == "skip":
         draft.step = "date"
         await _prompt_by_edit(callback.message, draft, DATE_PROMPT, DATE_KEYBOARD)
     elif draft.step == "date" and action in ("today", "tomorrow", "day"):
@@ -684,6 +703,90 @@ def _short_id(value: uuid.UUID) -> str:
 
 def _from_short_id(value: str) -> uuid.UUID:
     return uuid.UUID(bytes=base64.urlsafe_b64decode(value + "=="))
+
+
+# --- Quick ideas: appended to the user's Ideas note (app/services/ideas.py) ------------
+
+IDEA_PROMPT = "💡 Напишите идею одним сообщением."
+IDEA_PROMPT_KEYBOARD = InlineKeyboardMarkup(inline_keyboard=[[CANCEL_BUTTON]])
+IDEA_UNDO_KEYBOARD = InlineKeyboardMarkup(inline_keyboard=[[_button("Отменить", "idea:undo")]])
+MAX_UNDOABLE_IDEAS = 200
+
+# (Telegram user id, confirmation message id) -> the block appended, for its Undo button.
+# In memory like drafts: after a bot restart, undoing means editing the note itself.
+_idea_blocks: dict[tuple[int, int], str] = {}
+
+
+def _idea_saved_text(text: str) -> str:
+    shown = text.strip()
+    if len(shown) > 300:
+        shown = shown[:300].rstrip() + "…"
+    return f"💡 Записал в «Идеи»:\n{shown}"
+
+
+async def _save_idea(user: User, text: str) -> str:
+    async with async_session_factory() as session:
+        return await ideas_service.append_idea(session, user.id, text, _local_now(user))
+
+
+def _remember_idea(telegram_user_id: int, message_id: int, block: str) -> None:
+    _idea_blocks[(telegram_user_id, message_id)] = block
+    while len(_idea_blocks) > MAX_UNDOABLE_IDEAS:
+        del _idea_blocks[next(iter(_idea_blocks))]
+
+
+async def _save_idea_and_reply(
+    message: Message, telegram_user_id: int, user: User, text: str
+) -> None:
+    block = await _save_idea(user, text)
+    sent = await message.answer(_idea_saved_text(text), reply_markup=IDEA_UNDO_KEYBOARD)
+    _remember_idea(telegram_user_id, sent.message_id, block)
+
+
+@router.message(Command("idea"))
+async def handle_idea_command(message: Message, command: CommandObject) -> None:
+    if message.from_user is None:
+        return
+    user = await _linked_user(message.from_user.id)
+    if user is None:
+        await message.answer(NOT_LINKED_TEXT)
+        return
+    old = _drafts.pop(message.from_user.id, None)
+    if old is not None:
+        await _drop_prompt_buttons(old)
+    text = (command.args or "").strip()
+    if text:
+        await _save_idea_and_reply(message, message.from_user.id, user, text)
+        return
+    # "/idea" alone: the next message is the idea.
+    draft = _Draft(title="", step="idea")
+    _drafts[message.from_user.id] = draft
+    draft.prompt = await message.answer(IDEA_PROMPT, reply_markup=IDEA_PROMPT_KEYBOARD)
+
+
+@router.callback_query(F.data == "idea:undo")
+async def handle_idea_undo(callback: CallbackQuery) -> None:
+    if callback.from_user is None or not isinstance(callback.message, Message):
+        return
+    key = (callback.from_user.id, callback.message.message_id)
+    block = _idea_blocks.get(key)
+    user = await _linked_user(callback.from_user.id) if block is not None else None
+    if block is None or user is None:
+        await callback.answer(
+            "Отменить отсюда уже не получится — удалите идею в заметке «Идеи».", show_alert=True
+        )
+        return
+    async with async_session_factory() as session:
+        removed = await ideas_service.remove_idea(session, user.id, block)
+    _idea_blocks.pop(key, None)
+    if removed:
+        await callback.message.edit_text("Идея удалена.")
+        await callback.answer()
+    else:
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.answer(
+            "Не нашёл эту идею в заметке — похоже, её уже изменили.", show_alert=True
+        )
 
 
 @router.callback_query(F.data.startswith("qa:list:"))

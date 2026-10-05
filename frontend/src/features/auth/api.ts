@@ -19,6 +19,7 @@ export type MeUpdateInput = Partial<
     | 'notifications_enabled'
     | 'theme'
     | 'editor_preview_enabled'
+    | 'ideas_note_hidden'
   >
 >
 

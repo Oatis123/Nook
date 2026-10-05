@@ -1,13 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  createContext,
-  type DragEvent,
-  type FormEvent,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { createContext, type DragEvent, type FormEvent, useContext, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
@@ -16,12 +8,14 @@ import {
   Folder as FolderIcon,
   FolderPlus,
   FilePlus,
+  Lightbulb,
   MoreHorizontal,
 } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
+import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { updateNote as updateNoteApi } from '@/features/notes/api'
 import type { NoteSummary } from '@/lib/types'
 import {
@@ -45,6 +39,7 @@ import { QueryState } from '@/design/components/QueryState'
 import { errorMessage } from '@/lib/errors'
 import { toast } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
+import { isClickDrag } from '@/lib/dragClick'
 
 type DragPayload = { type: 'note' | 'folder'; id: string }
 
@@ -52,55 +47,6 @@ type DragPayload = { type: 'note' | 'folder'; id: string }
  * alternative to drag and drop (which phones don't support). */
 const MoveContext = createContext<(payload: DragPayload) => void>(() => {})
 const DRAG_MIME = 'application/x-nook-item'
-
-/** Rows are draggable, so a press that moves a few pixels before release starts a native
- * drag and the browser swallows the click: a slightly shaky click didn't open the note
- * (it had to be clicked again), and releasing it over the tree "dropped" a nested note at
- * the top level. A drag that ends within this distance of where it started is treated as
- * the click it was meant to be. */
-const CLICK_SLOP_PX = 12
-
-type DragTracker = {
-  start: (e: DragEvent) => void
-  /** True while — or right after — a drag that never left the click slop. */
-  isClick: () => boolean
-  end: () => boolean
-}
-
-const DragContext = createContext<DragTracker>({
-  start: () => {},
-  isClick: () => false,
-  end: () => false,
-})
-
-function useDragTracker() {
-  const drag = useRef<{ startX: number; startY: number; x: number; y: number } | null>(null)
-  const track = (e: DragEvent) => {
-    // Some browsers report 0,0 for the last events of a drag; keep the last real position.
-    if (drag.current && (e.clientX !== 0 || e.clientY !== 0)) {
-      drag.current.x = e.clientX
-      drag.current.y = e.clientY
-    }
-  }
-  const tracker = useMemo<DragTracker>(() => {
-    const isClick = () =>
-      drag.current !== null &&
-      Math.hypot(drag.current.x - drag.current.startX, drag.current.y - drag.current.startY) <
-        CLICK_SLOP_PX
-    return {
-      start: (e) => {
-        drag.current = { startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY }
-      },
-      isClick,
-      end: () => {
-        const click = isClick()
-        drag.current = null
-        return click
-      },
-    }
-  }, [])
-  return { tracker, track }
-}
 
 export function FolderTree() {
   const foldersQuery = useFolders()
@@ -111,17 +57,24 @@ export function FolderTree() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [renaming, setRenaming] = useState<string | null>(null)
   const [moving, setMoving] = useState<DragPayload | null>(null)
-  const { tracker: dragTracker, track: trackDrag } = useDragTracker()
 
   const createFolder = useCreateFolder()
   const createNote = useCreateNote()
   const updateFolder = useUpdateFolder()
   const deleteNoteMutation = useDeleteNote()
+  const { data: user } = useCurrentUser()
+  const updateProfile = useUpdateProfile()
 
   if (!foldersQuery.data) return <QueryState query={foldersQuery} compact />
   if (!notesQuery.data) return <QueryState query={notesQuery} compact />
 
-  const tree = buildTree(foldersQuery.data, notesQuery.data)
+  // The Ideas note (quick ideas from the Telegram bot) is pinned above the tree, wherever
+  // its folder, unless hidden in Settings.
+  const ideasNote = user?.ideas_note_hidden ? undefined : notesQuery.data.find((n) => n.is_ideas)
+  const tree = buildTree(
+    foldersQuery.data,
+    notesQuery.data.filter((n) => !n.is_ideas),
+  )
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -167,8 +120,8 @@ export function FolderTree() {
 
   function handleDrop(e: DragEvent, folderId: string | null) {
     e.preventDefault()
-    // A shaky click, not a move — the dragged row's dragend turns it back into a click.
-    if (dragTracker.isClick()) return
+    // A click that moved the pointer a little (see lib/dragClick), not a move.
+    if (isClickDrag()) return
     const raw = e.dataTransfer.getData(DRAG_MIME)
     if (!raw) return
     const payload = JSON.parse(raw) as DragPayload
@@ -177,75 +130,88 @@ export function FolderTree() {
 
   return (
     <MoveContext.Provider value={setMoving}>
-      <DragContext.Provider value={dragTracker}>
-        <div
-          className="flex flex-col gap-0.5 px-2"
-          onDragOverCapture={trackDrag}
-          onDropCapture={trackDrag}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => handleDrop(e, null)}
-        >
-          <div className="mb-1 flex items-center justify-between px-1">
-            <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
-              Notes
-            </span>
-            <div className="flex gap-0.5">
-              <IconButton
-                label="New folder"
-                onClick={() => createFolder.mutate({ name: 'New folder', parent_id: null })}
-              >
-                <FolderPlus size={14} strokeWidth={1.5} />
-              </IconButton>
-              <IconButton
-                label="New note"
-                onClick={() =>
-                  createNote.mutate(
-                    {
-                      title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], null),
-                      folder_id: null,
-                    },
-                    { onSuccess: (note) => navigate(`/notes/${note.id}`) },
-                  )
-                }
-              >
-                <FilePlus size={14} strokeWidth={1.5} />
-              </IconButton>
-            </div>
+      <div
+        className="flex flex-col gap-0.5 px-2"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => handleDrop(e, null)}
+      >
+        <div className="mb-1 flex items-center justify-between px-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Notes</span>
+          <div className="flex gap-0.5">
+            <IconButton
+              label="New folder"
+              onClick={() => createFolder.mutate({ name: 'New folder', parent_id: null })}
+            >
+              <FolderPlus size={14} strokeWidth={1.5} />
+            </IconButton>
+            <IconButton
+              label="New note"
+              onClick={() =>
+                createNote.mutate(
+                  {
+                    title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], null),
+                    folder_id: null,
+                  },
+                  { onSuccess: (note) => navigate(`/notes/${note.id}`) },
+                )
+              }
+            >
+              <FilePlus size={14} strokeWidth={1.5} />
+            </IconButton>
           </div>
-
-          {tree.roots.map((node) => (
-            <FolderRow
-              key={node.folder.id}
-              node={node}
-              depth={0}
-              expanded={expanded}
-              onToggle={toggle}
-              renaming={renaming}
-              setRenaming={setRenaming}
-              activeNoteId={activeNoteId}
-              onDropOn={handleDrop}
-            />
-          ))}
-
-          {tree.rootNotes.map((note) => (
-            <NoteRow
-              key={note.id}
-              note={note}
-              depth={0}
-              active={note.id === activeNoteId}
-              renaming={renaming === `note:${note.id}`}
-              onStartRename={() => setRenaming(`note:${note.id}`)}
-              onFinishRename={() => setRenaming(null)}
-              onDelete={() => deleteNoteMutation.mutate(note.id)}
-              onDropOn={handleDrop}
-            />
-          ))}
-
-          {tree.roots.length === 0 && tree.rootNotes.length === 0 && (
-            <p className="px-1 py-2 text-sm text-text-muted">No notes yet.</p>
-          )}
         </div>
-      </DragContext.Provider>
+
+        {ideasNote && (
+          <IdeasNoteRow
+            note={ideasNote}
+            active={ideasNote.id === activeNoteId}
+            renaming={renaming === `note:${ideasNote.id}`}
+            onStartRename={() => setRenaming(`note:${ideasNote.id}`)}
+            onFinishRename={() => setRenaming(null)}
+            onHide={() =>
+              updateProfile.mutate(
+                { ideas_note_hidden: true },
+                {
+                  onSuccess: () =>
+                    toast.info('The Ideas note is hidden. You can show it again in Settings.'),
+                },
+              )
+            }
+          />
+        )}
+
+        {tree.roots.map((node) => (
+          <FolderRow
+            key={node.folder.id}
+            node={node}
+            depth={0}
+            expanded={expanded}
+            onToggle={toggle}
+            renaming={renaming}
+            setRenaming={setRenaming}
+            activeNoteId={activeNoteId}
+            onDropOn={handleDrop}
+          />
+        ))}
+
+        {tree.rootNotes.map((note) => (
+          <NoteRow
+            key={note.id}
+            note={note}
+            depth={0}
+            active={note.id === activeNoteId}
+            renaming={renaming === `note:${note.id}`}
+            onStartRename={() => setRenaming(`note:${note.id}`)}
+            onFinishRename={() => setRenaming(null)}
+            onDelete={() => deleteNoteMutation.mutate(note.id)}
+            onDropOn={handleDrop}
+          />
+        ))}
+
+        {!ideasNote && tree.roots.length === 0 && tree.rootNotes.length === 0 && (
+          <p className="px-1 py-2 text-sm text-text-muted">No notes yet.</p>
+        )}
+      </div>
       <MoveDialog
         payload={moving}
         tree={tree}
@@ -371,7 +337,6 @@ function FolderRow({
   const deleteNoteMutation = useDeleteNote()
   const notesQuery = useNotes()
   const startMove = useContext(MoveContext)
-  const drag = useContext(DragContext)
   const [dragOver, setDragOver] = useState(false)
 
   const items: DropdownMenuItem[] = [
@@ -424,10 +389,6 @@ function FolderRow({
             DRAG_MIME,
             JSON.stringify({ type: 'folder', id: node.folder.id } satisfies DragPayload),
           )
-          drag.start(e)
-        }}
-        onDragEnd={() => {
-          if (drag.end()) onToggle(node.folder.id)
         }}
         onDragOver={(e) => {
           e.preventDefault()
@@ -548,11 +509,9 @@ function NoteRow({
   onDropOn: (e: DragEvent, folderId: string | null) => void
 }) {
   const navigate = useNavigate()
-  const updateNote = useUpdateNote(note.id)
   const prefetchNote = usePrefetchNote()
 
   const startMove = useContext(MoveContext)
-  const drag = useContext(DragContext)
   const open = () => navigate(`/notes/${note.id}`)
 
   const items: DropdownMenuItem[] = [
@@ -560,14 +519,6 @@ function NoteRow({
     { label: 'Move to…', onSelect: () => startMove({ type: 'note', id: note.id }) },
     { label: 'Delete', danger: true, onSelect: onDelete },
   ]
-
-  function submitRename(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const input = e.currentTarget.elements.namedItem('title') as HTMLInputElement
-    const title = input.value.trim()
-    if (title) updateNote.mutate({ version: note.version, title })
-    onFinishRename()
-  }
 
   return (
     <div
@@ -577,10 +528,6 @@ function NoteRow({
           DRAG_MIME,
           JSON.stringify({ type: 'note', id: note.id } satisfies DragPayload),
         )
-        drag.start(e)
-      }}
-      onDragEnd={() => {
-        if (drag.end()) open()
       }}
       // Dropping onto a note means "into that note's folder" — before, the drop fell
       // through to the tree and moved a nested note to the top level.
@@ -605,15 +552,7 @@ function NoteRow({
     >
       <File size={14} strokeWidth={1.5} className="shrink-0" />
       {renaming ? (
-        <form onSubmit={submitRename} className="flex-1">
-          <input
-            name="title"
-            autoFocus
-            defaultValue={note.title}
-            onBlur={onFinishRename}
-            className="w-full rounded border border-accent bg-surface-raised px-1 text-sm text-text outline-none"
-          />
-        </form>
+        <NoteRenameForm note={note} onDone={onFinishRename} />
       ) : (
         <button type="button" onClick={open} className="flex-1 truncate text-left">
           {note.title}
@@ -630,5 +569,92 @@ function NoteRow({
         />
       </span>
     </div>
+  )
+}
+
+/** The Ideas note, pinned at the top: it can't be moved or deleted, only hidden (brought
+ * back in Settings). */
+function IdeasNoteRow({
+  note,
+  active,
+  renaming,
+  onStartRename,
+  onFinishRename,
+  onHide,
+}: {
+  note: NoteSummary
+  active: boolean
+  renaming: boolean
+  onStartRename: () => void
+  onFinishRename: () => void
+  onHide: () => void
+}) {
+  const navigate = useNavigate()
+  const prefetchNote = usePrefetchNote()
+
+  const items: DropdownMenuItem[] = [
+    { label: 'Rename', onSelect: onStartRename },
+    { label: 'Hide', onSelect: onHide },
+  ]
+
+  return (
+    <div
+      // Not a drop target: a drop here falls through to the tree (the top level).
+      onPointerEnter={() => prefetchNote(note.id)}
+      onFocus={() => prefetchNote(note.id)}
+      data-active={active || undefined}
+      className={clsx(
+        'ui-nav-item group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        active ? 'bg-surface-raised text-text' : 'text-text-muted',
+      )}
+      style={{ paddingLeft: 22 }}
+    >
+      <Lightbulb size={14} strokeWidth={1.5} className="shrink-0" />
+      {renaming ? (
+        <NoteRenameForm note={note} onDone={onFinishRename} />
+      ) : (
+        <button
+          type="button"
+          onClick={() => navigate(`/notes/${note.id}`)}
+          className="flex-1 truncate text-left"
+        >
+          {note.title}
+        </button>
+      )}
+      <span className="reveal-on-hover">
+        <DropdownMenu
+          items={items}
+          trigger={
+            <IconButton label={`Actions for ${note.title}`} className="h-6 w-6">
+              <MoreHorizontal size={13} strokeWidth={1.5} />
+            </IconButton>
+          }
+        />
+      </span>
+    </div>
+  )
+}
+
+function NoteRenameForm({ note, onDone }: { note: NoteSummary; onDone: () => void }) {
+  const updateNote = useUpdateNote(note.id)
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const input = e.currentTarget.elements.namedItem('title') as HTMLInputElement
+    const title = input.value.trim()
+    if (title) updateNote.mutate({ version: note.version, title })
+    onDone()
+  }
+
+  return (
+    <form onSubmit={submit} className="flex-1">
+      <input
+        name="title"
+        autoFocus
+        defaultValue={note.title}
+        onBlur={onDone}
+        className="w-full rounded border border-accent bg-surface-raised px-1 text-sm text-text outline-none"
+      />
+    </form>
   )
 }

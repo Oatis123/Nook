@@ -47,6 +47,7 @@ class NoteSummary(BaseModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None
+    is_ideas: bool = False
 
 
 class NoteDetail(NoteSummary):

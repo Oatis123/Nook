@@ -11,6 +11,7 @@ export interface User {
   notifications_enabled: boolean
   theme: Theme
   editor_preview_enabled: boolean
+  ideas_note_hidden: boolean
   telegram_linked: boolean
   telegram_blocked: boolean
   created_at: string
@@ -89,6 +90,8 @@ export interface NoteSummary {
   created_at: string
   updated_at: string
   deleted_at: string | null
+  /** The note quick ideas from the Telegram bot go to: can't be deleted, only hidden. */
+  is_ideas: boolean
 }
 
 export interface NoteDetail extends NoteSummary {

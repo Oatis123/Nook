@@ -9,6 +9,7 @@ from app.core.isolation import get_owned_or_404
 from app.models.folder import Folder
 from app.models.note import Note
 from app.schemas.folder import FolderUpdate
+from app.services.ideas import free_root_title
 
 
 async def _validate_parent(
@@ -121,6 +122,12 @@ async def delete_folder(session: AsyncSession, user_id: uuid.UUID, folder_id: uu
         )
     )
     for n in notes_result:
-        n.deleted_at = now
+        if n.is_ideas:
+            # The Ideas note can't be deleted: it moves out to the top level instead.
+            n.title = await free_root_title(session, user_id, n.title, n.id)
+            n.folder_id = None
+            n.version += 1
+        else:
+            n.deleted_at = now
 
     await session.commit()

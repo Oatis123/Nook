@@ -4,6 +4,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiogram.filters import CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from freezegun import freeze_time
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.models.task import Task, TaskPriority
 from app.models.task_list import TaskList, TaskListColor, TaskListIcon
 from app.models.user import User
+from app.services import ideas as ideas_service
 from app.services import task_lists as task_lists_service
 from app.services.telegram_format import format_due
 from bot import handlers
@@ -40,6 +42,7 @@ def _bot_uses_test_db(db_engine: Any, monkeypatch: pytest.MonkeyPatch) -> None:
         handlers, "async_session_factory", async_sessionmaker(db_engine, expire_on_commit=False)
     )
     handlers._drafts.clear()
+    handlers._idea_blocks.clear()
 
 
 def _checked(markup: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup | None:
@@ -58,6 +61,7 @@ _CALLBACK_ROUTES = [
     ("qa:setlist:", handlers.handle_set_list),
     ("qa:back:", handlers.handle_list_picker_back),
     ("qa:undo:", handlers.handle_undo),
+    ("idea:undo", handlers.handle_idea_undo),
 ]
 
 
@@ -110,6 +114,11 @@ class FakeChat:
     async def type(self, text: str) -> None:
         await handlers.handle_plain_message(self._user_message(text))
 
+    async def command(self, name: str, args: str | None = None) -> None:
+        text = f"/{name} {args}" if args else f"/{name}"
+        command = CommandObject(prefix="/", command=name, args=args)
+        await getattr(handlers, f"handle_{name}_command")(self._user_message(text), command)
+
     def buttons(self, msg: Any = None) -> list[str]:
         markup = (msg or self.last).reply_markup
         return [b.text for row in markup.inline_keyboard for b in row] if markup else []
@@ -141,6 +150,87 @@ async def _chat(db_session: AsyncSession) -> FakeChat:
 
 async def _tasks(db_session: AsyncSession) -> list[Task]:
     return list(await db_session.scalars(select(Task).where(Task.deleted_at.is_(None))))
+
+
+async def _ideas(db_session: AsyncSession) -> str | None:
+    """The Ideas note's content as the bot left it (written through its own sessions)."""
+    db_session.expire_all()
+    user = await db_session.scalar(select(User))
+    assert user is not None
+    note = await ideas_service.get_ideas_note(db_session, user.id)
+    return None if note is None else note.content
+
+
+# --- quick ideas ---
+
+
+@freeze_time(NOW)
+async def test_idea_button_instead_of_a_description(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    await chat.type("Сделать бота для заметок")
+    await chat.tap("💡 Это идея")
+
+    assert await _tasks(db_session) == []
+    assert await _ideas(db_session) == "**пт, 2 окт 2026, 10:00**  \nСделать бота для заметок\n"
+    assert chat.last.text == "💡 Записал в «Идеи»:\nСделать бота для заметок"
+    assert chat.buttons() == ["Отменить"]
+    assert handlers._drafts == {}
+
+
+@freeze_time(NOW)
+async def test_idea_command_with_text_appends_at_the_end(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    await chat.command("idea", "Первая")
+    await chat.command("idea", "Вторая")
+
+    assert await _ideas(db_session) == (
+        "**пт, 2 окт 2026, 10:00**  \nПервая\n\n**пт, 2 окт 2026, 10:00**  \nВторая\n"
+    )
+
+
+@freeze_time(NOW)
+async def test_idea_command_alone_takes_the_next_message(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    await chat.type("Недописанная задача")
+    await chat.command("idea")
+    prompt = chat.last
+    assert prompt.text.startswith("💡 Напишите идею")
+    await chat.type("Идея  \nв две строки")
+
+    assert await _ideas(db_session) == "**пт, 2 окт 2026, 10:00**  \nИдея  \nв две строки\n"
+    assert await _tasks(db_session) == []
+    assert prompt.reply_markup is None
+    assert handlers._drafts == {}
+    # The next message is a task again.
+    await chat.type("Обычная задача")
+    assert handlers._drafts[chat.telegram_id].step == "description"
+
+
+@freeze_time(NOW)
+async def test_idea_command_can_be_cancelled(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    await chat.command("idea")
+    await chat.tap("Отмена")
+
+    assert chat.last.text == "Отменено."
+    assert await _ideas(db_session) is None
+    assert handlers._drafts == {}
+
+
+@freeze_time(NOW)
+async def test_idea_undo_removes_just_that_idea(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+    await chat.command("idea", "Оставить")
+    await chat.command("idea", "Убрать")
+
+    await chat.tap("Отменить")
+
+    assert chat.last.text == "Идея удалена."
+    assert await _ideas(db_session) == "**пт, 2 окт 2026, 10:00**  \nОставить\n"
 
 
 # --- the flow ---

@@ -95,6 +95,7 @@ async def build_note_detail(session: AsyncSession, note: Note) -> NoteDetail:
         created_at=note.created_at,
         updated_at=note.updated_at,
         deleted_at=note.deleted_at,
+        is_ideas=note.is_ideas,
         content=note.content,
         frontmatter=note.frontmatter,
         tags=tags,
@@ -224,8 +225,18 @@ async def update_note(
     return note
 
 
+def ideas_note_undeletable() -> HTTPException:
+    return CodedHTTPException(
+        status.HTTP_409_CONFLICT,
+        "ideas_note",
+        "The Ideas note can't be deleted — hide it from the notes list instead",
+    )
+
+
 async def soft_delete_note(session: AsyncSession, user_id: uuid.UUID, note_id: uuid.UUID) -> None:
     note = await get_owned_or_404(session, Note, note_id, user_id)
+    if note.is_ideas:
+        raise ideas_note_undeletable()
     note.deleted_at = datetime.now(UTC)
     await session.commit()
 
@@ -265,6 +276,8 @@ def _restored_title(title: str, attempt: int) -> str:
 
 async def hard_delete_note(session: AsyncSession, user_id: uuid.UUID, note_id: uuid.UUID) -> None:
     note = await get_owned_or_404(session, Note, note_id, user_id)
+    if note.is_ideas:
+        raise ideas_note_undeletable()
     await session.delete(note)
     await session.commit()
 

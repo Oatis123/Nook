@@ -19,6 +19,7 @@ HEARTBEAT_SECONDS = 30
 
 COMMANDS_MENU = [
     BotCommand(command="new", description="Новая задача"),
+    BotCommand(command="idea", description="Записать идею"),
     BotCommand(command="cancel", description="Отменить создание задачи"),
     BotCommand(command="lists", description="Мои списки"),
     BotCommand(command="help", description="Справка"),

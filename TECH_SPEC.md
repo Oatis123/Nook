@@ -147,6 +147,7 @@
 - Удаление — в **корзину** (soft delete), автоочистка через 30 дней, восстановление, очистка вручную.
 - Имя заметки уникально в пределах папки.
 - Заметка хранит: `title`, `content` (markdown), `folder_id`, `version`, даты создания/изменения. Поддерживается YAML frontmatter (`tags`, `aliases`).
+- Заметка **«Идеи»** (одна на пользователя, `is_ideas`) — в неё бот дописывает быстрые идеи (§9). Создаётся с первой идеей, закреплена над деревом с иконкой лампочки, удалить её нельзя (API отвечает 409 `ideas_note`; при удалении её папки она переезжает в корень). Можно переименовать и скрыть из списка (пункт меню Hide); вернуть — переключателем в Settings → Telegram (`users.ideas_note_hidden`).
 
 ### 6.2 Редактор
 - **Split view:** слева markdown (CodeMirror 6), справа превью.
@@ -313,6 +314,7 @@
 | `/start link_<token>` | привязка аккаунта (5.2) |
 | `/start login_<token>` | подтверждение входа (5.3) |
 | `/new <text>` или просто текст | создание задачи |
+| `/idea <text>` или `/idea` | записать идею в заметку «Идеи» |
 | `/cancel` | отменить создание задачи |
 | `/lists` | показать списки (для справки) |
 | `/help` | справка |
@@ -327,6 +329,12 @@
 - На каждом шаге есть «Отмена» (и команда `/cancel`). Незавершённый черновик живёт в памяти бота и забывается через 30 минут — после этого новое сообщение снова начинает новую задачу.
 - Задачи из бота создаются **неповторяющимися** и со **средним приоритетом**.
 - После создания бот отвечает сводкой (название, список, срок, приоритет, описание) с кнопками **Сменить список** и **Удалить**.
+
+### Быстрые идеи
+- На шаге описания есть кнопка **«💡 Это идея»**: вместо задачи текст первого сообщения уходит в заметку «Идеи» (§6.1).
+- `/idea <текст>` записывает идею сразу; `/idea` без текста ждёт следующее сообщение (с кнопкой «Отмена»).
+- Каждая идея добавляется **в конец** заметки отдельным абзацем: жирная строка с датой и временем пользователя («пн, 5 окт 2026, 18:40»), под ней текст; переносы строк из сообщения сохраняются.
+- Ответ бота — «💡 Записал в «Идеи»» с кнопкой **«Отменить»**, которая убирает именно эту запись (пока бот не перезапускался и запись не изменили).
 
 ---
 
@@ -401,15 +409,15 @@
 
 ```
 users(id, username, password_hash, role, is_active, timezone, daily_reminder_time,
-      notifications_enabled, theme, editor_preview_enabled, telegram_user_id UNIQUE,
-      telegram_chat_id, telegram_blocked, created_at, last_login_at)
+      notifications_enabled, theme, editor_preview_enabled, ideas_note_hidden,
+      telegram_user_id UNIQUE, telegram_chat_id, telegram_blocked, created_at, last_login_at)
 invites(id, token_hash, created_by, comment, expires_at, used_by, used_at, revoked_at)
 auth_tokens(id, user_id, kind[link|login|password_reset], token_hash, expires_at, used_at, meta)
 refresh_tokens(id, user_id, token_hash, user_agent, ip, created_at, expires_at, revoked_at)
 
 folders(id, user_id, parent_id, name, position, deleted_at)
-notes(id, user_id, folder_id, title, content, frontmatter jsonb, version,
-      search_vector, created_at, updated_at, deleted_at)
+notes(id, user_id, folder_id, title, content, frontmatter jsonb, version, is_ideas,
+      search_vector, created_at, updated_at, deleted_at)   -- is_ideas: не больше одной на пользователя
 note_aliases(note_id, alias)
 tags(id, user_id, name)                         -- name в формате parent/child
 note_tags(note_id, tag_id)

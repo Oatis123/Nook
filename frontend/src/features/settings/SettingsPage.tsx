@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Download, Plus, Upload } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
+import { Switch } from '@/design/components/Switch'
 import { ThemeSkinPicker } from '@/design/components/ThemeSkinPicker'
 import { ThemeToggle } from '@/design/components/ThemeToggle'
 import { ApiError } from '@/lib/api'
@@ -84,6 +85,7 @@ function ProfileSection() {
 
 function TelegramSection() {
   const { data: user } = useCurrentUser()
+  const updateProfile = useUpdateProfile()
   const unlink = useUnlinkTelegram()
   const [open, setOpen] = useState(false)
   const [password, setPassword] = useState('')
@@ -144,6 +146,20 @@ function TelegramSection() {
             </div>
           </form>
         </Dialog>
+      </div>
+      <div className="mt-6 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-text">Ideas note</p>
+          <p className="text-sm text-text-muted">
+            Ideas you send the bot (the 💡 button or /idea) are added to it. Show it at the top of
+            the notes list.
+          </p>
+        </div>
+        <Switch
+          checked={!user.ideas_note_hidden}
+          onCheckedChange={(show) => updateProfile.mutate({ ideas_note_hidden: !show })}
+          label="Show the Ideas note in the notes list"
+        />
       </div>
     </section>
   )

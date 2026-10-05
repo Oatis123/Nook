@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Computed, DateTime, ForeignKey, Index, Integer, String, Text, func, text
+from sqlalchemy import (
+    Boolean,
+    Computed,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +55,13 @@ class Note(UUIDPKMixin, Base):
             postgresql_where=text("deleted_at IS NULL"),
             postgresql_nulls_not_distinct=True,
         ),
+        # At most one Ideas note per user (see app/services/ideas.py).
+        Index(
+            "uq_notes_one_ideas_note_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("is_ideas"),
+        ),
     )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
@@ -63,6 +81,11 @@ class Note(UUIDPKMixin, Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The user's Ideas note, which quick ideas from the bot are appended to: it can't be
+    # deleted (it can be hidden from the notes list, see User.ideas_note_hidden).
+    is_ideas: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
     # Generated STORED columns (populated by Postgres, see migration b0537c5876c8) — declared
     # here only so alembic's autogenerate doesn't see them as drift; queried via raw SQL in

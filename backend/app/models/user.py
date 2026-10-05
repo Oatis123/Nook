@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, time
 
-from sqlalchemy import Boolean, DateTime, Enum, String, Time, func
+from sqlalchemy import Boolean, DateTime, Enum, String, Time, func, text
 from sqlalchemy.dialects.postgresql import BIGINT
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +36,10 @@ class User(UUIDPKMixin, Base):
         Enum(Theme, name="theme"), nullable=False, default=Theme.system
     )
     editor_preview_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Hides the Ideas note (Note.is_ideas) from the notes list; it keeps receiving ideas.
+    ideas_note_hidden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
 
     telegram_user_id: Mapped[int | None] = mapped_column(
         BIGINT, unique=True, nullable=True, index=True

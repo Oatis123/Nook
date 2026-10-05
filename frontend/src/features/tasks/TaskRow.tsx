@@ -37,19 +37,23 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => 
   }
 
   return (
-    <div className="group flex items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-surface-raised">
+    <div className="group relative flex items-start gap-2.5 rounded-md px-2 py-1.5 hover:bg-surface-raised">
       <button
         type="button"
         onClick={handleToggle}
         aria-label={done ? 'Mark as not done' : 'Mark as done'}
         data-checked={done || undefined}
         className={clsx(
-          'ui-check touch-target mt-0.5 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
+          'ui-check touch-target relative z-10 mt-0.5 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
           done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
         )}
       />
 
-      <button type="button" onClick={() => onOpen(task)} className="min-w-0 flex-1 text-left">
+      <button
+        type="button"
+        onClick={() => onOpen(task)}
+        className="row-link min-w-0 flex-1 text-left"
+      >
         <div className="flex items-center gap-1.5">
           {task.priority !== 'none' && (
             <Flag

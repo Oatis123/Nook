@@ -108,7 +108,7 @@ export function TaskListSidebar() {
             onDragLeave={() => setDragOverId((id) => (id === list.id ? null : id))}
             onDrop={(e) => handleDrop(e, list)}
             className={clsx(
-              'ui-nav-item group flex items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+              'ui-nav-item group relative flex items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
               dragOverId === list.id && 'ring-1 ring-accent',
             )}
           >
@@ -116,7 +116,7 @@ export function TaskListSidebar() {
               to={`/tasks/list/${list.id}`}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-1 items-center gap-2 truncate',
+                  'row-link flex flex-1 items-center gap-2 truncate',
                   isActive ? 'text-text' : 'text-text-muted',
                 )
               }
@@ -124,7 +124,7 @@ export function TaskListSidebar() {
               <Icon size={14} strokeWidth={1.5} style={{ color: listColorVar(list.color) }} />
               <span className="truncate">{list.name}</span>
             </NavLink>
-            <span className="reveal-on-hover">
+            <span className="reveal-on-hover relative z-10">
               <DropdownMenu
                 items={items}
                 trigger={

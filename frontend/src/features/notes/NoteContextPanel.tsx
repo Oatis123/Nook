@@ -89,13 +89,13 @@ function LinkedTaskRow({ task }: { task: LinkedTask }) {
   const done = task.status === 'done'
 
   return (
-    <div className="group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-raised">
+    <div className="group relative flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-raised">
       <button
         type="button"
         onClick={() => (done ? reopenTask.mutate(task.id) : completeTask.mutate({ id: task.id }))}
         aria-label={done ? 'Mark as not done' : 'Mark as done'}
         className={clsx(
-          'h-3.5 w-3.5 shrink-0 rounded-full border transition-colors duration-150',
+          'relative z-10 h-3.5 w-3.5 shrink-0 rounded-full border transition-colors duration-150',
           done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
         )}
       />
@@ -103,7 +103,7 @@ function LinkedTaskRow({ task }: { task: LinkedTask }) {
         type="button"
         onClick={() => navigate(`/tasks/list/${task.list_id}`)}
         className={clsx(
-          'flex-1 truncate text-left text-sm',
+          'row-link flex-1 truncate text-left text-sm',
           done ? 'text-text-muted line-through' : 'text-text',
         )}
       >

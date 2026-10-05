@@ -338,6 +338,16 @@
   }
 }
 
+/* A list row's main button or link (open the note, the task, the list), stretched over
+   the whole row: a click anywhere on the row opens it, not just one on the label's text
+   (before, the row's padding and icon were dead). The row is `relative`; its other
+   controls (the "…" menu, the task checkbox) are `relative z-10`, above the stretch. */
+.row-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 /* Small visual controls (the round task checkbox) keep their look but get a larger
    invisible hit area on touch screens (spec §10.8: 44px touch targets). */
 @media (pointer: coarse) {

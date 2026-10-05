@@ -402,7 +402,7 @@ function FolderRow({
           onDropOn(e, node.folder.id)
         }}
         className={clsx(
-          'ui-nav-item group flex items-center gap-1 rounded-md px-1 py-1 text-sm text-text hover:bg-surface-raised',
+          'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm text-text hover:bg-surface-raised',
           dragOver && 'bg-surface-raised ring-1 ring-accent',
         )}
         style={{ paddingLeft: depth * 14 + 4 }}
@@ -438,12 +438,12 @@ function FolderRow({
             type="button"
             onClick={() => onToggle(node.folder.id)}
             aria-expanded={isOpen}
-            className="flex-1 truncate text-left"
+            className="row-link flex-1 truncate text-left"
           >
             {node.folder.name}
           </button>
         )}
-        <span className="reveal-on-hover">
+        <span className="reveal-on-hover relative z-10">
           <DropdownMenu
             items={items}
             trigger={
@@ -545,7 +545,7 @@ function NoteRow({
       onFocus={() => prefetchNote(note.id)}
       data-active={active || undefined}
       className={clsx(
-        'ui-nav-item group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
         active ? 'bg-surface-raised text-text' : 'text-text-muted',
       )}
       style={{ paddingLeft: depth * 14 + 22 }}
@@ -554,11 +554,11 @@ function NoteRow({
       {renaming ? (
         <NoteRenameForm note={note} onDone={onFinishRename} />
       ) : (
-        <button type="button" onClick={open} className="flex-1 truncate text-left">
+        <button type="button" onClick={open} className="row-link flex-1 truncate text-left">
           {note.title}
         </button>
       )}
-      <span className="reveal-on-hover">
+      <span className="reveal-on-hover relative z-10">
         <DropdownMenu
           items={items}
           trigger={
@@ -604,7 +604,7 @@ function IdeasNoteRow({
       onFocus={() => prefetchNote(note.id)}
       data-active={active || undefined}
       className={clsx(
-        'ui-nav-item group flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
         active ? 'bg-surface-raised text-text' : 'text-text-muted',
       )}
       style={{ paddingLeft: 22 }}
@@ -616,12 +616,12 @@ function IdeasNoteRow({
         <button
           type="button"
           onClick={() => navigate(`/notes/${note.id}`)}
-          className="flex-1 truncate text-left"
+          className="row-link flex-1 truncate text-left"
         >
           {note.title}
         </button>
       )}
-      <span className="reveal-on-hover">
+      <span className="reveal-on-hover relative z-10">
         <DropdownMenu
           items={items}
           trigger={

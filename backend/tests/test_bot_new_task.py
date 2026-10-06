@@ -17,6 +17,7 @@ from app.schemas.task import TaskCreate
 from app.services import ideas as ideas_service
 from app.services import task_lists as task_lists_service
 from app.services import tasks as tasks_service
+from app.services import week_agenda
 from app.services.recurrence import RecurrenceInput
 from app.services.telegram_format import format_due, plural
 from bot import handlers
@@ -595,7 +596,7 @@ async def test_a_long_week_is_cut_to_fit_one_message(db_session: AsyncSession) -
     await chat.command("week")
 
     text = chat.last.text
-    assert len(text) <= handlers.MAX_WEEK_TEXT + 40
+    assert len(text) <= week_agenda.MAX_WEEK_TEXT + 40
     shown = text.count("\n• ")
     left_out = int(text.rsplit("…и ещё ", 1)[1].split()[0])
     assert shown + left_out == 120

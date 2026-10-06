@@ -1,7 +1,7 @@
 import enum
-from datetime import datetime, time
+from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, DateTime, Enum, String, Time, func, text
+from sqlalchemy import Boolean, Date, DateTime, Enum, String, Time, func, text
 from sqlalchemy.dialects.postgresql import BIGINT
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -40,6 +40,13 @@ class User(UUIDPKMixin, Base):
     ideas_note_hidden: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=text("false")
     )
+
+    # The bot's Monday summary of the week's tasks (app/services/week_agenda.py), sent at
+    # daily_reminder_time; sent_on is the local Monday it last went out.
+    weekly_digest_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    weekly_digest_sent_on: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     telegram_user_id: Mapped[int | None] = mapped_column(
         BIGINT, unique=True, nullable=True, index=True

@@ -19,6 +19,7 @@ from app.services.vault_import import (
     fail_interrupted_import_jobs,
     process_pending_import_jobs,
 )
+from app.services.week_agenda import send_weekly_digests
 
 settings = get_settings()
 log = structlog.get_logger()
@@ -55,7 +56,11 @@ def _button_url_accepted(url: str) -> bool:
 
 
 async def _send_message(
-    bot: Bot, chat_id: int, text: str, reply_markup: InlineKeyboardMarkup | None = None
+    bot: Bot,
+    chat_id: int,
+    text: str,
+    reply_markup: InlineKeyboardMarkup | None = None,
+    parse_mode: str | None = None,
 ) -> None:
     """send_message with SEND_TIMEOUT_SECONDS and up to SEND_ATTEMPTS tries on network
     errors; anything else (bad request, blocked bot) is raised on the first try. The last
@@ -63,7 +68,11 @@ async def _send_message(
     for attempt in range(1, SEND_ATTEMPTS + 1):
         try:
             await bot.send_message(
-                chat_id, text, reply_markup=reply_markup, request_timeout=SEND_TIMEOUT_SECONDS
+                chat_id,
+                text,
+                reply_markup=reply_markup,
+                parse_mode=parse_mode,
+                request_timeout=SEND_TIMEOUT_SECONDS,
             )
             return
         except TelegramNetworkError as exc:
@@ -96,6 +105,16 @@ def _make_sender(bot: Bot):
     return send
 
 
+def _make_digest_sender(bot: Bot):
+    async def send(chat_id: int, text: str, keyboard: InlineKeyboardMarkup) -> None:
+        try:
+            await _send_message(bot, chat_id, text, keyboard, parse_mode="HTML")
+        except TelegramForbiddenError as exc:
+            raise ReminderBlocked from exc
+
+    return send
+
+
 async def _sleep(seconds: float) -> None:
     with contextlib.suppress(TimeoutError):
         await asyncio.wait_for(_stop.wait(), timeout=seconds)
@@ -108,6 +127,10 @@ async def tick(bot: Bot | None) -> None:
         count = await dispatch_due_reminders(session, _make_sender(bot))
     if count:
         log.info("worker.dispatched", count=count)
+    async with async_session_factory() as session:
+        digests = await send_weekly_digests(session, _make_digest_sender(bot))
+    if digests:
+        log.info("worker.weekly_digests_sent", count=digests)
 
 
 async def _reminder_loop(bot: Bot | None) -> None:

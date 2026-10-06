@@ -21,6 +21,7 @@ class UserPublic(BaseModel):
     theme: Theme
     editor_preview_enabled: bool
     ideas_note_hidden: bool
+    weekly_digest_enabled: bool
     telegram_linked: bool
     telegram_blocked: bool
     created_at: datetime
@@ -39,6 +40,7 @@ class UserPublic(BaseModel):
             theme=user.theme,
             editor_preview_enabled=user.editor_preview_enabled,
             ideas_note_hidden=user.ideas_note_hidden,
+            weekly_digest_enabled=user.weekly_digest_enabled,
             telegram_linked=user.telegram_user_id is not None,
             telegram_blocked=user.telegram_blocked,
             created_at=user.created_at,
@@ -59,6 +61,7 @@ class MeUpdate(BaseModel):
     theme: Theme | None = None
     editor_preview_enabled: bool | None = None
     ideas_note_hidden: bool | None = None
+    weekly_digest_enabled: bool | None = None
 
 
 class PasswordChange(BaseModel):

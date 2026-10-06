@@ -12,6 +12,7 @@ export interface User {
   theme: Theme
   editor_preview_enabled: boolean
   ideas_note_hidden: boolean
+  weekly_digest_enabled: boolean
   telegram_linked: boolean
   telegram_blocked: boolean
   created_at: string

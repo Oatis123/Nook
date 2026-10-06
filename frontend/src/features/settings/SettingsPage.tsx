@@ -161,6 +161,20 @@ function TelegramSection() {
           label="Show the Ideas note in the notes list"
         />
       </div>
+      <div className="mt-6 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-text">Weekly summary</p>
+          <p className="text-sm text-text-muted">
+            Every Monday at {user.daily_reminder_time.slice(0, 5)}, the bot sends the week&apos;s
+            tasks. /week shows them any time.
+          </p>
+        </div>
+        <Switch
+          checked={user.weekly_digest_enabled}
+          onCheckedChange={(on) => updateProfile.mutate({ weekly_digest_enabled: on })}
+          label="Send the weekly summary on Mondays"
+        />
+      </div>
     </section>
   )
 }

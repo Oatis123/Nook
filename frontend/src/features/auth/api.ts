@@ -20,6 +20,7 @@ export type MeUpdateInput = Partial<
     | 'theme'
     | 'editor_preview_enabled'
     | 'ideas_note_hidden'
+    | 'weekly_digest_enabled'
   >
 >
 

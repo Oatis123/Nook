@@ -1,6 +1,7 @@
 import base64
 import calendar
 import contextlib
+import html
 import re
 import time as monotonic_clock
 import uuid
@@ -12,6 +13,7 @@ from zoneinfo import ZoneInfo
 import dateparser
 import structlog
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     CallbackQuery,
@@ -37,10 +39,13 @@ from app.services import tasks as tasks_service
 from app.services import telegram_link as telegram_link_service
 from app.services.telegram_format import (
     MONTHS,
+    MONTHS_SHORT,
     PRIORITY_LABELS,
+    WEEKDAYS_SHORT,
     WEEKDAYS_TITLE,
     format_day,
     format_due,
+    plural,
 )
 
 router = Router()
@@ -77,7 +82,8 @@ async def handle_start_plain(message: Message) -> None:
     else:
         await message.answer(
             f"С возвращением, {user.username}.\n\n"
-            "Чтобы создать задачу, просто напишите её текст. Справка — /help."
+            "Чтобы создать задачу, просто напишите её текст. Задачи на неделю — /week, "
+            "справка — /help."
         )
 
 
@@ -232,6 +238,8 @@ async def handle_help(message: Message) -> None:
         "/idea <текст> — записать идею в заметку «Идеи» (или кнопка «💡 Это идея» "
         "после текста)\n"
         "/cancel — отменить создание задачи\n"
+        "/week — задачи на эту неделю; кнопками можно листать дальше, а /week 2 "
+        "или /week 20.10 сразу откроет нужную неделю\n"
         "/lists — ваши списки\n"
         "/help — эта справка\n"
         "/unlink — отвязать Telegram от аккаунта"
@@ -898,6 +906,220 @@ async def handle_undo(callback: CallbackQuery) -> None:
             return
 
     await callback.message.edit_text("Задача удалена.")
+    await callback.answer()
+
+
+# --- The week's tasks: /week, with buttons to page through the weeks ahead ----------------
+#
+# Calendar weeks, Monday to Sunday. The current one is shown from today on: open tasks
+# from its earlier days are overdue and listed as such. Done tasks are left out. Each
+# button carries its week's Monday, so old messages keep working after a bot restart.
+
+MAX_WEEKS_AHEAD = 520  # ten years, as far as recurring tasks are expanded anyway
+MAX_OVERDUE_SHOWN = 5
+MAX_AGENDA_TITLE = 100
+# Telegram allows 4096 characters; what doesn't fit becomes "…и ещё N задач".
+MAX_WEEK_TEXT = 3800
+_WEEKS_AHEAD_RE = re.compile(r"^\+?(\d{1,3})$")
+
+WEEK_USAGE = (
+    "Не понял, какую неделю показать. Например: /week 2 — через две недели, "
+    "/week 20.10 — неделя с этой датой."
+)
+
+
+def week_start(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def parse_week(text: str, today: date) -> date | None:
+    """The Monday of the week a /week argument names: weeks from now ("1", "+2"),
+    "следующая", or any date parse_day reads ("20.10", "пятница", "через 2 недели")."""
+    text = text.strip().lower()
+    match = _WEEKS_AHEAD_RE.match(text)
+    if match:
+        return week_start(today) + timedelta(weeks=int(match.group(1)))
+    if text.startswith("след"):  # dateparser doesn't read "следующая неделя"
+        return week_start(today) + timedelta(weeks=1)
+    day = parse_day(text, today)
+    return week_start(day) if day is not None else None
+
+
+def _day_month(day: date) -> str:
+    return f"{day.day} {MONTHS_SHORT[day.month - 1]}"
+
+
+def _week_heading(monday: date, today: date) -> str:
+    """'📅 Следующая неделя: 12–18 окт'"""
+    sunday = monday + timedelta(days=6)
+    if monday.year != sunday.year:
+        dates = f"{_day_month(monday)} {monday.year} – {_day_month(sunday)} {sunday.year}"
+    else:
+        year = f" {monday.year}" if monday.year != today.year else ""
+        if monday.month == sunday.month:
+            dates = f"{monday.day}–{_day_month(sunday)}{year}"
+        else:
+            dates = f"{_day_month(monday)} – {_day_month(sunday)}{year}"
+    weeks = (monday - week_start(today)).days // 7
+    if weeks == 0:
+        label = "Эта неделя"
+    elif weeks == 1:
+        label = "Следующая неделя"
+    else:
+        label = f"Через {weeks} {plural(weeks, 'неделю', 'недели', 'недель')}"
+    return f"📅 <b>{label}: {dates}</b>"
+
+
+def _agenda_line(task: Task, due_time: time | None, suffix: str = "") -> str:
+    """'• ❗ 18:00 Встреча 🔁' — high priority, time, title, repeats."""
+    title = " ".join(task.title.split())
+    if len(title) > MAX_AGENDA_TITLE:
+        title = title[:MAX_AGENDA_TITLE].rstrip() + "…"
+    parts = ["•"]
+    if task.priority == TaskPriority.high:
+        parts.append("❗")
+    if due_time is not None:
+        parts.append(f"{due_time:%H:%M}")
+    parts.append(html.escape(title))
+    if task.is_recurring:
+        parts.append("🔁")
+    return " ".join(parts) + suffix
+
+
+def week_text(
+    monday: date,
+    today: date,
+    occurrences: list[tasks_service.Occurrence],
+    overdue: list[Task],
+) -> str:
+    """The /week message (Telegram HTML): overdue tasks, then each day that has tasks."""
+    sections: list[list[str]] = []
+    if overdue:
+        lines = ["⚠️ <b>Просрочено</b>"]
+        for task in overdue[:MAX_OVERDUE_SHOWN]:
+            assert task.due_date is not None
+            day = task.due_date
+            lines.append(
+                _agenda_line(task, None, f" — {WEEKDAYS_SHORT[day.weekday()]}, {_day_month(day)}")
+            )
+        if len(overdue) > MAX_OVERDUE_SHOWN:
+            more = len(overdue) - MAX_OVERDUE_SHOWN
+            lines.append(f"…и ещё {more} {plural(more, 'задача', 'задачи', 'задач')}")
+        sections.append(lines)
+
+    by_day: dict[date, list[tasks_service.Occurrence]] = {}
+    for occurrence in occurrences:
+        by_day.setdefault(occurrence.date, []).append(occurrence)
+    for day, items in sorted(by_day.items()):
+        heading = f"<b>{WEEKDAYS_TITLE[day.weekday()]}, {_day_month(day)}</b>"
+        if day == today:
+            heading += " · сегодня"
+        elif day == today + timedelta(days=1):
+            heading += " · завтра"
+        # Tasks without a time first, then by time.
+        items.sort(key=lambda o: (o.time is not None, o.time or time(0), o.task.title.lower()))
+        sections.append([heading, *(_agenda_line(o.task, o.time) for o in items)])
+
+    text = _week_heading(monday, today)
+    if not by_day:
+        text += "\n\n" + (
+            "До конца недели задач нет." if monday == week_start(today) else "Задач нет."
+        )
+    full, left_out = False, 0
+    for lines in sections:
+        for index, line in enumerate(lines):
+            separator = "\n\n" if index == 0 else "\n"
+            full = full or len(text) + len(separator) + len(line) > MAX_WEEK_TEXT
+            if not full:
+                text += separator + line
+            elif line.startswith("•"):  # a task, not a heading
+                left_out += 1
+    if left_out:
+        text += f"\n\n…и ещё {left_out} {plural(left_out, 'задача', 'задачи', 'задач')}"
+    return text
+
+
+def _week_keyboard(monday: date, today: date) -> InlineKeyboardMarkup:
+    current = week_start(today)
+    nav = []
+    if monday > current:
+        nav.append(_button("‹ Пред. неделя", f"wk:{monday - timedelta(weeks=1)}"))
+    if monday < current + timedelta(weeks=MAX_WEEKS_AHEAD):
+        nav.append(_button("След. неделя ›", f"wk:{monday + timedelta(weeks=1)}"))
+    rows = [nav]
+    if monday > current + timedelta(weeks=1):
+        rows.append([_button("« Эта неделя", f"wk:{current}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+async def _week_view(user: User, monday: date) -> tuple[str, InlineKeyboardMarkup]:
+    today = _local_now(user).date()
+    current = week_start(today)
+    # A button from a week that has since passed shows the current one.
+    monday = min(max(week_start(monday), current), current + timedelta(weeks=MAX_WEEKS_AHEAD))
+    async with async_session_factory() as session:
+        occurrences = await tasks_service.task_occurrences(
+            session, user.id, max(monday, today), monday + timedelta(days=6), open_only=True
+        )
+        overdue = (
+            await tasks_service.overdue_tasks(session, user.id, today) if monday == current else []
+        )
+    return (
+        week_text(monday, today, occurrences, overdue),
+        _week_keyboard(monday, today),
+    )
+
+
+@router.message(Command("week"))
+async def handle_week_command(message: Message, command: CommandObject) -> None:
+    if message.from_user is None:
+        return
+    user = await _linked_user(message.from_user.id)
+    if user is None:
+        await message.answer(NOT_LINKED_TEXT)
+        return
+    today = _local_now(user).date()
+    monday = week_start(today)
+    if command.args and command.args.strip():
+        parsed = parse_week(command.args, today)
+        if parsed is None:
+            await message.answer(WEEK_USAGE)
+            return
+        if parsed < monday:
+            await message.answer("Эта неделя уже прошла — можно посмотреть текущую и будущие.")
+            return
+        if parsed > monday + timedelta(weeks=MAX_WEEKS_AHEAD):
+            await message.answer("Так далеко не заглядываю: не больше чем на 10 лет вперёд.")
+            return
+        monday = parsed
+    text, keyboard = await _week_view(user, monday)
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("wk:"))
+async def handle_week_callback(callback: CallbackQuery) -> None:
+    if (
+        callback.data is None
+        or callback.from_user is None
+        or not isinstance(callback.message, Message)
+    ):
+        return
+    try:
+        monday = date.fromisoformat(callback.data.removeprefix("wk:"))
+    except ValueError:
+        await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+        return
+    user = await _linked_user(callback.from_user.id)
+    if user is None:
+        await callback.answer(NOT_LINKED_TEXT, show_alert=True)
+        return
+    text, keyboard = await _week_view(user, monday)
+    try:
+        await callback.message.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+    except TelegramBadRequest as error:
+        # A stale button that lands on the week already shown.
+        if "message is not modified" not in error.message:
+            raise
     await callback.answer()
 
 

@@ -13,9 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.models.task import Task, TaskPriority
 from app.models.task_list import TaskList, TaskListColor, TaskListIcon
 from app.models.user import User
+from app.schemas.task import TaskCreate
 from app.services import ideas as ideas_service
 from app.services import task_lists as task_lists_service
-from app.services.telegram_format import format_due
+from app.services import tasks as tasks_service
+from app.services.recurrence import RecurrenceInput
+from app.services.telegram_format import format_due, plural
 from bot import handlers
 from tests.conftest import make_user
 
@@ -62,6 +65,7 @@ _CALLBACK_ROUTES = [
     ("qa:back:", handlers.handle_list_picker_back),
     ("qa:undo:", handlers.handle_undo),
     ("idea:undo", handlers.handle_idea_undo),
+    ("wk:", handlers.handle_week_callback),
 ]
 
 
@@ -468,3 +472,140 @@ def test_parse_time(text: str, expected: time | None) -> None:
 def test_format_due_in_russian() -> None:
     assert format_due(date(2026, 10, 3), time(18, 0)) == "сб, 3 окт 2026, 18:00"
     assert format_due(date(2026, 5, 1), None) == "пт, 1 мая 2026"
+
+
+# --- /week ---
+
+
+async def _add_task(
+    db_session: AsyncSession, user: User, title: str, due: date, at: time | None = None, **kw: Any
+) -> Task:
+    return await tasks_service.create_task(
+        db_session, user.id, TaskCreate(title=title, due_date=due, due_time=at, **kw)
+    )
+
+
+@freeze_time(NOW)
+async def test_week_shows_open_tasks_by_day_and_pages_ahead(db_session: AsyncSession) -> None:
+    user = await make_user(db_session, "alice")
+    assert user.telegram_user_id is not None
+    chat = FakeChat(user.telegram_user_id)
+    await _add_task(db_session, user, "Позвонить врачу", date(2026, 9, 30))
+    await _add_task(db_session, user, "Купить хлеб", date(2026, 10, 2))
+    await _add_task(
+        db_session, user, "Встреча", date(2026, 10, 2), time(18, 0), priority=TaskPriority.high
+    )
+    await _add_task(
+        db_session,
+        user,
+        "Зарядка",
+        date(2026, 10, 2),
+        time(9, 0),
+        recurrence=RecurrenceInput(freq="daily"),
+    )
+    await _add_task(db_session, user, "Уборка <дома>", date(2026, 10, 4))
+    await _add_task(db_session, user, "Отчёт", date(2026, 10, 6))
+    done = await _add_task(db_session, user, "Уже сделано", date(2026, 10, 3))
+    await tasks_service.complete_task(db_session, user.id, done.id, complete_subtasks=False)
+
+    await chat.command("week")
+    this_week = chat.last.text
+    assert this_week == (
+        "📅 <b>Эта неделя: 28 сен – 4 окт</b>\n\n"
+        "⚠️ <b>Просрочено</b>\n"
+        "• Позвонить врачу — ср, 30 сен\n\n"
+        "<b>Пт, 2 окт</b> · сегодня\n"
+        "• Купить хлеб\n"
+        "• 09:00 Зарядка 🔁\n"
+        "• ❗ 18:00 Встреча\n\n"
+        "<b>Сб, 3 окт</b> · завтра\n"
+        "• 09:00 Зарядка 🔁\n\n"
+        "<b>Вс, 4 окт</b>\n"
+        "• Уборка &lt;дома&gt;\n"
+        "• 09:00 Зарядка 🔁"
+    )
+    assert chat.buttons() == ["След. неделя ›"]
+
+    await chat.tap("След. неделя ›")
+    assert chat.last.text.startswith("📅 <b>Следующая неделя: 5–11 окт</b>\n\n<b>Пн, 5 окт</b>\n")
+    assert "Просрочено" not in chat.last.text
+    assert "<b>Вт, 6 окт</b>\n• Отчёт\n• 09:00 Зарядка 🔁\n" in chat.last.text
+    assert chat.last.text.count("Зарядка") == 7
+    assert chat.buttons() == ["‹ Пред. неделя", "След. неделя ›"]
+
+    await chat.tap("След. неделя ›")
+    assert chat.last.text.startswith("📅 <b>Через 2 недели: 12–18 окт</b>")
+    assert chat.buttons() == ["‹ Пред. неделя", "След. неделя ›", "« Эта неделя"]
+
+    await chat.tap("« Эта неделя")
+    assert chat.last.text == this_week
+    assert len(chat.sent) == 1  # every tap edited the same message
+
+
+@freeze_time(NOW)
+async def test_week_command_picks_the_week(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+
+    await chat.command("week")
+    assert chat.last.text == "📅 <b>Эта неделя: 28 сен – 4 окт</b>\n\nДо конца недели задач нет."
+    for args, heading in [
+        ("1", "Следующая неделя: 5–11 окт"),
+        ("следующая", "Следующая неделя: 5–11 окт"),
+        ("3", "Через 3 недели: 19–25 окт"),
+        ("20.10", "Через 3 недели: 19–25 окт"),
+        ("через 5 недель", "Через 5 недель: 2–8 ноя"),
+        ("28.12", "Через 13 недель: 28 дек 2026 – 3 янв 2027"),
+        ("15.06.2027", "Через 37 недель: 14–20 июн 2027"),
+    ]:
+        await chat.command("week", args)
+        assert chat.last.text == f"📅 <b>{heading}</b>\n\nЗадач нет.", args
+
+    await chat.command("week", "непонятно")
+    assert chat.last.text == handlers.WEEK_USAGE
+    await chat.command("week", "01.09.2026")
+    assert chat.last.text.startswith("Эта неделя уже прошла")
+    await chat.command("week", "999")
+    assert chat.last.text.startswith("Так далеко не заглядываю")
+
+
+@freeze_time(NOW)
+async def test_a_button_from_a_past_week_shows_the_current_one(db_session: AsyncSession) -> None:
+    chat = await _chat(db_session)
+    await chat.command("week")
+    message = chat.last
+    message.reply_markup = InlineKeyboardMarkup(
+        inline_keyboard=[[handlers._button("‹ Пред. неделя", "wk:2026-09-14")]]
+    )
+
+    await chat.tap("‹ Пред. неделя")
+
+    assert message.text.startswith("📅 <b>Эта неделя: 28 сен – 4 окт</b>")
+    assert chat.buttons() == ["След. неделя ›"]
+
+
+@freeze_time(NOW)
+async def test_a_long_week_is_cut_to_fit_one_message(db_session: AsyncSession) -> None:
+    user = await make_user(db_session, "alice")
+    assert user.telegram_user_id is not None
+    chat = FakeChat(user.telegram_user_id)
+    for n in range(120):
+        title = f"Задача номер {n} " + "очень длинная " * 6
+        await _add_task(db_session, user, title, date(2026, 10, 2))
+
+    await chat.command("week")
+
+    text = chat.last.text
+    assert len(text) <= handlers.MAX_WEEK_TEXT + 40
+    shown = text.count("\n• ")
+    left_out = int(text.rsplit("…и ещё ", 1)[1].split()[0])
+    assert shown + left_out == 120
+    assert text.endswith(f"…и ещё {left_out} {plural(left_out, 'задача', 'задачи', 'задач')}")
+
+
+@pytest.mark.parametrize(
+    ("count", "word"),
+    [(1, "задача"), (2, "задачи"), (5, "задач"), (11, "задач"), (12, "задач"), (21, "задача")]
+    + [(22, "задачи"), (111, "задач"), (104, "задачи")],
+)
+def test_plural(count: int, word: str) -> None:
+    assert plural(count, "задача", "задачи", "задач") == word

@@ -403,43 +403,44 @@ async def delete_task(session: AsyncSession, user_id: uuid.UUID, task_id: uuid.U
 MAX_CALENDAR_ENTRIES = 5000
 
 
-async def get_calendar_entries(
-    session: AsyncSession, user_id: uuid.UUID, start: date, end: date
-) -> list[CalendarEntryOut]:
-    """Real tasks due within [start, end] plus, for open recurring tasks, their virtual
-    future occurrences in that range (spec §7.6: computed on the fly, never stored)."""
-    tasks = list(
-        await session.scalars(
-            select(Task).where(
-                Task.user_id == user_id,
-                Task.deleted_at.is_(None),
-                Task.due_date.is_not(None),
-                Task.due_date <= end,
-                # A recurring task's current due_date can predate `start` while its future
-                # occurrences still land inside [start, end] — keep those in the fetch even
-                # though the plain due_date >= start check below would exclude them.
-                (Task.due_date >= start) | (Task.is_recurring.is_(True)),
-            )
-        )
-    )
+@dataclass(frozen=True)
+class Occurrence:
+    """A task on one day: its own due date, or (`virtual`) a future occurrence of a
+    recurring task that is computed, not stored."""
 
-    entries: list[CalendarEntryOut] = []
+    task: Task
+    date: date
+    time: time | None
+    virtual: bool
+
+
+async def task_occurrences(
+    session: AsyncSession, user_id: uuid.UUID, start: date, end: date, *, open_only: bool = False
+) -> list[Occurrence]:
+    """Real tasks due within [start, end] plus, for open recurring tasks, their virtual
+    future occurrences in that range (spec §7.6: computed on the fly, never stored).
+    `open_only` leaves out tasks already done."""
+    conditions = [
+        Task.user_id == user_id,
+        Task.deleted_at.is_(None),
+        Task.due_date.is_not(None),
+        Task.due_date <= end,
+        # A recurring task's current due_date can predate `start` while its future
+        # occurrences still land inside [start, end] — keep those in the fetch even
+        # though the plain due_date >= start check below would exclude them.
+        (Task.due_date >= start) | (Task.is_recurring.is_(True)),
+    ]
+    if open_only:
+        conditions.append(Task.status == TaskStatus.open)
+    tasks = list(await session.scalars(select(Task).where(*conditions)))
+
+    occurrences: list[Occurrence] = []
     range_start = datetime.combine(start, time(0, 0))
     range_end = datetime.combine(end, time(23, 59, 59))
 
     for task in tasks:
         if task.due_date is not None and start <= task.due_date <= end:
-            entries.append(
-                CalendarEntryOut(
-                    task_id=task.id,
-                    list_id=task.list_id,
-                    title=task.title,
-                    priority=task.priority,
-                    date=task.due_date,
-                    time=task.due_time,
-                    virtual=False,
-                )
-            )
+            occurrences.append(Occurrence(task, task.due_date, task.due_time, virtual=False))
 
         if (
             task.is_recurring
@@ -455,7 +456,7 @@ async def get_calendar_entries(
             # calendar when browsing a past range, rather than mechanically re-deriving
             # every occurrence the RRULE would ever produce since dtstart.
             expand_from = max(range_start, current_occurrence)
-            remaining = MAX_CALENDAR_ENTRIES - len(entries)
+            remaining = MAX_CALENDAR_ENTRIES - len(occurrences)
             if remaining <= 0:
                 break
             for occ in recurrence_service.occurrences_between(
@@ -468,17 +469,39 @@ async def get_calendar_entries(
             ):
                 if occ == current_occurrence:
                     continue
-                entries.append(
-                    CalendarEntryOut(
-                        task_id=task.id,
-                        list_id=task.list_id,
-                        title=task.title,
-                        priority=task.priority,
-                        date=occ.date(),
-                        time=occ.time(),
-                        virtual=True,
-                    )
-                )
+                occurrences.append(Occurrence(task, occ.date(), occ.time(), virtual=True))
 
-    entries.sort(key=lambda e: (e.date, e.time or time(0, 0)))
-    return entries
+    occurrences.sort(key=lambda o: (o.date, o.time or time(0, 0)))
+    return occurrences
+
+
+async def get_calendar_entries(
+    session: AsyncSession, user_id: uuid.UUID, start: date, end: date
+) -> list[CalendarEntryOut]:
+    return [
+        CalendarEntryOut(
+            task_id=o.task.id,
+            list_id=o.task.list_id,
+            title=o.task.title,
+            priority=o.task.priority,
+            date=o.date,
+            time=o.time,
+            virtual=o.virtual,
+        )
+        for o in await task_occurrences(session, user_id, start, end)
+    ]
+
+
+async def overdue_tasks(session: AsyncSession, user_id: uuid.UUID, today: date) -> list[Task]:
+    """Open tasks due before `today`, oldest first."""
+    result = await session.scalars(
+        select(Task)
+        .where(
+            Task.user_id == user_id,
+            Task.deleted_at.is_(None),
+            Task.status == TaskStatus.open,
+            Task.due_date < today,
+        )
+        .order_by(Task.due_date, Task.due_time.nulls_first(), Task.position)
+    )
+    return list(result)

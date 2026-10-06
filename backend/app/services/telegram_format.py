@@ -34,6 +34,15 @@ PRIORITY_LABELS: dict[TaskPriority, str] = {
 }
 
 
+def plural(count: int, one: str, few: str, many: str) -> str:
+    """The noun form that goes with `count`: plural(1, "задача", "задачи", "задач")."""
+    if count % 10 == 1 and count % 100 != 11:
+        return one
+    if 2 <= count % 10 <= 4 and not 12 <= count % 100 <= 14:
+        return few
+    return many
+
+
 def format_day(day: date) -> str:
     """'пт, 3 окт 2026'"""
     return f"{WEEKDAYS_SHORT[day.weekday()]}, {day.day} {MONTHS_SHORT[day.month - 1]} {day.year}"

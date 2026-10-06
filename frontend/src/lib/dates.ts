@@ -16,16 +16,41 @@ export function parseLocalDate(ymd: string): Date {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
 }
 
+/** Building an Intl.DateTimeFormat is costly (a list of tasks made one per row on every
+ * render, just to know today's date), so each one is made once per time zone. Throws for
+ * an unknown zone, like the constructor. */
+function cachedFormat(
+  cache: Map<string, Intl.DateTimeFormat>,
+  timeZone: string | undefined,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = timeZone ?? ''
+  let format = cache.get(key)
+  if (!format) {
+    format = new Intl.DateTimeFormat('en-CA', { ...options, timeZone })
+    cache.set(key, format)
+  }
+  return format
+}
+
+const dateFormats = new Map<string, Intl.DateTimeFormat>()
+const DATE_PARTS: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' }
+
+const clockFormats = new Map<string, Intl.DateTimeFormat>()
+const CLOCK_PARTS: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+}
+
 /** Today's calendar date in `timeZone` (an IANA name), as `YYYY-MM-DD`. Falls back to
  * the browser's own zone if the name is missing or unknown. */
 export function todayIn(timeZone?: string | null, now: Date = new Date()): string {
-  const parts = (tz?: string) =>
-    new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).formatToParts(now)
+  const parts = (tz?: string) => cachedFormat(dateFormats, tz, DATE_PARTS).formatToParts(now)
   let resolved
   try {
     resolved = parts(timeZone ?? undefined)
@@ -42,16 +67,7 @@ export function todayIn(timeZone?: string | null, now: Date = new Date()): strin
 export function nowIn(timeZone?: string | null, now: Date = new Date()): Date {
   let parts
   try {
-    parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: timeZone ?? undefined,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hourCycle: 'h23',
-    }).formatToParts(now)
+    parts = cachedFormat(clockFormats, timeZone ?? undefined, CLOCK_PARTS).formatToParts(now)
   } catch {
     return now
   }

@@ -1,5 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createContext, type DragEvent, type FormEvent, useContext, useState } from 'react'
+import {
+  createContext,
+  type DragEvent,
+  type FormEvent,
+  memo,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
@@ -17,7 +28,7 @@ import { DropdownMenu, type DropdownMenuItem } from '@/design/components/Dropdow
 import { IconButton } from '@/design/components/IconButton'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { updateNote as updateNoteApi } from '@/features/notes/api'
-import type { NoteSummary } from '@/lib/types'
+import type { Folder, NoteSummary } from '@/lib/types'
 import {
   buildTree,
   collectDescendantFolderIds,
@@ -29,6 +40,7 @@ import {
   useCreateNote,
   useDeleteFolder,
   useDeleteNote,
+  notesKey,
   useFolders,
   useNotes,
   usePrefetchNote,
@@ -51,6 +63,17 @@ const DRAG_MIME = 'application/x-nook-item'
 export function FolderTree() {
   const foldersQuery = useFolders()
   const notesQuery = useNotes()
+
+  if (!foldersQuery.data) return <QueryState query={foldersQuery} compact />
+  if (!notesQuery.data) return <QueryState query={notesQuery} compact />
+  return <LoadedFolderTree folders={foldersQuery.data} notes={notesQuery.data} />
+}
+
+/** The rows are memoized and get only stable callbacks: an autosave refetches the note
+ * list and switching notes changes the active one, and with a few hundred rows (each with
+ * its own menu) re-rendering them all made both visibly slow. Unchanged notes keep their
+ * object identity across refetches, so their rows are skipped. */
+function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSummary[] }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { noteId: activeNoteId } = useParams<{ noteId: string }>()
@@ -61,29 +84,35 @@ export function FolderTree() {
   const createFolder = useCreateFolder()
   const createNote = useCreateNote()
   const updateFolder = useUpdateFolder()
-  const deleteNoteMutation = useDeleteNote()
+  const { mutate: deleteNote } = useDeleteNote()
   const { data: user } = useCurrentUser()
   const updateProfile = useUpdateProfile()
 
-  if (!foldersQuery.data) return <QueryState query={foldersQuery} compact />
-  if (!notesQuery.data) return <QueryState query={notesQuery} compact />
-
   // The Ideas note (quick ideas from the Telegram bot) is pinned above the tree, wherever
   // its folder, unless hidden in Settings.
-  const ideasNote = user?.ideas_note_hidden ? undefined : notesQuery.data.find((n) => n.is_ideas)
-  const tree = buildTree(
-    foldersQuery.data,
-    notesQuery.data.filter((n) => !n.is_ideas),
+  const ideasNote = user?.ideas_note_hidden ? undefined : notes.find((n) => n.is_ideas)
+  const tree = useMemo(
+    () =>
+      buildTree(
+        folders,
+        notes.filter((n) => !n.is_ideas),
+      ),
+    [folders, notes],
   )
 
-  function toggle(id: string) {
+  const toggle = useCallback((id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
-  }
+  }, [])
+  // Rows don't call useNavigate themselves: it reads the route context, which changes on
+  // every navigation and would re-render every (memoized) row each time a note is opened.
+  const openNote = useCallback((id: string) => navigate(`/notes/${id}`), [navigate])
+  const startRenameNote = useCallback((id: string) => setRenaming(`note:${id}`), [])
+  const finishRename = useCallback(() => setRenaming(null), [])
 
   async function moveNoteToFolder(note: NoteSummary, folderId: string | null) {
     if (note.folder_id === folderId) return
@@ -104,7 +133,7 @@ export function FolderTree() {
 
   function moveToFolder(payload: DragPayload, folderId: string | null) {
     if (payload.type === 'note') {
-      const note = notesQuery.data?.find((n) => n.id === payload.id)
+      const note = notes.find((n) => n.id === payload.id)
       if (note) moveNoteToFolder(note, folderId)
     } else {
       if (payload.id === folderId) return
@@ -128,6 +157,16 @@ export function FolderTree() {
     moveToFolder(payload, folderId)
   }
 
+  // One stable drop handler for every row, reading this render's tree through a ref.
+  const dropRef = useRef(handleDrop)
+  useLayoutEffect(() => {
+    dropRef.current = handleDrop
+  })
+  const onDropOn = useCallback(
+    (e: DragEvent, folderId: string | null) => dropRef.current(e, folderId),
+    [],
+  )
+
   return (
     <MoveContext.Provider value={setMoving}>
       <div
@@ -149,7 +188,7 @@ export function FolderTree() {
               onClick={() =>
                 createNote.mutate(
                   {
-                    title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], null),
+                    title: uniqueNoteTitle('Untitled', notes, null),
                     folder_id: null,
                   },
                   { onSuccess: (note) => navigate(`/notes/${note.id}`) },
@@ -189,8 +228,12 @@ export function FolderTree() {
             onToggle={toggle}
             renaming={renaming}
             setRenaming={setRenaming}
+            onStartRenameNote={startRenameNote}
+            onFinishRename={finishRename}
+            onDeleteNote={deleteNote}
+            onOpenNote={openNote}
             activeNoteId={activeNoteId}
-            onDropOn={handleDrop}
+            onDropOn={onDropOn}
           />
         ))}
 
@@ -201,10 +244,11 @@ export function FolderTree() {
             depth={0}
             active={note.id === activeNoteId}
             renaming={renaming === `note:${note.id}`}
-            onStartRename={() => setRenaming(`note:${note.id}`)}
-            onFinishRename={() => setRenaming(null)}
-            onDelete={() => deleteNoteMutation.mutate(note.id)}
-            onDropOn={handleDrop}
+            onStartRename={startRenameNote}
+            onFinishRename={finishRename}
+            onDelete={deleteNote}
+            onOpen={openNote}
+            onDropOn={onDropOn}
           />
         ))}
 
@@ -308,13 +352,17 @@ function findFolderNode(nodes: FolderNode[], id: string): FolderNode | null {
   return null
 }
 
-function FolderRow({
+const FolderRow = memo(function FolderRow({
   node,
   depth,
   expanded,
   onToggle,
   renaming,
   setRenaming,
+  onStartRenameNote,
+  onFinishRename,
+  onDeleteNote,
+  onOpenNote,
   activeNoteId,
   onDropOn,
 }: {
@@ -324,18 +372,21 @@ function FolderRow({
   onToggle: (id: string) => void
   renaming: string | null
   setRenaming: (id: string | null) => void
+  onStartRenameNote: (noteId: string) => void
+  onFinishRename: () => void
+  onDeleteNote: (noteId: string) => void
+  onOpenNote: (noteId: string) => void
   activeNoteId: string | undefined
   onDropOn: (e: DragEvent, folderId: string | null) => void
 }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const isOpen = expanded.has(node.folder.id)
   const isRenaming = renaming === `folder:${node.folder.id}`
   const createFolder = useCreateFolder()
   const createNote = useCreateNote()
   const updateFolder = useUpdateFolder()
   const deleteFolder = useDeleteFolder()
-  const deleteNoteMutation = useDeleteNote()
-  const notesQuery = useNotes()
   const startMove = useContext(MoveContext)
   const [dragOver, setDragOver] = useState(false)
 
@@ -345,7 +396,13 @@ function FolderRow({
       onSelect: () =>
         createNote.mutate(
           {
-            title: uniqueNoteTitle('Untitled', notesQuery.data ?? [], node.folder.id),
+            // Read when picked, not subscribed to: a row re-rendering on every note-list
+            // refetch would undo the tree's memoization.
+            title: uniqueNoteTitle(
+              'Untitled',
+              queryClient.getQueryData<NoteSummary[]>(notesKey()) ?? [],
+              node.folder.id,
+            ),
             folder_id: node.folder.id,
           },
           { onSuccess: (note) => navigate(`/notes/${note.id}`) },
@@ -466,6 +523,10 @@ function FolderRow({
               onToggle={onToggle}
               renaming={renaming}
               setRenaming={setRenaming}
+              onStartRenameNote={onStartRenameNote}
+              onFinishRename={onFinishRename}
+              onDeleteNote={onDeleteNote}
+              onOpenNote={onOpenNote}
               activeNoteId={activeNoteId}
               onDropOn={onDropOn}
             />
@@ -477,9 +538,10 @@ function FolderRow({
               depth={depth + 1}
               active={note.id === activeNoteId}
               renaming={renaming === `note:${note.id}`}
-              onStartRename={() => setRenaming(`note:${note.id}`)}
-              onFinishRename={() => setRenaming(null)}
-              onDelete={() => deleteNoteMutation.mutate(note.id)}
+              onStartRename={onStartRenameNote}
+              onFinishRename={onFinishRename}
+              onDelete={onDeleteNote}
+              onOpen={onOpenNote}
               onDropOn={onDropOn}
             />
           ))}
@@ -487,9 +549,9 @@ function FolderRow({
       )}
     </div>
   )
-}
+})
 
-function NoteRow({
+const NoteRow = memo(function NoteRow({
   note,
   depth,
   active,
@@ -497,27 +559,28 @@ function NoteRow({
   onStartRename,
   onFinishRename,
   onDelete,
+  onOpen,
   onDropOn,
 }: {
   note: NoteSummary
   depth: number
   active: boolean
   renaming: boolean
-  onStartRename: () => void
+  onStartRename: (noteId: string) => void
   onFinishRename: () => void
-  onDelete: () => void
+  onDelete: (noteId: string) => void
+  onOpen: (noteId: string) => void
   onDropOn: (e: DragEvent, folderId: string | null) => void
 }) {
-  const navigate = useNavigate()
   const prefetchNote = usePrefetchNote()
 
   const startMove = useContext(MoveContext)
-  const open = () => navigate(`/notes/${note.id}`)
+  const open = () => onOpen(note.id)
 
   const items: DropdownMenuItem[] = [
-    { label: 'Rename', onSelect: onStartRename },
+    { label: 'Rename', onSelect: () => onStartRename(note.id) },
     { label: 'Move to…', onSelect: () => startMove({ type: 'note', id: note.id }) },
-    { label: 'Delete', danger: true, onSelect: onDelete },
+    { label: 'Delete', danger: true, onSelect: () => onDelete(note.id) },
   ]
 
   return (
@@ -570,7 +633,7 @@ function NoteRow({
       </span>
     </div>
   )
-}
+})
 
 /** The Ideas note, pinned at the top: it can't be moved or deleted, only hidden (brought
  * back in Settings). */

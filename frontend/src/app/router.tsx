@@ -6,9 +6,6 @@ import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'
 import InviteAcceptPage from '@/features/auth/InviteAcceptPage'
 import { RequireAdmin, RequireAuth } from '@/features/auth/RequireAuth'
-import TodayView from '@/features/tasks/TodayView'
-import UpcomingView from '@/features/tasks/UpcomingView'
-import ListView from '@/features/tasks/ListView'
 import { RouteError } from '@/app/RouteError'
 
 /** Route-level code splitting: each heavier page (the CodeMirror editor, the graph,
@@ -43,9 +40,9 @@ export const router = createBrowserRouter([
           { path: 'notes/:noteId', lazy: page(() => import('@/features/notes/NoteEditorRoute')) },
           { path: 'tags/:name', lazy: page(() => import('@/features/notes/TagNotesPage')) },
           { path: 'tasks', element: <Navigate to="/tasks/today" replace /> },
-          { path: 'tasks/today', element: <TodayView /> },
-          { path: 'tasks/upcoming', element: <UpcomingView /> },
-          { path: 'tasks/list/:listId', element: <ListView /> },
+          { path: 'tasks/today', lazy: page(() => import('@/features/tasks/TodayView')) },
+          { path: 'tasks/upcoming', lazy: page(() => import('@/features/tasks/UpcomingView')) },
+          { path: 'tasks/list/:listId', lazy: page(() => import('@/features/tasks/ListView')) },
           { path: 'tasks/calendar', lazy: page(() => import('@/features/tasks/CalendarPage')) },
           { path: 'graph', lazy: page(() => import('@/features/graph/GraphPage')) },
           { path: 'search', lazy: page(() => import('@/features/search/SearchPage')) },

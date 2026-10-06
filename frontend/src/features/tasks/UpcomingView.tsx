@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { addDays, format } from 'date-fns'
 import { CalendarRange } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
@@ -17,6 +17,8 @@ const UPCOMING_DAYS = 7
 
 export default function UpcomingView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  // Stable, so the (memoized) task rows don't all re-render when a task opens.
+  const openTask = useCallback((task: Task) => setOpenTaskId(task.id), [])
   const tasksQuery = useTasks({ view: 'upcoming' })
   const todayYmd = useToday()
   useDocumentTitle('Upcoming')
@@ -59,11 +61,7 @@ export default function UpcomingView() {
       {tasksQuery.data.length === 0 ? (
         <EmptyState icon={CalendarRange} title="Nothing coming up" />
       ) : (
-        <TaskGroupedList
-          groups={groups}
-          onOpenTask={(task: Task) => setOpenTaskId(task.id)}
-          emptyMessage="Nothing coming up"
-        />
+        <TaskGroupedList groups={groups} onOpenTask={openTask} emptyMessage="Nothing coming up" />
       )}
 
       <TaskDetailDialog taskId={openTaskId} onOpenChange={(open) => !open && setOpenTaskId(null)} />

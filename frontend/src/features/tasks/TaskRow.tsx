@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { clsx } from 'clsx'
 import { Flag } from '@/design/icons'
 import { ApiError } from '@/lib/api'
@@ -14,7 +14,15 @@ function isOverdue(task: Task, today: string): boolean {
   return task.due_date < today
 }
 
-export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => void }) {
+/** Memoized: unchanged tasks keep their object identity across refetches, so opening a
+ * task or completing one re-renders just the rows that changed. */
+export const TaskRow = memo(function TaskRow({
+  task,
+  onOpen,
+}: {
+  task: Task
+  onOpen: (task: Task) => void
+}) {
   const completeTask = useCompleteTask()
   const reopenTask = useReopenTask()
   const today = useToday()
@@ -94,4 +102,4 @@ export function TaskRow({ task, onOpen }: { task: Task; onOpen: (task: Task) => 
       />
     </div>
   )
-}
+})

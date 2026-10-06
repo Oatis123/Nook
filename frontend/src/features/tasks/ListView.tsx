@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { ListTodo } from '@/design/icons'
@@ -21,6 +21,8 @@ export default function ListView() {
   const [showCompleted, setShowCompleted] = useState(false)
   const [groupBy, setGroupBy] = useState<GroupBy>('date')
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  // Stable, so the (memoized) task rows don't all re-render when a task opens.
+  const openTask = useCallback((task: Task) => setOpenTaskId(task.id), [])
 
   const taskListsQuery = useTaskLists()
   useDocumentTitle(taskListsQuery.data?.find((l) => l.id === listId)?.name)
@@ -82,11 +84,7 @@ export default function ListView() {
       {tasksQuery.data.length === 0 ? (
         <EmptyState icon={Icon} title="No tasks here yet" />
       ) : (
-        <TaskGroupedList
-          groups={groups}
-          onOpenTask={(task: Task) => setOpenTaskId(task.id)}
-          emptyMessage="No tasks here yet"
-        />
+        <TaskGroupedList groups={groups} onOpenTask={openTask} emptyMessage="No tasks here yet" />
       )}
 
       <TaskDetailDialog taskId={openTaskId} onOpenChange={(open) => !open && setOpenTaskId(null)} />

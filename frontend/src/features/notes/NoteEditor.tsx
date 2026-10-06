@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import CodeMirror from '@uiw/react-codemirror'
+import { memo, type RefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import CodeMirror, { type Extension, ExternalChange } from '@uiw/react-codemirror'
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { autocompletion } from '@codemirror/autocomplete'
@@ -12,7 +12,11 @@ import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { getRenameImpact, noteExportUrl } from '@/features/notes/api'
 import { editorHighlighting, editorTheme } from '@/features/notes/editorTheme'
 import { useNote, useNoteLinkTargets, useTags } from '@/features/notes/hooks'
-import { type SaveStatus, useNoteAutosave } from '@/features/notes/useNoteAutosave'
+import {
+  type EditorContent,
+  type SaveStatus,
+  useNoteAutosave,
+} from '@/features/notes/useNoteAutosave'
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
 import { createAttachmentDropHandler } from '@/features/notes/attachmentDrop'
 import { MarkdownPreview } from '@/features/notes/MarkdownPreview'
@@ -37,7 +41,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const viewRef = useRef<EditorView | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autosave = useNoteAutosave(noteId, noteQuery.data)
-  const { draft, status } = autosave
+  const { draft, editorContent, status } = autosave
   useDocumentTitle(draft?.title ?? noteQuery.data?.title)
 
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
@@ -123,7 +127,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     }
     return <QueryState query={noteQuery} />
   }
-  if (noteQuery.isLoading || !draft) return null
+  if (noteQuery.isLoading || !draft || !editorContent) return null
 
   return (
     <div className="flex h-full flex-col">
@@ -227,23 +231,21 @@ export function NoteEditor({ noteId }: { noteId: string }) {
             mobileTab === 'preview' ? 'hidden md:block' : ''
           }`}
         >
-          <CodeMirror
-            value={draft.content}
+          <NoteCodeMirror
+            content={editorContent}
             onChange={autosave.setContent}
-            onCreateEditor={(view) => {
-              viewRef.current = view
-            }}
             extensions={editorExtensions}
-            basicSetup={EDITOR_BASIC_SETUP}
-            theme="none"
-            height="100%"
-            className="h-full"
+            viewRef={viewRef}
           />
         </div>
 
+        {/* contain: the preview's layout and paint are its own, so a keystroke in the
+            editor doesn't make the browser revisit the preview's (long) tree. It scrolls,
+            so it clips its content already — nothing looks different. (Not on the editor:
+            its autocomplete popup is position: fixed, which contain would confine.) */}
         {previewEnabled && (
           <div
-            className={`min-w-0 flex-1 overflow-y-auto border-l border-border px-6 py-4 md:block ${
+            className={`min-w-0 flex-1 overflow-y-auto border-l border-border px-6 py-4 [contain:layout_paint_style] md:block ${
               mobileTab === 'edit' ? 'hidden' : ''
             }`}
           >
@@ -269,6 +271,50 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     </div>
   )
 }
+
+/** The editor owns its text while you type (nothing re-renders per keystroke); text that
+ * comes from elsewhere — a newer server copy, the version picked in a conflict — is put
+ * in here. */
+const NoteCodeMirror = memo(function NoteCodeMirror({
+  content,
+  onChange,
+  extensions,
+  viewRef,
+}: {
+  content: EditorContent
+  onChange: (content: string) => void
+  extensions: Extension[]
+  viewRef: RefObject<EditorView | null>
+}) {
+  // @uiw/react-codemirror re-syncs the document whenever `value` changes, deferring while
+  // you type — fed the typed text with a lag, that could put back stale text. It only
+  // ever gets the text the editor opened with; replacements are dispatched below.
+  const [initialText] = useState(content.text)
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view || view.state.doc.toString() === content.text) return
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: content.text },
+      annotations: [ExternalChange.of(true)],
+    })
+  }, [content, viewRef])
+
+  return (
+    <CodeMirror
+      value={initialText}
+      onChange={onChange}
+      onCreateEditor={(view) => {
+        viewRef.current = view
+      }}
+      extensions={extensions}
+      basicSetup={EDITOR_BASIC_SETUP}
+      theme="none"
+      height="100%"
+      className="h-full"
+    />
+  )
+})
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
   // Short labels on phones, where the status shares the header row with the title.

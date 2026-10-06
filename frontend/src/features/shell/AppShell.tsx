@@ -30,6 +30,7 @@ import { FolderTree } from '@/features/notes/FolderTree'
 import { TagList } from '@/features/notes/TagList'
 import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
 import { TaskListSidebar } from '@/features/tasks/TaskListSidebar'
+import { prefetchCommonPages } from '@/app/prefetch'
 
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
@@ -80,6 +81,8 @@ export function AppShell() {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [navigate, focusSearch])
+
+  useEffect(() => prefetchCommonPages(), [])
 
   // Selecting a note/list on mobile should close the drawer it was picked from, the same
   // way a native app's nav drawer behaves — without this the destination renders behind

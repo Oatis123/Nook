@@ -8,6 +8,9 @@ import { clearStoredDraft, readStoredDraft, writeStoredDraft } from '@/features/
 import type { NoteDetail } from '@/lib/types'
 
 export const SAVE_DEBOUNCE_MS = 800
+/** How long after the last keystroke `draft.content` (what the preview renders) catches
+ * up with the editor. */
+export const SETTLE_MS = 200
 const RETRY_DELAY_MS = 10_000
 const MAX_AUTO_RETRIES = 30
 
@@ -16,6 +19,14 @@ export type SaveStatus = 'saved' | 'saving' | 'offline' | 'retrying' | 'conflict
 interface Draft {
   title: string
   content: string
+}
+
+/** Text the editor must show that didn't come from typing in it — the note as loaded, a
+ * newer server copy, the version picked in a conflict. `rev` tells two replacements with
+ * the same text apart. */
+export interface EditorContent {
+  text: string
+  rev: number
 }
 
 /**
@@ -29,10 +40,15 @@ interface Draft {
  * advances the known server version; it never overwrites the editor's text, so
  * characters typed during a save aren't lost. Content autosaves on a debounce; the title
  * is sent only when committed (blur/Enter) via `commitTitle`.
+ *
+ * Typing doesn't re-render: the editor owns its text, and `draft.content` follows it once
+ * typing pauses (SETTLE_MS) — re-rendering the editor on every keystroke was most of the
+ * cost of a keystroke in a long note.
  */
 export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) {
   const queryClient = useQueryClient()
   const [draft, setDraftState] = useState<Draft | null>(null)
+  const [editorContent, setEditorContent] = useState<EditorContent | null>(null)
   const [status, setStatus] = useState<SaveStatus>('saved')
   const [conflict, setConflictState] = useState<NoteDetail | null>(null)
   const [titleError, setTitleError] = useState<string | null>(null)
@@ -47,17 +63,34 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
   const fatalRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const settleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const saveNowRef = useRef<() => Promise<void>>(async () => {})
 
   const setDraft = useCallback((next: Draft) => {
+    if (settleRef.current) clearTimeout(settleRef.current)
+    settleRef.current = null
     draftRef.current = next
     setDraftState(next)
   }, [])
 
-  const setConflict = useCallback((note: NoteDetail | null) => {
-    conflictRef.current = note !== null
-    setConflictState(note)
-  }, [])
+  /** Puts text into the editor from outside (not typed there). */
+  const replaceContent = useCallback(
+    (next: Draft) => {
+      setDraft(next)
+      setEditorContent((prev) => ({ text: next.content, rev: (prev?.rev ?? 0) + 1 }))
+    },
+    [setDraft],
+  )
+
+  const setConflict = useCallback(
+    (note: NoteDetail | null) => {
+      conflictRef.current = note !== null
+      setConflictState(note)
+      // The conflict dialog compares against the text as it is now, not as of the last pause.
+      if (note && draftRef.current) setDraft(draftRef.current)
+    },
+    [setDraft],
+  )
 
   const isDirty = useCallback(
     () =>
@@ -205,7 +238,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
       // Syncing from external sources (the query cache and localStorage) is what this
       // effect is for; it runs once per note.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft({ title: server.title, content: stored.content })
+      replaceContent({ title: server.title, content: stored.content })
       if (stored.baseVersion === server.version) {
         setStatus('saving')
         scheduleSave(0)
@@ -216,9 +249,9 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
       }
     } else {
       if (stored) clearStoredDraft(noteId)
-      setDraft({ title: server.title, content: server.content })
+      replaceContent({ title: server.title, content: server.content })
     }
-  }, [server, noteId, scheduleSave, setConflict, setDraft])
+  }, [server, noteId, scheduleSave, setConflict, replaceContent])
 
   // Later server updates (background refetch, a move/rename from the sidebar, another
   // tab): adopt them when they don't touch the text being edited.
@@ -238,9 +271,9 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
     } else {
       versionRef.current = server.version
       savedRef.current = { title: server.title, content: server.content }
-      setDraft({ title: server.title, content: server.content })
+      replaceContent({ title: server.title, content: server.content })
     }
-  }, [server, isDirty, setConflict, setDraft])
+  }, [server, isDirty, setConflict, setDraft, replaceContent])
 
   useEffect(() => {
     function handleOnline() {
@@ -292,6 +325,7 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
     mountedRef.current = true
     return () => {
       mountedRef.current = false
+      if (settleRef.current) clearTimeout(settleRef.current)
       clearTimers()
       if (isDirty()) void saveNowRef.current()
     }
@@ -301,14 +335,19 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
     (content: string) => {
       const current = draftRef.current
       if (!current || content === current.content) return
-      setDraft({ ...current, content })
+      draftRef.current = { ...current, content }
+      if (settleRef.current) clearTimeout(settleRef.current)
+      settleRef.current = setTimeout(() => {
+        settleRef.current = null
+        if (draftRef.current) setDraftState(draftRef.current)
+      }, SETTLE_MS)
       writeStoredDraft(noteId, { content, baseVersion: versionRef.current })
       if (fatalRef.current || conflictRef.current) return
       setStatus(navigator.onLine ? 'saving' : 'offline')
       retriesRef.current = 0
       scheduleSave()
     },
-    [noteId, scheduleSave, setDraft],
+    [noteId, scheduleSave],
   )
 
   const setTitle = useCallback(
@@ -356,14 +395,15 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
     versionRef.current = conflict.version
     savedRef.current = { title: conflict.title, content: conflict.content }
     pendingTitleRef.current = null
-    setDraft({ title: conflict.title, content: conflict.content })
+    replaceContent({ title: conflict.title, content: conflict.content })
     clearStoredDraft(noteId)
     setConflict(null)
     setStatus('saved')
-  }, [conflict, noteId, setConflict, setDraft])
+  }, [conflict, noteId, setConflict, replaceContent])
 
   return {
     draft,
+    editorContent,
     status,
     conflict,
     titleError,

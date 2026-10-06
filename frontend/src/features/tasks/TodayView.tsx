@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { CalendarClock } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
@@ -13,6 +13,8 @@ import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function TodayView() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  // Stable, so the (memoized) task rows don't all re-render when a task opens.
+  const openTask = useCallback((task: Task) => setOpenTaskId(task.id), [])
   const tasksQuery = useTasks({ view: 'today' })
   const today = useToday()
   useDocumentTitle('Today')
@@ -37,11 +39,7 @@ export default function TodayView() {
       {tasksQuery.data.length === 0 ? (
         <EmptyState icon={CalendarClock} title="Nothing due today" />
       ) : (
-        <TaskGroupedList
-          groups={groups}
-          onOpenTask={(task: Task) => setOpenTaskId(task.id)}
-          emptyMessage="Nothing due today"
-        />
+        <TaskGroupedList groups={groups} onOpenTask={openTask} emptyMessage="Nothing due today" />
       )}
 
       <TaskDetailDialog taskId={openTaskId} onOpenChange={(open) => !open && setOpenTaskId(null)} />

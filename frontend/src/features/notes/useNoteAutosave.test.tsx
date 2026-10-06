@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as notesApi from '@/features/notes/api'
-import { SAVE_DEBOUNCE_MS, useNoteAutosave } from '@/features/notes/useNoteAutosave'
+import { SAVE_DEBOUNCE_MS, SETTLE_MS, useNoteAutosave } from '@/features/notes/useNoteAutosave'
 import { ApiError } from '@/lib/api'
 import type { NoteDetail } from '@/lib/types'
 
@@ -132,6 +132,41 @@ describe('useNoteAutosave', () => {
     await act(() => vi.advanceTimersByTimeAsync(0))
     expect(updateNote).toHaveBeenCalledWith('a', { version: 1, content: 'Written offline' })
     expect(localStorage.getItem('nook:note-draft:a')).toBeNull()
+  })
+
+  it("doesn't re-render while typing; outside text reaches the editor", async () => {
+    updateNote.mockImplementation(async (_id, input) =>
+      note({ version: 2, content: input.content }),
+    )
+    let renders = 0
+    const { result, rerender } = renderHook(
+      ({ server }) => {
+        renders += 1
+        return useNoteAutosave('a', server)
+      },
+      { wrapper, initialProps: { server: note() } },
+    )
+    expect(result.current.editorContent).toEqual({ text: 'Alpha', rev: 1 })
+
+    const before = renders
+    act(() => {
+      for (const text of ['Alpha 1', 'Alpha 12', 'Alpha 123']) result.current.setContent(text)
+    })
+    // Only the status flips to "Saving…"; the text itself lives in the editor.
+    expect(renders - before).toBeLessThanOrEqual(1)
+    expect(result.current.draft?.content).toBe('Alpha')
+
+    await act(() => vi.advanceTimersByTimeAsync(SETTLE_MS))
+    expect(result.current.draft?.content).toBe('Alpha 123')
+    expect(result.current.editorContent?.rev).toBe(1) // typed text isn't pushed back in
+
+    await act(() => vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS))
+    expect(updateNote).toHaveBeenCalledWith('a', { version: 1, content: 'Alpha 123' })
+
+    // A newer copy from elsewhere, nothing unsaved: it replaces the editor's text.
+    rerender({ server: note({ version: 5, content: 'From another tab' }) })
+    expect(result.current.editorContent).toEqual({ text: 'From another tab', rev: 2 })
+    expect(result.current.draft?.content).toBe('From another tab')
   })
 
   it('asks to resolve when the stored draft is older than the server copy', () => {

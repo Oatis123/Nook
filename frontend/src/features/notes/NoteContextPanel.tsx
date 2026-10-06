@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { Link2, Plus } from '@/design/icons'
@@ -6,8 +6,13 @@ import { EmptyState } from '@/design/components/EmptyState'
 import { useBacklinks, useCreateTaskFromNote, useNote } from '@/features/notes/hooks'
 import { useCompleteTask, useReopenTask } from '@/features/tasks/hooks'
 import { useGraph } from '@/features/graph/hooks'
-import { GraphCanvas } from '@/features/graph/GraphCanvas'
 import type { LinkedTask } from '@/lib/types'
+
+// react-force-graph and d3 come with the local graph, not with the app's first load —
+// they were about a third of the main bundle.
+const GraphCanvas = lazy(() =>
+  import('@/features/graph/GraphCanvas').then((m) => ({ default: m.GraphCanvas })),
+)
 
 interface Heading {
   level: number
@@ -187,7 +192,10 @@ function LocalGraphSection({ noteId }: { noteId: string }) {
         </div>
       </div>
       {graphQuery.data && graphQuery.data.nodes.length > 1 ? (
-        <GraphCanvas data={graphQuery.data} colorBy="folder" height={220} />
+        // The fallback is what the canvas itself shows until it has measured its width.
+        <Suspense fallback={<div style={{ height: 220 }} />}>
+          <GraphCanvas data={graphQuery.data} colorBy="folder" height={220} />
+        </Suspense>
       ) : (
         <p className="text-sm text-text-muted">No connections yet.</p>
       )}

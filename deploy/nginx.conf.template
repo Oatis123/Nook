@@ -46,9 +46,10 @@ server {
     add_header X-Frame-Options "DENY" always;
     # script-src needs 'wasm-unsafe-eval' (not the much broader 'unsafe-eval') for the
     # markdown preview's syntax highlighter (shiki), which compiles a WebAssembly oniguruma
-    # regex engine on the client. font-src needs data: because @fontsource's per-subset
-    # woff2 files are small enough that Vite inlines many of them as data: URIs in the
-    # built CSS instead of emitting separate font files.
+    # regex engine on the client — in the preview's Web Worker, which gets this same header
+    # with its script from /assets/. font-src keeps data: from when Vite inlined small
+    # @fontsource subsets into the CSS; the build now emits every font as a file
+    # (frontend/vite.config.ts), so nothing relies on it any more.
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
     add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" always;
 

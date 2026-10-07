@@ -310,7 +310,7 @@
 :root[data-theme-skin='github']
   .markdown-preview
   .task-list-item
-  input[type='checkbox']:not(:checked) {
+  input[type='checkbox']:not(:checked, :hover) {
   border-color: light-dark(#818b98, #656c76);
 }
 

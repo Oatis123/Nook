@@ -216,6 +216,7 @@
   border-radius: 0.3em;
   background: var(--bg);
   opacity: 1;
+  cursor: pointer;
   transition:
     background-color 150ms var(--ease-standard),
     border-color 150ms var(--ease-standard);
@@ -223,6 +224,12 @@
 .markdown-preview .task-list-item input[type='checkbox']:checked {
   border-color: var(--accent);
   background: var(--accent);
+}
+.markdown-preview .task-list-item input[type='checkbox']:not(:checked, :disabled):hover {
+  border-color: var(--accent);
+}
+.markdown-preview .task-list-item input[type='checkbox']:disabled {
+  cursor: default;
 }
 .markdown-preview .task-list-item input[type='checkbox']:checked::after {
   content: '';

@@ -52,6 +52,23 @@ export function NoteEditor({ noteId }: { noteId: string }) {
 
   const previewEnabled = user?.editor_preview_enabled ?? true
 
+  // A checklist box clicked in the preview flips its `[ ]` in the editor, like typing it
+  // would — so it's autosaved, and Ctrl+Z undoes it.
+  const toggleTask = useCallback((offset: number, checked: boolean, shown: string) => {
+    const view = viewRef.current
+    if (!view) return false
+    const doc = view.state.doc
+    // The preview trails typing by a moment: a box from text that has changed since is
+    // refused rather than applied to the wrong place.
+    if (doc.length !== shown.length || doc.toString() !== shown) return false
+    if (!/^\[[ xX]\]$/.test(doc.sliceString(offset, offset + 3))) return false
+    view.dispatch({
+      changes: { from: offset + 1, to: offset + 2, insert: checked ? 'x' : ' ' },
+      userEvent: 'input.toggle-task',
+    })
+    return true
+  }, [])
+
   useEffect(() => {
     function handleKeydown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
@@ -249,7 +266,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               mobileTab === 'edit' ? 'hidden' : ''
             }`}
           >
-            <MarkdownPreview content={draft.content} />
+            <MarkdownPreview content={draft.content} onToggleTask={toggleTask} />
           </div>
         )}
       </div>

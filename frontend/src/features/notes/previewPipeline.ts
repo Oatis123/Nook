@@ -115,6 +115,8 @@ export interface PreviewBlocks {
   blocks: Record<string, HastContent>
   /** The note has formulas: the page needs KaTeX's stylesheet. */
   math: boolean
+  /** Each checkbox's `[ ]` in the source, in page order (-1: not found). */
+  tasks: number[]
 }
 
 export class HighlighterUnavailableError extends Error {}
@@ -184,6 +186,9 @@ function rehypeTaskItems() {
       )
       if (at === -1) return
       const input = holder.children[at] as Element
+      // Clickable in the editor's preview (MarkdownPreview disables it elsewhere): a click
+      // toggles the item's `[ ]` in the note.
+      delete input.properties.disabled
       if (input.properties.checked) {
         node.properties.className = [
           ...(node.properties.className as string[]),
@@ -212,6 +217,25 @@ function rehypeTaskItems() {
       })
     })
   }
+}
+
+const TASK_MARKER = /\[[ xX]\]/g
+
+/** Where each checkbox's `[ ]` / `[x]` is in the note, in the order the checkboxes appear
+ * on the page (footnotes move to the end, so source order wouldn't do). Kept out of the
+ * blocks themselves, whose keys mustn't depend on where they are. */
+function taskMarkers(tree: HastRoot, source: string): number[] {
+  const offsets: number[] = []
+  visit(tree, 'element', (node) => {
+    if (node.tagName !== 'li' || !hasClass(node, 'task-list-item')) return
+    const start = node.position?.start.offset
+    if (start === undefined) return
+    // The item starts at its bullet; the marker is the first one after it.
+    TASK_MARKER.lastIndex = start
+    const match = TASK_MARKER.exec(source)
+    offsets.push(match ? match.index : -1)
+  })
+  return offsets
 }
 
 /** Notes with formulas also get dollar amounts wrong: "$5 and $10" parses as the formula
@@ -365,7 +389,7 @@ export function createPreviewRenderer() {
         keys.push(key)
         if (!have.has(key) && !(key in blocks)) blocks[key] = JSON.parse(serialized) as HastContent
       }
-      return { keys, blocks, math: renderMath !== null }
+      return { keys, blocks, math: renderMath !== null, tasks: taskMarkers(hast, content) }
     },
   }
 }

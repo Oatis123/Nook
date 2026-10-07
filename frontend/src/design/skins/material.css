@@ -428,7 +428,7 @@
 :root[data-theme-skin='material']
   .markdown-preview
   .task-list-item
-  input[type='checkbox']:not(:checked) {
+  input[type='checkbox']:not(:checked, :hover) {
   border-color: var(--text-muted);
 }
 

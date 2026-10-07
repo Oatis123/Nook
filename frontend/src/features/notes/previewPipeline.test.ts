@@ -96,4 +96,23 @@ describe('preview blocks', () => {
       true,
     )
   })
+
+  it("finds each checkbox's marker in the source, in page order", async () => {
+    const renderer = createPreviewRenderer()
+    renderer.setContext(context)
+    const source = [
+      'Intro [x] not a task',
+      '',
+      '- [ ] One',
+      '  - [X] Nested',
+      '',
+      '> - [x] Quoted',
+      '',
+      '1. [ ] Numbered',
+    ].join('\n')
+    const result = await renderer.render(source, new Set())
+    expect(result.tasks.map((at) => source.slice(at, at + 3))).toEqual(['[ ]', '[X]', '[x]', '[ ]'])
+    expect(result.tasks[0]).toBe(source.indexOf('- [ ] One') + 2)
+    expect(JSON.stringify(result.blocks)).not.toContain('disabled')
+  })
 })

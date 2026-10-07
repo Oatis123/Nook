@@ -1,9 +1,12 @@
 import {
+  createContext,
   memo,
   startTransition,
   type ImgHTMLAttributes,
+  type InputHTMLAttributes,
   type MouseEvent,
   type ReactNode,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -42,6 +45,25 @@ function PreviewImage(props: ImgHTMLAttributes<HTMLImageElement>) {
   )
 }
 
+/** Whether checklist boxes can be clicked: only next to the editor (onToggleTask). */
+const TasksClickable = createContext(false)
+
+/** A checklist box. Uncontrolled, so a click shows at once, before the note is re-rendered
+ * with the item's new `[x]` (a new block, so a new box); a click that can't be applied is
+ * cancelled, which puts the box back. */
+function PreviewCheckbox({ checked, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  const clickable = useContext(TasksClickable)
+  if (props.type !== 'checkbox') return <input checked={checked} readOnly {...props} />
+  return (
+    <input
+      {...props}
+      defaultChecked={checked}
+      disabled={!clickable}
+      aria-label={checked ? 'Mark as not done' : 'Mark as done'}
+    />
+  )
+}
+
 let mathStyles: Promise<unknown> | null = null
 
 /** KaTeX's stylesheet (and through it, its fonts) — only for notes with formulas. A
@@ -57,7 +79,7 @@ const toReact = unified().use(rehypeReact, {
   Fragment,
   jsx,
   jsxs,
-  components: { img: PreviewImage },
+  components: { img: PreviewImage, input: PreviewCheckbox },
 }) as unknown as Processor
 
 /** One top-level block of the note. An unchanged block comes back as the very same object,
@@ -68,9 +90,24 @@ const PreviewBlock = memo(function PreviewBlock({ block }: { block: HastContent 
   return toReact.stringify(root) as ReactNode
 })
 
+/** What's on screen: the blocks, and the text and checkbox markers they came from. */
+interface Rendered {
+  nodes: ReactNode
+  content: string
+  tasks: number[]
+}
+
 /** Renders `content` as soon as it changes: while typing, it's given the text only once
- * typing pauses (useNoteAutosave's SETTLE_MS). */
-export const MarkdownPreview = memo(function MarkdownPreview({ content }: { content: string }) {
+ * typing pauses (useNoteAutosave's SETTLE_MS). `onToggleTask` makes checklist boxes
+ * clickable: it gets the `[ ]`'s offset in `content` (the text on screen, which the editor
+ * may since have moved past) and returns whether it applied the change. */
+export const MarkdownPreview = memo(function MarkdownPreview({
+  content,
+  onToggleTask,
+}: {
+  content: string
+  onToggleTask?: (offset: number, checked: boolean, content: string) => boolean
+}) {
   const resolvedTheme = useResolvedTheme()
   const navigate = useNavigate()
   const linkTargets = useNoteLinkTargets()
@@ -79,7 +116,7 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: { cont
   const createNote = useCreateNote()
   const [highlighterError, setHighlighterError] = useState(false)
   const [highlighterAttempt, setHighlighterAttempt] = useState(0)
-  const [tree, setTree] = useState<ReactNode>(null)
+  const [tree, setTree] = useState<Rendered | null>(null)
   const [session] = useState(createPreviewSession)
   // The note's blocks by content key: after an edit only the edited ones are new.
   const blocksRef = useRef(new Map<string, HastContent>())
@@ -106,7 +143,12 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: { cont
       if (cancelled || result.status === 'skipped') return
       if (result.status === 'error') {
         if (result.error === 'highlighter') setHighlighterError(true)
-        else setTree(<p className="text-danger">Couldn't render this note.</p>)
+        else
+          setTree({
+            nodes: <p className="text-danger">Couldn't render this note.</p>,
+            content,
+            tasks: [],
+          })
         return
       }
       // Before showing the formulas, so they don't flash up unstyled.
@@ -125,7 +167,7 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: { cont
         return <PreviewBlock key={repeat ? `${key}:${repeat}` : key} block={block} />
       })
       blocksRef.current = next
-      startTransition(() => setTree(children))
+      startTransition(() => setTree({ nodes: children, content, tasks: result.tasks }))
     }
     void render()
     return () => {
@@ -134,7 +176,16 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: { cont
   }, [content, context, session, highlighterAttempt])
 
   function handleClick(e: MouseEvent<HTMLDivElement>) {
-    const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-wikilink]')
+    const target = e.target as HTMLElement
+    if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+      // The boxes are in page order, as are the markers.
+      const boxes = [...e.currentTarget.querySelectorAll('.task-list-item input[type="checkbox"]')]
+      const offset = tree?.tasks[boxes.indexOf(target)] ?? -1
+      const applied = offset >= 0 && tree && onToggleTask?.(offset, target.checked, tree.content)
+      if (!applied) e.preventDefault()
+      return
+    }
+    const link = target.closest<HTMLAnchorElement>('a[data-wikilink]')
     if (!link) return
     e.preventDefault()
 
@@ -171,8 +222,10 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: { cont
   }
 
   return (
-    <div className="markdown-preview" onClick={handleClick}>
-      {tree ?? <p className="text-sm text-text-muted">Loading preview…</p>}
-    </div>
+    <TasksClickable.Provider value={onToggleTask !== undefined}>
+      <div className="markdown-preview" onClick={handleClick}>
+        {tree?.nodes ?? <p className="text-sm text-text-muted">Loading preview…</p>}
+      </div>
+    </TasksClickable.Provider>
   )
 })

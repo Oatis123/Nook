@@ -248,7 +248,7 @@
 :root[data-theme-skin='telegram']
   .markdown-preview
   .task-list-item
-  input[type='checkbox']:not(:checked) {
+  input[type='checkbox']:not(:checked, :hover) {
   border-color: color-mix(in srgb, var(--text-muted) 70%, transparent);
 }
 

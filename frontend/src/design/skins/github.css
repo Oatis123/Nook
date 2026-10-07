@@ -302,6 +302,18 @@
   mask: var(--mask-check) center / contain no-repeat;
 }
 
+/* Note checklists: the same Primer checkbox. */
+:root[data-theme-skin='github'] .markdown-preview .task-list-item input[type='checkbox'] {
+  border-width: 1px;
+  border-radius: 3px;
+}
+:root[data-theme-skin='github']
+  .markdown-preview
+  .task-list-item
+  input[type='checkbox']:not(:checked) {
+  border-color: light-dark(#818b98, #656c76);
+}
+
 :root[data-theme-skin='github'] :is(input, select, textarea).border {
   background: var(--bg);
 }

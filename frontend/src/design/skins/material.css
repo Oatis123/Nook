@@ -420,6 +420,18 @@
   animation: m3-check-in 350ms var(--ease-spring);
 }
 
+/* Note checklists: the same M3 checkbox. */
+:root[data-theme-skin='material'] .markdown-preview .task-list-item input[type='checkbox'] {
+  border-width: 2px;
+  border-radius: 0.2em;
+}
+:root[data-theme-skin='material']
+  .markdown-preview
+  .task-list-item
+  input[type='checkbox']:not(:checked) {
+  border-color: var(--text-muted);
+}
+
 :root[data-theme-skin='material'] :is(input, select, textarea).border {
   border-color: var(--m3-outline);
 }

@@ -1,16 +1,17 @@
 /** The note preview's Markdown → HTML-tree pipeline, without React: it runs in a Web
  * Worker (preview.worker.ts), so parsing and highlighting a long note never blocks
  * typing, or on the main thread where workers aren't available (previewClient.ts). */
-import type { Root as HastRoot, RootContent as HastContent } from 'hast'
+import type { Element, ElementContent, Root as HastRoot, RootContent as HastContent } from 'hast'
 import type { Root as MdastRoot } from 'mdast'
 import { unified, type Processor } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
 import remarkRehype from 'remark-rehype'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import rehypeShikiFromHighlighter from '@shikijs/rehype/core'
 import type { HighlighterCore } from 'shiki/core'
-import { visit } from 'unist-util-visit'
+import { SKIP, visit } from 'unist-util-visit'
 import { getHighlighter, loadLanguages } from '@/features/notes/shiki'
 import { remarkWikilinks } from '@/features/notes/remarkWikilinks'
 import { remarkCallouts } from '@/features/notes/remarkCallouts'
@@ -112,22 +113,154 @@ export interface PreviewContext {
 export interface PreviewBlocks {
   keys: string[]
   blocks: Record<string, HastContent>
+  /** The note has formulas: the page needs KaTeX's stylesheet. */
+  math: boolean
 }
 
 export class HighlighterUnavailableError extends Error {}
 
+type RenderMath = (tex: string, displayMode: boolean) => ElementContent[]
+
+function hasClass(node: Element, name: string): boolean {
+  const className = node.properties.className
+  return Array.isArray(className) && className.includes(name)
+}
+
+/** remark-math writes display math as `<pre><code class="math-display">` — which Shiki
+ * would take for a code block. Unwrapped before it runs; formulas are rendered after
+ * sanitizing (rehypeMath). */
+function rehypeUnwrapDisplayMath() {
+  return (tree: HastRoot) => {
+    visit(tree, 'element', (node, index, parent) => {
+      if (node.tagName !== 'pre' || !parent || index === undefined) return
+      const code = node.children.find((child) => child.type === 'element')
+      if (code?.type === 'element' && hasClass(code, 'math-display')) {
+        parent.children[index] = code
+        return SKIP
+      }
+    })
+  }
+}
+
+/** Formulas through KaTeX. After sanitizing, as KaTeX's markup (inline styles, SVG
+ * strokes for roots and arrows) is beyond the schema — and needn't pass it: KaTeX escapes
+ * what it's given and, with `trust` off, emits no links or images. */
+function rehypeMath(render: RenderMath) {
+  return (tree: HastRoot) => {
+    visit(tree, 'element', (node, index, parent) => {
+      if (node.tagName !== 'code' || !parent || index === undefined) return
+      const display = hasClass(node, 'math-display')
+      if (!display && !hasClass(node, 'math-inline')) return
+      const tex = node.children.map((child) => (child.type === 'text' ? child.value : '')).join('')
+      const rendered = render(tex, display)
+      const replacement: ElementContent[] = display
+        ? [
+            {
+              type: 'element',
+              tagName: 'div',
+              properties: { className: ['math-display'] },
+              children: rendered,
+            },
+          ]
+        : rendered
+      ;(parent.children as ElementContent[]).splice(index, 1, ...replacement)
+      return [SKIP, index + replacement.length]
+    })
+  }
+}
+
+/** GFM task items: the text after the checkbox goes in a `.task-list-label` (so a done
+ * item can be struck through without striking its sub-list), and done items get
+ * `.task-list-item-checked`. After sanitizing: these classes are ours, not the note's. */
+function rehypeTaskItems() {
+  return (tree: HastRoot) => {
+    visit(tree, 'element', (node) => {
+      if (node.tagName !== 'li' || !hasClass(node, 'task-list-item')) return
+      // A loose list wraps the item's text, checkbox included, in a <p>.
+      const first = node.children.find((child) => child.type === 'element')
+      const holder = first?.type === 'element' && first.tagName === 'p' ? first : node
+      const at = holder.children.findIndex(
+        (child) => child.type === 'element' && child.tagName === 'input',
+      )
+      if (at === -1) return
+      const input = holder.children[at] as Element
+      if (input.properties.checked) {
+        node.properties.className = [
+          ...(node.properties.className as string[]),
+          'task-list-item-checked',
+        ]
+      }
+      let end = at + 1
+      while (end < holder.children.length) {
+        const child = holder.children[end]
+        if (child.type === 'element' && (child.tagName === 'ul' || child.tagName === 'ol')) break
+        end += 1
+      }
+      const label = holder.children.slice(at + 1, end)
+      // The space after the box (its gap is CSS's) and the newline before a sub-list.
+      const lead = label[0]
+      if (lead?.type === 'text') label[0] = { ...lead, value: lead.value.trimStart() }
+      const last = label[label.length - 1]
+      if (last?.type === 'text') label[label.length - 1] = { ...last, value: last.value.trimEnd() }
+      const trimmed = label.filter((child) => child.type !== 'text' || child.value !== '')
+      label.splice(0, label.length, ...trimmed)
+      holder.children.splice(at + 1, end - at - 1, {
+        type: 'element',
+        tagName: 'span',
+        properties: { className: ['task-list-label'] },
+        children: label,
+      })
+    })
+  }
+}
+
+/** Notes with formulas also get dollar amounts wrong: "$5 and $10" parses as the formula
+ * "5 and ". Like Pandoc and Obsidian, `$…$` is math only if it doesn't start or end with a
+ * space and isn't followed by a digit; anything else goes back to being plain text. */
+function dropDollarAmounts(tree: MdastRoot, source: string): void {
+  visit(tree, 'inlineMath', (node, index, parent) => {
+    const start = node.position?.start.offset
+    const end = node.position?.end.offset
+    if (!parent || index === undefined || start === undefined || end === undefined) return
+    const raw = source.slice(start, end)
+    const single = raw.startsWith('$') && !raw.startsWith('$$')
+    // The source, not node.value: the parser drops a space at either end ("$ 3 $" → "3").
+    const inner = raw.slice(1, -1)
+    if (single && (/^\s|\s$/.test(inner) || /\d/.test(source[end] ?? ''))) {
+      parent.children[index] = { type: 'text', value: raw }
+    }
+  })
+}
+
+/** Which costly parts the note needs: Shiki for fenced code, KaTeX for formulas. */
+function needs(tree: MdastRoot): { languages: Set<string>; math: boolean } {
+  const languages = new Set<string>()
+  let math = false
+  visit(tree, (node) => {
+    if (node.type === 'code' && node.lang) languages.add(node.lang)
+    if (node.type === 'math' || node.type === 'inlineMath') math = true
+  })
+  return { languages, math }
+}
+
 /** Without a highlighter, the pipeline for notes with no fenced code in a language —
  * Shiki only ever touches those blocks, so its WebAssembly engine and grammars aren't
- * fetched at all for them. */
-function buildProcessor(context: PreviewContext, highlighter: HighlighterCore | null): Processor {
+ * fetched at all for them; likewise KaTeX for notes without formulas. */
+function buildProcessor(
+  context: PreviewContext,
+  highlighter: HighlighterCore | null,
+  renderMath: RenderMath | null,
+): Processor {
   const wikilinkIndex = buildWikilinkIndex(context.notes, context.folders as Folder[])
   const attachmentIndex = buildAttachmentIndex(context.attachments as Attachment[])
   return unified()
     .use(remarkParse)
     .use(remarkGfm)
+    .use(remarkMath)
     .use(remarkWikilinks, wikilinkIndex, attachmentIndex)
     .use(remarkCallouts)
     .use(remarkRehype)
+    .use(renderMath ? [rehypeUnwrapDisplayMath] : [])
     .use(
       highlighter
         ? [
@@ -143,16 +276,24 @@ function buildProcessor(context: PreviewContext, highlighter: HighlighterCore | 
           ]
         : [],
     )
-    .use(rehypeSanitize, sanitizeSchema) as unknown as Processor
+    .use(rehypeSanitize, sanitizeSchema)
+    .use(renderMath ? [[rehypeMath, renderMath]] : [])
+    .use(rehypeTaskItems) as unknown as Processor
 }
 
-/** The languages of the note's fenced code blocks (```js) — the ones Shiki highlights. */
-function codeLanguages(tree: MdastRoot): Set<string> {
-  const languages = new Set<string>()
-  visit(tree, 'code', (node) => {
-    if (node.lang) languages.add(node.lang)
-  })
-  return languages
+let mathModule: Promise<RenderMath | null> | null = null
+
+/** KaTeX, loaded once. If it can't be (offline, a failed deploy), formulas stay as their
+ * source text, and the next note with math tries again. */
+function loadMath(): Promise<RenderMath | null> {
+  mathModule ??= import('@/features/notes/math').then(
+    (module) => module.renderMath,
+    () => {
+      mathModule = null
+      return null
+    },
+  )
+  return mathModule
 }
 
 /** Source positions shift with every edit above a block but never change its output, so
@@ -179,34 +320,42 @@ function blockKey(serialized: string): string {
 
 export function createPreviewRenderer() {
   let context: PreviewContext | null = null
-  let processors: { plain: Processor; highlighting: Processor | null } | null = null
+  // By which of Shiki and KaTeX they use; rebuilt when the context changes.
+  let processors = new Map<string, Processor>()
 
   return {
     setContext(next: PreviewContext) {
       context = next
-      processors = null
+      processors = new Map()
     },
 
     /** `have`: block keys the caller already holds — those aren't sent again. */
     async render(content: string, have: ReadonlySet<string>): Promise<PreviewBlocks> {
       if (!context) throw new Error('Preview context not set')
-      processors ??= { plain: buildProcessor(context, null), highlighting: null }
       const current = processors
-      const mdast = current.plain.parse(content) as MdastRoot
-      const languages = codeLanguages(mdast)
-      let processor = current.plain
+      const processorFor = (h: HighlighterCore | null, m: RenderMath | null) => {
+        const key = `${h ? 'h' : ''}${m ? 'm' : ''}`
+        let processor = current.get(key)
+        if (!processor) {
+          processor = buildProcessor(context!, h, m)
+          current.set(key, processor)
+        }
+        return processor
+      }
+      const mdast = processorFor(null, null).parse(content) as MdastRoot
+      dropDollarAmounts(mdast, content)
+      const { languages, math } = needs(mdast)
+      let highlighter: HighlighterCore | null = null
       if (languages.size > 0) {
-        let highlighter: HighlighterCore
         try {
           highlighter = await getHighlighter()
         } catch {
           throw new HighlighterUnavailableError()
         }
         await loadLanguages(highlighter, languages)
-        current.highlighting ??= buildProcessor(context, highlighter)
-        processor = current.highlighting
       }
-      const hast = (await processor.run(mdast)) as HastRoot
+      const renderMath = math ? await loadMath() : null
+      const hast = (await processorFor(highlighter, renderMath).run(mdast)) as HastRoot
 
       const keys: string[] = []
       const blocks: Record<string, HastContent> = {}
@@ -216,7 +365,7 @@ export function createPreviewRenderer() {
         keys.push(key)
         if (!have.has(key) && !(key in blocks)) blocks[key] = JSON.parse(serialized) as HastContent
       }
-      return { keys, blocks }
+      return { keys, blocks, math: renderMath !== null }
     },
   }
 }

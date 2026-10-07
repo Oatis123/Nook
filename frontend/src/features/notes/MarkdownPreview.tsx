@@ -42,6 +42,17 @@ function PreviewImage(props: ImgHTMLAttributes<HTMLImageElement>) {
   )
 }
 
+let mathStyles: Promise<unknown> | null = null
+
+/** KaTeX's stylesheet (and through it, its fonts) — only for notes with formulas. A
+ * failure leaves the formulas unstyled rather than the note unrendered. */
+function loadMathStyles(): Promise<unknown> {
+  mathStyles ??= import('katex/dist/katex.min.css').catch(() => {
+    mathStyles = null
+  })
+  return mathStyles
+}
+
 const toReact = unified().use(rehypeReact, {
   Fragment,
   jsx,
@@ -97,6 +108,11 @@ export const MarkdownPreview = memo(function MarkdownPreview({ content }: { cont
         if (result.error === 'highlighter') setHighlighterError(true)
         else setTree(<p className="text-danger">Couldn't render this note.</p>)
         return
+      }
+      // Before showing the formulas, so they don't flash up unstyled.
+      if (result.math) {
+        await loadMathStyles()
+        if (cancelled) return
       }
       const next = new Map<string, HastContent>()
       const seen = new Map<string, number>()

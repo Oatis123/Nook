@@ -6,9 +6,10 @@ import { defineConfig, type Plugin } from 'vite'
 
 const rootDir = import.meta.dirname
 
-/** @fontsource's @font-face rules list a .woff after each .woff2 — a fallback for browsers
- * without WOFF2, and every browser this app supports has it. Dropping it shortens every
- * rule in the render-blocking stylesheet (and the .woff files are no longer emitted). */
+/** @fontsource's @font-face rules list a .woff after each .woff2, and KaTeX's a .woff and a
+ * .ttf — fallbacks for browsers without WOFF2, and every browser this app supports has it.
+ * Dropping them shortens every rule in the render-blocking stylesheet (and the fallback
+ * files are no longer emitted). */
 function woff2Only(): Plugin {
   return {
     name: 'nook:woff2-only',
@@ -17,7 +18,10 @@ function woff2Only(): Plugin {
     // them) itself; before Vite resolves the url()s into emitted assets.
     transform(code, id) {
       if (!/\.css(\?|$)/.test(id) || !code.includes('@font-face')) return null
-      return code.replace(/,\s*url\([^)]*\.woff\)\s*format\(['"]?woff['"]?\)/g, '')
+      return code.replace(
+        /,\s*url\([^)]*\.(?:woff|ttf)\)\s*format\(['"]?(?:woff|truetype)['"]?\)/g,
+        '',
+      )
     },
   }
 }

@@ -199,6 +199,53 @@
 .markdown-preview li.task-list-item {
   list-style: none;
   margin-left: -1.5em;
+  /* A hanging indent: wrapped lines line up with the text, not under the box. */
+  padding-left: 1.6em;
+}
+/* The checkbox, drawn like the app's own (skins restyle it next to their task checkbox):
+   1.05em wide plus 0.55em of gap fills the 1.6em indent. */
+.markdown-preview .task-list-item input[type='checkbox'] {
+  appearance: none;
+  position: relative;
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0 0.55em 0 -1.6em;
+  vertical-align: -0.17em;
+  border: 1.5px solid color-mix(in srgb, var(--text-muted) 55%, transparent);
+  border-radius: 0.3em;
+  background: var(--bg);
+  opacity: 1;
+  transition:
+    background-color 150ms var(--ease-standard),
+    border-color 150ms var(--ease-standard);
+}
+.markdown-preview .task-list-item input[type='checkbox']:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.markdown-preview .task-list-item input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  inset: 0.06em;
+  background: var(--accent-text);
+  mask: var(--mask-check) center / contain no-repeat;
+}
+.markdown-preview .task-list-item-checked > .task-list-label,
+.markdown-preview .task-list-item-checked > p > .task-list-label {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-muted) 60%, transparent);
+}
+/* Formulas (KaTeX). A display formula wider than the page scrolls on its own. */
+.markdown-preview .math-display {
+  margin: 0.9em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.markdown-preview .math-display > .katex-display {
+  margin: 0;
+  padding: 0.2em 0;
 }
 .markdown-preview blockquote {
   border-left: 2px solid var(--border);

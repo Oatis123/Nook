@@ -3,12 +3,12 @@ import CodeMirror, { type Extension, ExternalChange } from '@uiw/react-codemirro
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { autocompletion } from '@codemirror/autocomplete'
-import { Download, Eye, EyeOff, Link2, Paperclip } from '@/design/icons'
+import { clsx } from 'clsx'
+import { Download, Eye, Link2, Paperclip, Pencil } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { IconButton } from '@/design/components/IconButton'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
-import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { getRenameImpact, noteExportUrl } from '@/features/notes/api'
 import { editorHighlighting, editorTheme } from '@/features/notes/editorTheme'
 import { useNote, useNoteLinkTargets, useTags } from '@/features/notes/hooks'
@@ -20,6 +20,7 @@ import {
 import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/autocomplete'
 import { createAttachmentDropHandler } from '@/features/notes/attachmentDrop'
 import { MarkdownPreview } from '@/features/notes/MarkdownPreview'
+import { type NoteMode, setNoteMode, useNoteMode } from '@/features/notes/noteMode'
 import { ConflictDialog } from '@/features/notes/ConflictDialog'
 import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import { useUploadAttachment } from '@/features/attachments/hooks'
@@ -33,24 +34,41 @@ const EDITOR_BASIC_SETUP = { lineNumbers: false, foldGutter: false, highlightAct
 
 export function NoteEditor({ noteId }: { noteId: string }) {
   const noteQuery = useNote(noteId)
-  const { data: user } = useCurrentUser()
-  const updateProfile = useUpdateProfile()
   // Only the (stable) mutateAsync: useMutation returns a new object every render, and
   // depending on it rebuilt the editor's extensions — a full reconfigure — per keystroke.
   const { mutateAsync: uploadAttachment } = useUploadAttachment()
   const viewRef = useRef<EditorView | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autosave = useNoteAutosave(noteId, noteQuery.data)
-  const { draft, editorContent, status } = autosave
+  const { draft, editorContent, status, settle } = autosave
   useDocumentTitle(draft?.title ?? noteQuery.data?.title)
 
-  const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
   const [renamePrompt, setRenamePrompt] = useState<{ affectedNotes: number } | null>(null)
 
   const linkTargets = useNoteLinkTargets()
   const tagsQuery = useTags()
 
-  const previewEnabled = user?.editor_preview_enabled ?? true
+  // Editing or reading: the last mode picked, on any note. A new, empty note opens for
+  // writing whatever it was — there's nothing to read yet.
+  const lastMode = useNoteMode()
+  const [openedEmpty, setOpenedEmpty] = useState<boolean | null>(null)
+  if (draft && openedEmpty === null) setOpenedEmpty(draft.content.trim() === '')
+  const mode: NoteMode = openedEmpty ? 'edit' : lastMode
+  // The preview is rendered from the first switch to reading on, then only hidden: a note
+  // only ever edited never pays for it, and switching back and forth is instant.
+  const [previewMounted, setPreviewMounted] = useState(false)
+  if (mode === 'view' && !previewMounted) setPreviewMounted(true)
+
+  const switchMode = useCallback(
+    (next: NoteMode) => {
+      setOpenedEmpty(false)
+      // Reading right after typing: show the text as typed, not as of a moment ago.
+      if (next === 'view') settle()
+      setNoteMode(next)
+      if (next === 'edit') requestAnimationFrame(() => viewRef.current?.focus())
+    },
+    [settle],
+  )
 
   // A checklist box clicked in the preview flips its `[ ]` in the editor, like typing it
   // would — so it's autosaved, and Ctrl+Z undoes it.
@@ -73,13 +91,12 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     function handleKeydown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
         e.preventDefault()
-        updateProfile.mutate({ editor_preview_enabled: !previewEnabled })
+        switchMode(mode === 'edit' ? 'view' : 'edit')
       }
     }
     window.addEventListener('keydown', handleKeydown)
     return () => window.removeEventListener('keydown', handleKeydown)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewEnabled])
+  }, [mode, switchMode])
 
   // Title changes are saved explicitly on blur/Enter, not on every keystroke like
   // content — renaming needs a settled title to check link impact against.
@@ -201,20 +218,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               <Download size={16} strokeWidth={1.5} />
             </a>
           </Tooltip>
-          <Tooltip label="Toggle preview (Ctrl/Cmd+E)">
-            <IconButton
-              label="Toggle preview"
-              active={previewEnabled}
-              onClick={() => updateProfile.mutate({ editor_preview_enabled: !previewEnabled })}
-              className="max-md:hidden"
-            >
-              {previewEnabled ? (
-                <Eye size={16} strokeWidth={1.5} />
-              ) : (
-                <EyeOff size={16} strokeWidth={1.5} />
-              )}
-            </IconButton>
-          </Tooltip>
+          <ModeSwitch mode={mode} onChange={switchMode} />
         </div>
       </header>
 
@@ -227,27 +231,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         </p>
       )}
 
-      <div className="flex md:hidden">
-        {(['edit', 'preview'] as const).map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setMobileTab(tab)}
-            className={`flex-1 border-b-2 py-2 text-sm capitalize ${
-              mobileTab === tab ? 'border-accent text-text' : 'border-transparent text-text-muted'
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
-
       <div className="flex min-h-0 flex-1">
-        <div
-          className={`min-w-0 flex-1 overflow-y-auto ${
-            mobileTab === 'preview' ? 'hidden md:block' : ''
-          }`}
-        >
+        {/* Hidden, not unmounted, while reading: the editor holds the text, its undo
+            history and cursor — and a checklist box ticked while reading is typed into it. */}
+        <div className={clsx('min-w-0 flex-1 overflow-y-auto', mode === 'view' && 'hidden')}>
           <NoteCodeMirror
             content={editorContent}
             onChange={autosave.setContent}
@@ -256,17 +243,20 @@ export function NoteEditor({ noteId }: { noteId: string }) {
           />
         </div>
 
-        {/* contain: the preview's layout and paint are its own, so a keystroke in the
-            editor doesn't make the browser revisit the preview's (long) tree. It scrolls,
-            so it clips its content already — nothing looks different. (Not on the editor:
-            its autocomplete popup is position: fixed, which contain would confine.) */}
-        {previewEnabled && (
+        {/* Padded like the editor's text, so switching modes doesn't shift it. contain: it
+            scrolls and clips already, and its layout stays its own. */}
+        {previewMounted && (
           <div
-            className={`min-w-0 flex-1 overflow-y-auto border-l border-border px-6 py-4 [contain:layout_paint_style] md:block ${
-              mobileTab === 'edit' ? 'hidden' : ''
-            }`}
+            className={clsx(
+              'min-w-0 flex-1 overflow-y-auto px-5 py-4 [contain:layout_paint_style]',
+              mode === 'edit' && 'hidden',
+            )}
           >
-            <MarkdownPreview content={draft.content} onToggleTask={toggleTask} />
+            {draft.content.trim() ? (
+              <MarkdownPreview content={draft.content} onToggleTask={toggleTask} />
+            ) : (
+              <p className="text-sm text-text-muted">This note is empty.</p>
+            )}
           </div>
         )}
       </div>
@@ -332,6 +322,45 @@ const NoteCodeMirror = memo(function NoteCodeMirror({
     />
   )
 })
+
+const MODES: { value: NoteMode; label: string; icon: typeof Eye }[] = [
+  { value: 'edit', label: 'Edit', icon: Pencil },
+  { value: 'view', label: 'View', icon: Eye },
+]
+
+/** Edit / View, styled like the app's other segmented controls (skins restyle them). */
+function ModeSwitch({ mode, onChange }: { mode: NoteMode; onChange: (mode: NoteMode) => void }) {
+  return (
+    <Tooltip label="Edit or view (Ctrl/Cmd+E)">
+      <div
+        role="radiogroup"
+        aria-label="Mode"
+        className="ui-segmented inline-flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5"
+      >
+        {MODES.map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={mode === value}
+            aria-label={label}
+            data-active={mode === value}
+            onClick={() => onChange(value)}
+            className={clsx(
+              'ui-segment inline-flex h-7 items-center justify-center gap-1.5 rounded px-2 text-sm transition-colors duration-150',
+              mode === value
+                ? 'bg-surface-raised text-text shadow-sm'
+                : 'text-text-muted hover:text-text',
+            )}
+          >
+            <Icon size={15} strokeWidth={1.5} />
+            <span className="max-sm:hidden">{label}</span>
+          </button>
+        ))}
+      </div>
+    </Tooltip>
+  )
+}
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
   // Short labels on phones, where the status shares the header row with the title.

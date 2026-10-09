@@ -401,10 +401,20 @@ export function useNoteAutosave(noteId: string, server: NoteDetail | undefined) 
     setStatus('saved')
   }, [conflict, noteId, setConflict, replaceContent])
 
+  /** Brings `draft` up to the typed text now instead of SETTLE_MS later — for switching
+   * to reading right after typing. */
+  const settle = useCallback(() => {
+    if (!settleRef.current) return
+    clearTimeout(settleRef.current)
+    settleRef.current = null
+    if (draftRef.current) setDraftState(draftRef.current)
+  }, [])
+
   return {
     draft,
     editorContent,
     status,
+    settle,
     conflict,
     titleError,
     fatalError,

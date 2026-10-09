@@ -48,6 +48,7 @@ import {
   PanelLeft as LucidePanelLeft,
   PanelRight as LucidePanelRight,
   Paperclip as LucidePaperclip,
+  Pencil as LucidePencil,
   PawPrint as LucidePawPrint,
   Plane as LucidePlane,
   Plus as LucidePlus,
@@ -111,6 +112,7 @@ import {
   PaintbrushIcon,
   PaperAirplaneIcon,
   PaperclipIcon,
+  PencilIcon,
   PeopleIcon,
   PlusIcon,
   ProjectRoadmapIcon,
@@ -157,6 +159,7 @@ import ms_desktop_windows from '@material-symbols/svg-400/rounded/desktop_window
 import ms_directions_car from '@material-symbols/svg-400/rounded/directions_car.svg?raw'
 import ms_download from '@material-symbols/svg-400/rounded/download.svg?raw'
 import ms_draft from '@material-symbols/svg-400/rounded/draft.svg?raw'
+import ms_edit from '@material-symbols/svg-400/rounded/edit.svg?raw'
 import ms_favorite from '@material-symbols/svg-400/rounded/favorite.svg?raw'
 import ms_fitness_center from '@material-symbols/svg-400/rounded/fitness_center.svg?raw'
 import ms_flag from '@material-symbols/svg-400/rounded/flag.svg?raw'
@@ -419,6 +422,7 @@ export const Paperclip = themedIcon('Paperclip', LucidePaperclip, {
   github: PaperclipIcon,
   material: ms_attach_file,
 })
+export const Pencil = themedIcon('Pencil', LucidePencil, { github: PencilIcon, material: ms_edit })
 export const PawPrint = themedIcon('PawPrint', LucidePawPrint, {
   github: SquirrelIcon,
   material: ms_pets,

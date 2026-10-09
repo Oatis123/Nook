@@ -9,9 +9,15 @@ for implementation decisions left to the agent's discretion by the spec.
 
 ## Screenshots
 
-Markdown notes with `[[wikilinks]]`, tags and a live preview:
+Markdown notes with `[[wikilinks]]`, tags, checklists and LaTeX — open for editing or for
+reading, and the next note opens in the same mode:
 
-![Note editor with live preview](docs/screenshots/notes.png)
+<table>
+  <tr>
+    <td><img src="docs/screenshots/notes-edit.png" alt="A note in edit mode"></td>
+    <td><img src="docs/screenshots/notes.png" alt="The same note in view mode, with checklists and a formula"></td>
+  </tr>
+</table>
 
 Tasks — Today and the month calendar:
 

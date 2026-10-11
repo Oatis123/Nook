@@ -30,12 +30,21 @@ function handleNotLinked(error: unknown): boolean {
   return false
 }
 
+/** How often what's on screen is fetched again, so changes made elsewhere (the MCP agent,
+ * the Telegram bot, another device) show up without a reload. Only while the tab is
+ * visible; unchanged data keeps its identity (structural sharing), so nothing re-renders
+ * for it. */
+const LIVE_REFRESH_MS = 10_000
+
 const queryClient: QueryClient = new QueryClient({
   queryCache: new QueryCache({ onError: handleNotLinked }),
   defaultOptions: {
     queries: {
       retry: 1,
       staleTime: 30_000,
+      refetchInterval: LIVE_REFRESH_MS,
+      // Coming back to the tab catches up at once rather than at the next tick.
+      refetchOnWindowFocus: 'always',
     },
   },
   // Every mutation that fails without its own error UI used to fail silently; this

@@ -203,10 +203,10 @@ async def test_one_broken_reminder_does_not_block_the_rest(
 
     original = reminder_dispatch.format_reminder_text
 
-    def flaky(kind, task, task_list):
+    def flaky(kind, task, task_list, *args):
         if task.title == "Broken":
             raise RuntimeError("boom")
-        return original(kind, task, task_list)
+        return original(kind, task, task_list, *args)
 
     monkeypatch.setattr(reminder_dispatch, "format_reminder_text", flaky)
     now = (await _pending(db_session, fine["id"]))[0].remind_at

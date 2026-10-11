@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { FileText, Repeat, SkipForward, Trash2, X } from '@/design/icons'
 import { Dialog } from '@/design/components/Dialog'
-import { Switch } from '@/design/components/Switch'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
 import { fuzzyFilter } from '@/lib/fuzzy'
@@ -23,6 +22,8 @@ import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
 import { CompleteSubtasksDialog } from '@/features/tasks/CompleteSubtasksDialog'
 import { QuickAdd } from '@/features/tasks/QuickAdd'
 import { RecurrencePicker } from '@/features/tasks/RecurrencePicker'
+import { ReminderFields } from '@/features/tasks/ReminderFields'
+import { TagInput } from '@/features/tasks/TagInput'
 import { describeRrule } from '@/features/tasks/recurrenceLabel'
 import type { RecurrenceInput, Task, TaskDetail, TaskPriority } from '@/lib/types'
 import { confirmAction } from '@/lib/confirm'
@@ -355,16 +356,25 @@ export function TaskDetailDialog({
           )}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-text-muted">
-          <Switch
-            checked={task.reminders_enabled}
-            onCheckedChange={(checked) =>
-              updateTask.mutate({ id: task.id, reminders_enabled: checked })
-            }
-            label="Reminders enabled"
-          />
-          Reminders
-        </label>
+        <TagInput tags={task.tags} onChange={(tags) => updateTask.mutate({ id: task.id, tags })} />
+
+        <ReminderFields
+          enabled={task.reminders_enabled}
+          offsets={task.reminder_offsets}
+          hasDueDate={task.due_date !== null}
+          timed={task.due_time !== null}
+          recurring={task.is_recurring}
+          onEnabledChange={(checked) =>
+            updateTask.mutate({ id: task.id, reminders_enabled: checked })
+          }
+          onOffsetsChange={(offsets) =>
+            updateTask.mutate(
+              offsets === null
+                ? { id: task.id, default_reminders: true }
+                : { id: task.id, reminder_offsets: offsets },
+            )
+          }
+        />
 
         {!task.parent_id && (
           <div>

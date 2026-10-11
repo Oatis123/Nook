@@ -200,8 +200,8 @@ async def test_organizing_notes_folders_tags_and_backlinks(
     [backlink] = _tool_list(call("get_backlinks", note_id=roadmap["id"]))
     assert (backlink["title"], backlink["heading"]) == ("Standup", "Q4")
     assert _tool_list(call("list_tags")) == [
-        {"name": "daily", "note_count": 1},
-        {"name": "work", "note_count": 2},
+        {"name": "daily", "note_count": 1, "task_count": 0},
+        {"name": "work", "note_count": 2, "task_count": 0},
     ]
     assert [n["title"] for n in _tool_list(call("list_notes", tag="daily"))] == ["Standup"]
 
@@ -255,3 +255,88 @@ async def test_managing_task_lists_and_deleting_tasks(
     assert "icon" in bad["result"]["content"][0]["text"]
     inbox_delete = _call_tool(mcp_client, token, sid, "delete_task_list", {"list_id": inbox["id"]})
     assert "Inbox can't be deleted" in inbox_delete["result"]["content"][0]["text"]
+
+
+async def test_tasks_with_recurrence_reminders_tags_subtasks_and_batches(
+    mcp_client: TestClient, db_session: AsyncSession
+) -> None:
+    alice = await make_user(db_session, "alice")
+    _, token = await create_api_token(db_session, alice.id, "agent")
+    sid = _initialize(mcp_client, token)
+
+    def call(tool: str, /, **arguments: Any) -> dict:
+        response = _call_tool(mcp_client, token, sid, tool, arguments)
+        assert response["result"]["isError"] is False, response
+        return response
+
+    note = _tool_object(call("create_note", title="Gym plan"))
+    gym = _tool_object(
+        call(
+            "create_task",
+            title="Gym",
+            due_date="2030-01-07",
+            due_time="18:00",
+            recurrence="FREQ=WEEKLY;BYDAY=MO,WE",
+            reminders=[120, 15],
+            tags=["#health"],
+            note_ids=[note["id"]],
+        )
+    )
+    assert gym["recurrence"] == "FREQ=WEEKLY;BYDAY=MO,WE"
+    assert (gym["reminders"], gym["tags"]) == ([120, 15], ["health"])
+    assert [n["title"] for n in gym["linked_notes"]] == ["Gym plan"]
+
+    warmup = _tool_object(call("create_task", title="Warm up", parent_id=gym["id"]))
+    assert warmup["parent_id"] == gym["id"]
+    top = _tool_object(call("update_task", task_id=warmup["id"], parent_id=""))
+    assert top["parent_id"] is None
+    sub = _tool_object(call("update_task", task_id=top["id"], parent_id=gym["id"]))
+    assert sub["parent_id"] == gym["id"]
+
+    changed = _tool_object(
+        call("update_task", task_id=gym["id"], recurrence="", default_reminders=True, tags=[])
+    )
+    assert (changed["recurrence"], changed["reminders"], changed["tags"]) == (None, None, [])
+    unlinked = _tool_object(call("unlink_note_from_task", task_id=gym["id"], note_id=note["id"]))
+    assert unlinked["linked_notes"] == []
+    relinked = _tool_object(call("link_note_to_task", task_id=gym["id"], note_id=note["id"]))
+    assert len(relinked["linked_notes"]) == 1
+
+    results = _tool_list(
+        call(
+            "create_tasks",
+            tasks=[
+                {"title": "A", "tags": ["errands"]},
+                {"title": "B", "recurrence": "FREQ=DAILY"},  # no due date/time: fails
+                {"title": "C", "tags": ["errands"]},
+            ],
+        )
+    )
+    assert [r["ok"] for r in results] == [True, False, True]
+    assert "due date and time" in results[1]["error"]
+    a, c = results[0]["task"], results[2]["task"]
+    assert [t["title"] for t in _tool_list(call("list_tasks", tag="errands"))] == ["A", "C"]
+    assert {"name": "errands", "note_count": 0, "task_count": 2} in _tool_list(call("list_tags"))
+
+    ordered = _tool_list(call("reorder_tasks", task_ids=[c["id"], a["id"]]))
+    assert [t["title"] for t in ordered] == ["C", "A", "Gym"]
+
+    moved = _tool_list(
+        call(
+            "update_tasks",
+            updates=[
+                {"task_id": a["id"], "due_date": "2030-02-01"},
+                {"task_id": "not-an-id", "title": "X"},
+            ],
+        )
+    )
+    assert moved[0]["task"]["due_date"] == "2030-02-01"
+    assert moved[1]["ok"] is False
+
+    done = _tool_list(call("complete_tasks", task_ids=[a["id"], c["id"], gym["id"]]))
+    assert [r["ok"] for r in done] == [True, True, False]  # Gym still has an open subtask
+    assert "open subtask" in done[2]["error"]
+    assert (
+        _tool_object(call("complete_task", task_id=gym["id"], complete_subtasks=True))["status"]
+        == "done"
+    )

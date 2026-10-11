@@ -60,6 +60,8 @@ export const createTask = (input: {
   due_date?: string | null
   due_time?: string | null
   reminders_enabled?: boolean
+  reminder_offsets?: number[] | null
+  tags?: string[]
   recurrence?: RecurrenceInput | null
 }) => apiFetch<Task>('/tasks', { method: 'POST', body: input })
 
@@ -75,6 +77,9 @@ export const updateTask = (
     clear_due_date?: boolean
     clear_due_time?: boolean
     reminders_enabled?: boolean
+    reminder_offsets?: number[]
+    default_reminders?: boolean
+    tags?: string[]
     position?: number
     recurrence?: RecurrenceInput | null
     clear_recurrence?: boolean

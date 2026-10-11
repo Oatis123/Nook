@@ -2,10 +2,11 @@ import { type FormEvent, useState } from 'react'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
-import { Switch } from '@/design/components/Switch'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
 import { RecurrenceFields } from '@/features/tasks/RecurrenceFields'
+import { ReminderFields } from '@/features/tasks/ReminderFields'
+import { TagInput } from '@/features/tasks/TagInput'
 import { DEFAULT_RECURRENCE } from '@/features/tasks/recurrenceDefaults'
 import type { RecurrenceInput, TaskPriority } from '@/lib/types'
 
@@ -40,6 +41,8 @@ export function TaskCreateDialog({
   const [dueTime, setDueTime] = useState('')
   const [selectedListId, setSelectedListId] = useState<string | undefined>(listId)
   const [remindersEnabled, setRemindersEnabled] = useState(true)
+  const [reminderOffsets, setReminderOffsets] = useState<number[] | null>(null)
+  const [tags, setTags] = useState<string[]>([])
   const [mode, setMode] = useState<TaskMode>('once')
   const [recurrence, setRecurrence] = useState<RecurrenceInput>(DEFAULT_RECURRENCE)
 
@@ -58,6 +61,8 @@ export function TaskCreateDialog({
         listId ?? taskListsQuery.data?.find((l) => l.is_inbox)?.id ?? taskListsQuery.data?.[0]?.id,
       )
       setRemindersEnabled(true)
+      setReminderOffsets(null)
+      setTags([])
       setMode('once')
       setRecurrence(DEFAULT_RECURRENCE)
     }
@@ -87,6 +92,8 @@ export function TaskCreateDialog({
         due_date: dueDate || undefined,
         due_time: dueTime || undefined,
         reminders_enabled: remindersEnabled,
+        reminder_offsets: reminderOffsets,
+        tags,
         recurrence: mode === 'recurring' && canRepeat ? recurrence : undefined,
       },
       { onSuccess: () => onOpenChange(false) },
@@ -202,14 +209,17 @@ export function TaskCreateDialog({
           )}
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-text-muted">
-          <Switch
-            checked={remindersEnabled}
-            onCheckedChange={setRemindersEnabled}
-            label="Reminders enabled"
-          />
-          Reminders
-        </label>
+        <TagInput tags={tags} onChange={setTags} />
+
+        <ReminderFields
+          enabled={remindersEnabled}
+          offsets={reminderOffsets}
+          hasDueDate={dueDate !== ''}
+          timed={dueDate !== '' && dueTime !== ''}
+          recurring={mode === 'recurring' && canRepeat}
+          onEnabledChange={setRemindersEnabled}
+          onOffsetsChange={setReminderOffsets}
+        />
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

@@ -227,6 +227,9 @@ export interface Task {
   status: TaskStatus
   completed_at: string | null
   reminders_enabled: boolean
+  /** Minutes before the due moment; null = the default reminders. */
+  reminder_offsets: number[] | null
+  tags: string[]
   position: number
   subtask_done_count: number
   subtask_total_count: number

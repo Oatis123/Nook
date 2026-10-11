@@ -1,6 +1,6 @@
 from datetime import date, datetime, time, timedelta
 from itertools import islice
-from typing import Literal
+from typing import Any, Literal
 
 from dateutil.rrule import rrulestr
 from pydantic import BaseModel, Field, field_validator
@@ -39,6 +39,54 @@ class RecurrenceInput(BaseModel):
         ):
             raise ValueError(f"end_date must be within {MAX_RECURRENCE_END_YEARS} years from today")
         return value
+
+
+def parse_rrule(text: str) -> RecurrenceInput:
+    """The inverse of `build_rrule`, for clients that speak RRULE (the MCP tools): accepts
+    `FREQ=WEEKLY;BYDAY=MO,WE`, with or without an `RRULE:` prefix, limited to what
+    RecurrenceInput can express — FREQ, INTERVAL, BYDAY (plain days, weekly), BYMONTHDAY
+    (one day or -1, monthly), and COUNT or UNTIL. Raises ValueError for anything else."""
+    parts: dict[str, str] = {}
+    body = text.strip().removeprefix("RRULE:").removeprefix("rrule:")
+    for chunk in filter(None, body.split(";")):
+        key, sep, value = chunk.partition("=")
+        if not sep or not value:
+            raise ValueError(f"Malformed RRULE part '{chunk}'")
+        parts[key.strip().upper()] = value.strip().upper()
+
+    freq = parts.pop("FREQ", "").lower()
+    if freq not in ("daily", "weekly", "monthly", "yearly"):
+        raise ValueError("FREQ must be DAILY, WEEKLY, MONTHLY or YEARLY")
+    values: dict[str, Any] = {"freq": freq}
+    if "INTERVAL" in parts:
+        values["interval"] = int(parts.pop("INTERVAL"))
+    if "BYDAY" in parts:
+        if freq != "weekly":
+            raise ValueError("BYDAY is only supported with FREQ=WEEKLY")
+        days = parts.pop("BYDAY").split(",")
+        if any(d not in _WEEKDAY_CODES for d in days):
+            raise ValueError("BYDAY takes plain weekdays: MO,TU,WE,TH,FR,SA,SU")
+        values["by_weekday"] = [_WEEKDAY_CODES.index(d) for d in days]
+    if "BYMONTHDAY" in parts:
+        if freq != "monthly":
+            raise ValueError("BYMONTHDAY is only supported with FREQ=MONTHLY")
+        day = int(parts.pop("BYMONTHDAY"))
+        if day == -1:
+            values["on_last_day"] = True
+        else:
+            values["by_month_day"] = day
+    if "COUNT" in parts and "UNTIL" in parts:
+        raise ValueError("Use COUNT or UNTIL, not both")
+    if "COUNT" in parts:
+        values["end_type"] = "after_count"
+        values["end_count"] = int(parts.pop("COUNT"))
+    elif "UNTIL" in parts:
+        until = parts.pop("UNTIL")
+        values["end_type"] = "on_date"
+        values["end_date"] = datetime.strptime(until[:8], "%Y%m%d").date()
+    if parts:
+        raise ValueError(f"Unsupported RRULE parts: {', '.join(sorted(parts))}")
+    return RecurrenceInput(**values)
 
 
 def build_rrule(rec: RecurrenceInput) -> str:

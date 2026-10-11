@@ -111,7 +111,7 @@ async def _dispatch_one(
         # A recurring task's chain of "occurrence" reminders is only ever extended from
         # here — without this, one missed reminder (downtime, notifications off) ended
         # the task's reminders for good.
-        await schedule_next_occurrence_reminder(session, task, row.occurrence_at, not_before=now)
+        await _schedule_next(session, task, row, not_before=now)
         return
 
     user = await session.get(User, task.user_id)
@@ -130,7 +130,7 @@ async def _dispatch_one(
         row.status = ReminderStatus.cancelled
         return
 
-    text = format_reminder_text(ReminderKind(row.kind), task, task_list)
+    text = format_reminder_text(ReminderKind(row.kind), task, task_list, row.offset_minutes)
     url = reminder_task_url(settings.public_url, task)
 
     try:
@@ -139,16 +139,14 @@ async def _dispatch_one(
         user.telegram_blocked = True
         row.status = ReminderStatus.failed
         row.last_error = "blocked"
-        await schedule_next_occurrence_reminder(session, task, row.occurrence_at, not_before=now)
+        await _schedule_next(session, task, row, not_before=now)
         return
     except Exception as exc:  # noqa: BLE001 — any send failure feeds the same retry/backoff path
         row.attempts += 1
         row.last_error = str(exc)[:500]
         if row.attempts >= MAX_ATTEMPTS:
             row.status = ReminderStatus.failed
-            await schedule_next_occurrence_reminder(
-                session, task, row.occurrence_at, not_before=now
-            )
+            await _schedule_next(session, task, row, not_before=now)
         else:
             row.remind_at = now + timedelta(minutes=RETRY_BACKOFF_MINUTES[row.attempts - 1])
         return
@@ -158,4 +156,17 @@ async def _dispatch_one(
     # Record the send before anything else can fail: otherwise an error in scheduling the
     # next occurrence would roll back "sent" and the message would go out again.
     await session.commit()
-    await schedule_next_occurrence_reminder(session, task, row.occurrence_at)
+    await _schedule_next(session, task, row)
+
+
+async def _schedule_next(
+    session: AsyncSession, task: Task, row: ScheduledReminder, *, not_before: datetime | None = None
+) -> None:
+    await schedule_next_occurrence_reminder(
+        session,
+        task,
+        row.occurrence_at,
+        kind=ReminderKind(row.kind),
+        offset_minutes=row.offset_minutes,
+        not_before=not_before,
+    )

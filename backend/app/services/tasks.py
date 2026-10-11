@@ -77,6 +77,19 @@ def _clear_recurrence(task: Task) -> None:
     task.recurrence_end = None
 
 
+async def _next_position(
+    session: AsyncSession, user_id: uuid.UUID, list_id: uuid.UUID, parent_id: uuid.UUID | None
+) -> int:
+    max_position = await session.scalar(
+        select(func.max(Task.position)).where(
+            Task.user_id == user_id,
+            Task.list_id == list_id,
+            Task.parent_id.is_(None) if parent_id is None else Task.parent_id == parent_id,
+        )
+    )
+    return (max_position or 0) + 1
+
+
 async def create_task(session: AsyncSession, user_id: uuid.UUID, data: TaskCreate) -> Task:
     if data.due_time is not None and data.due_date is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "due_time requires due_date")
@@ -95,11 +108,6 @@ async def create_task(session: AsyncSession, user_id: uuid.UUID, data: TaskCreat
     else:
         list_id = (await get_or_create_inbox(session, user_id)).id
 
-    max_position = await session.scalar(
-        select(func.max(Task.position)).where(
-            Task.user_id == user_id, Task.list_id == list_id, Task.parent_id == data.parent_id
-        )
-    )
     task = Task(
         user_id=user_id,
         list_id=list_id,
@@ -110,7 +118,9 @@ async def create_task(session: AsyncSession, user_id: uuid.UUID, data: TaskCreat
         due_date=data.due_date,
         due_time=data.due_time,
         reminders_enabled=data.reminders_enabled,
-        position=(max_position or 0) + 1,
+        reminder_offsets=data.reminder_offsets,
+        tags=data.tags,
+        position=await _next_position(session, user_id, list_id, data.parent_id),
     )
     if data.recurrence is not None:
         _apply_recurrence(task, data.recurrence)
@@ -128,7 +138,7 @@ class TaskWithCounts:
     counts: SubtaskCounts = field(default_factory=SubtaskCounts)
 
 
-async def _attach_counts(session: AsyncSession, tasks: list[Task]) -> list[TaskWithCounts]:
+async def attach_counts(session: AsyncSession, tasks: list[Task]) -> list[TaskWithCounts]:
     counts_by_parent = await _subtask_counts(session, {t.id for t in tasks})
     return [
         TaskWithCounts(task=t, counts=counts_by_parent.get(t.id, SubtaskCounts())) for t in tasks
@@ -143,6 +153,7 @@ async def list_tasks(
     view: str | None = None,
     status_filter: str = "open",
     priority: str | None = None,
+    tag: str | None = None,
     timezone: str = "UTC",
 ) -> list[TaskWithCounts]:
     conditions = [Task.user_id == user_id, Task.parent_id.is_(None), Task.deleted_at.is_(None)]
@@ -172,13 +183,15 @@ async def list_tasks(
 
     if priority is not None:
         conditions.append(Task.priority == priority)
+    if tag is not None:
+        conditions.append(Task.tags.contains([tag.removeprefix("#")]))
 
     result = await session.scalars(
         select(Task)
         .where(*conditions)
         .order_by(Task.due_date.is_(None), Task.due_date, Task.position)
     )
-    return await _attach_counts(session, list(result))
+    return await attach_counts(session, list(result))
 
 
 async def get_task_detail(
@@ -193,7 +206,7 @@ async def get_task_detail(
         .where(Task.parent_id == task_id, Task.deleted_at.is_(None))
         .order_by(Task.position)
     )
-    subtasks = await _attach_counts(session, list(subtasks_result))
+    subtasks = await attach_counts(session, list(subtasks_result))
     counts = SubtaskCounts(
         done=sum(1 for s in subtasks if s.task.status == TaskStatus.done), total=len(subtasks)
     )
@@ -211,9 +224,10 @@ async def update_task(
         task.title = data.title
     if data.description is not None:
         task.description = data.description
-    if data.list_id is not None and task.parent_id is None:
+    await _apply_parent(session, user_id, task, data)
+    if data.list_id is not None and task.parent_id is None and data.list_id != task.list_id:
         await _validate_list(session, user_id, data.list_id)
-        task.list_id = data.list_id
+        await _move_to_list(session, task, data.list_id)
     if data.priority is not None:
         task.priority = data.priority
 
@@ -234,6 +248,12 @@ async def update_task(
 
     if data.reminders_enabled is not None:
         task.reminders_enabled = data.reminders_enabled
+    if data.default_reminders:
+        task.reminder_offsets = None
+    elif data.reminder_offsets is not None:
+        task.reminder_offsets = data.reminder_offsets
+    if data.tags is not None:
+        task.tags = data.tags
     if data.position is not None:
         task.position = data.position
 
@@ -259,6 +279,93 @@ async def update_task(
     await session.commit()
     await session.refresh(task)
     return task
+
+
+async def _live_subtasks(session: AsyncSession, task_id: uuid.UUID) -> list[Task]:
+    return list(
+        await session.scalars(
+            select(Task).where(Task.parent_id == task_id, Task.deleted_at.is_(None))
+        )
+    )
+
+
+async def _move_to_list(session: AsyncSession, task: Task, list_id: uuid.UUID) -> None:
+    """Moves a top-level task, with its subtasks, to the end of another list."""
+    task.position = await _next_position(session, task.user_id, list_id, None)
+    task.list_id = list_id
+    for subtask in await _live_subtasks(session, task.id):
+        subtask.list_id = list_id
+
+
+async def _apply_parent(
+    session: AsyncSession, user_id: uuid.UUID, task: Task, data: TaskUpdate
+) -> None:
+    """Turns a task into a subtask of `data.parent_id` (moving it to the parent's list), or
+    back into a top-level task in its current list (`data.clear_parent`). Nesting stays one
+    level deep (spec §7.3): the new parent can't be a subtask, and a task that has
+    subtasks of its own can't become one."""
+    if data.clear_parent:
+        if task.parent_id is not None:
+            task.parent_id = None
+            task.position = await _next_position(session, user_id, task.list_id, None)
+        return
+    if data.parent_id is None or data.parent_id == task.parent_id:
+        return
+    if data.parent_id == task.id:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A task can't be its own subtask")
+    parent = await get_owned_or_404(session, Task, data.parent_id, user_id)
+    if parent.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    if parent.parent_id is not None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Subtasks can't have their own subtasks")
+    if await _live_subtasks(session, task.id):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, "A task with subtasks can't become a subtask"
+        )
+    task.parent_id = parent.id
+    task.list_id = parent.list_id
+    task.position = await _next_position(session, user_id, parent.list_id, parent.id)
+
+
+async def reorder_tasks(
+    session: AsyncSession, user_id: uuid.UUID, task_ids: list[uuid.UUID]
+) -> list[Task]:
+    """Puts the given tasks — siblings: same list, same parent — first, in the given order,
+    followed by their other siblings in the order those already had. Returns every sibling
+    in the new order."""
+    if not task_ids:
+        return []
+    if len(set(task_ids)) != len(task_ids):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A task is listed twice")
+    tasks = [await get_owned_or_404(session, Task, task_id, user_id) for task_id in task_ids]
+    first = tasks[0]
+    if any(t.deleted_at is not None for t in tasks):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
+    if any((t.list_id, t.parent_id) != (first.list_id, first.parent_id) for t in tasks):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Only tasks in the same list (or subtasks of the same task) can be reordered together",
+        )
+    siblings = list(
+        await session.scalars(
+            select(Task)
+            .where(
+                Task.user_id == user_id,
+                Task.list_id == first.list_id,
+                Task.parent_id.is_(None)
+                if first.parent_id is None
+                else Task.parent_id == first.parent_id,
+                Task.deleted_at.is_(None),
+            )
+            .order_by(Task.position, Task.created_at)
+        )
+    )
+    listed = set(task_ids)
+    ordered = tasks + [t for t in siblings if t.id not in listed]
+    for position, task in enumerate(ordered, start=1):
+        task.position = position
+    await session.commit()
+    return ordered
 
 
 async def complete_task(

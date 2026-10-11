@@ -1,5 +1,6 @@
 import uuid
-from collections.abc import Coroutine
+from collections import Counter
+from collections.abc import Awaitable, Callable, Coroutine
 from datetime import date, time
 from typing import Any
 
@@ -7,6 +8,7 @@ from fastapi import HTTPException
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import async_session_factory
 from app.mcp.auth import current_user_id
@@ -24,9 +26,12 @@ from app.schemas.task_list import TaskListCreate, TaskListUpdate
 from app.services import folders as folders_service
 from app.services import note_links as note_links_service
 from app.services import notes as notes_service
+from app.services import recurrence as recurrence_service
 from app.services import search as search_service
 from app.services import task_lists as task_lists_service
+from app.services import task_note_links as task_note_links_service
 from app.services import tasks as tasks_service
+from app.services.recurrence import RecurrenceInput
 
 
 def _uuid(value: str, field: str) -> uuid.UUID:
@@ -92,6 +97,9 @@ def _task_summary(twc: tasks_service.TaskWithCounts) -> dict[str, Any]:
         "priority": task.priority.value,
         "due_date": task.due_date.isoformat() if task.due_date else None,
         "due_time": task.due_time.isoformat() if task.due_time else None,
+        "recurrence": task.rrule if task.is_recurring else None,
+        "tags": list(task.tags),
+        "position": task.position,
         "subtasks_done": twc.counts.done,
         "subtasks_total": twc.counts.total,
     }
@@ -108,6 +116,12 @@ def _task_detail(task: Task) -> dict[str, Any]:
         "priority": task.priority.value,
         "due_date": task.due_date.isoformat() if task.due_date else None,
         "due_time": task.due_time.isoformat() if task.due_time else None,
+        "recurrence": task.rrule if task.is_recurring else None,
+        "reminders_enabled": task.reminders_enabled,
+        # None: the default reminders.
+        "reminders": task.reminder_offsets,
+        "tags": list(task.tags),
+        "position": task.position,
     }
 
 
@@ -253,8 +267,9 @@ async def get_backlinks(note_id: str) -> list[dict[str, Any]]:
 
 @server.tool()
 async def list_tags() -> list[dict[str, Any]]:
-    """The user's tags with how many notes carry each. Pass a name to
-    `list_notes(tag=...)`, or use `tag:name` in `search_notes`."""
+    """The user's tags with how many notes and tasks carry each. Pass a name to
+    `list_notes(tag=...)` or `list_tasks(tag=...)`, or use `tag:name` in
+    `search_notes`."""
     user_id = current_user_id()
     async with async_session_factory() as session:
         result = await session.execute(
@@ -263,9 +278,19 @@ async def list_tags() -> list[dict[str, Any]]:
             .join(Note, Note.id == NoteTag.note_id)
             .where(Tag.user_id == user_id, Note.deleted_at.is_(None))
             .group_by(Tag.name)
-            .order_by(Tag.name)
         )
-        return [{"name": name, "note_count": count} for name, count in result.all()]
+        note_counts = dict(result.tuples().all())
+        task_counts = Counter(
+            await session.scalars(
+                select(func.unnest(Task.tags)).where(
+                    Task.user_id == user_id, Task.deleted_at.is_(None)
+                )
+            )
+        )
+        return [
+            {"name": name, "note_count": note_counts.get(name, 0), "task_count": task_counts[name]}
+            for name in sorted(note_counts.keys() | task_counts.keys())
+        ]
 
 
 @server.tool()
@@ -356,13 +381,159 @@ async def delete_folder(folder_id: str) -> dict[str, str]:
 
 # --- Tasks --------------------------------------------------------------------
 
+_REMINDERS_DOC = """`reminders`: minutes before the due moment, one reminder each — e.g. `[60]` for
+an hour before only, `[1440, 120, 15]` for a day, 2 hours and 15 minutes before, `[0]` at
+the due time; `[]` for none. Leave it unset for the defaults (the day before at the
+user's daily reminder time, an hour before and at the due time; for a repeating task, at
+each occurrence). A task with a date but no time is reminded at the daily reminder time,
+on the day the offset (in whole days) points to."""
+
+_RECURRENCE_DOC = """`recurrence` is an RRULE: `FREQ=DAILY`, `FREQ=WEEKLY;BYDAY=MO,WE`,
+`FREQ=MONTHLY;BYMONTHDAY=15` (or `-1` for the last day), `FREQ=YEARLY`, with optional
+`INTERVAL=2` and `COUNT=10` or `UNTIL=20271231`. A repeating task needs both `due_date`
+and `due_time` (its first occurrence)."""
+
+
+def _recurrence(value: str) -> RecurrenceInput:
+    try:
+        return recurrence_service.parse_rrule(value)
+    except ValueError as exc:
+        raise ToolError(f"Invalid recurrence '{value}': {exc}") from exc
+
+
+def _uuids(values: list[str] | None, field: str) -> list[uuid.UUID]:
+    return [_uuid(v, field) for v in values or []]
+
+
+class NewTask(BaseModel):
+    """One task for `create_tasks` — the same fields as `create_task`."""
+
+    title: str
+    list_id: str | None = None
+    parent_id: str | None = None
+    priority: str = "none"
+    due_date: str | None = None
+    due_time: str | None = None
+    description: str | None = None
+    recurrence: str | None = None
+    reminders: list[int] | None = None
+    reminders_enabled: bool = True
+    tags: list[str] | None = None
+    note_ids: list[str] | None = None
+
+
+class TaskChanges(BaseModel):
+    """One task's changes for `update_tasks` — the same fields as `update_task`."""
+
+    task_id: str
+    title: str | None = None
+    description: str | None = None
+    priority: str | None = None
+    due_date: str | None = None
+    due_time: str | None = None
+    list_id: str | None = None
+    parent_id: str | None = None
+    recurrence: str | None = None
+    reminders: list[int] | None = None
+    default_reminders: bool = False
+    reminders_enabled: bool | None = None
+    tags: list[str] | None = None
+
+
+async def _task_out(session: AsyncSession, task: Task) -> dict[str, Any]:
+    linked = await task_note_links_service.get_linked_notes(session, task.id)
+    return {**_task_detail(task), "linked_notes": [_note_summary(n) for n in linked]}
+
+
+async def _create_task(session: AsyncSession, user_id: uuid.UUID, item: NewTask) -> Task:
+    note_ids = _uuids(item.note_ids, "note")
+    for note_id in note_ids:  # check them all before creating anything
+        await _run(notes_service.get_note(session, user_id, note_id))
+    task = await _run(
+        tasks_service.create_task(
+            session,
+            user_id,
+            _validated(
+                TaskCreate,
+                title=item.title,
+                description=item.description,
+                list_id=_uuid(item.list_id, "list") if item.list_id else None,
+                parent_id=_uuid(item.parent_id, "task") if item.parent_id else None,
+                priority=item.priority,
+                due_date=_date(item.due_date),
+                due_time=_time(item.due_time),
+                recurrence=_recurrence(item.recurrence) if item.recurrence else None,
+                reminder_offsets=item.reminders,
+                reminders_enabled=item.reminders_enabled,
+                tags=item.tags or [],
+            ),
+        )
+    )
+    for note_id in note_ids:
+        await _run(task_note_links_service.link_note_to_task(session, user_id, task.id, note_id))
+    return task
+
+
+async def _update_task(session: AsyncSession, user_id: uuid.UUID, item: TaskChanges) -> Task:
+    return await _run(
+        tasks_service.update_task(
+            session,
+            user_id,
+            _uuid(item.task_id, "task"),
+            _validated(
+                TaskUpdate,
+                title=item.title,
+                description=item.description,
+                list_id=_uuid(item.list_id, "list") if item.list_id else None,
+                parent_id=_uuid(item.parent_id, "task") if item.parent_id else None,
+                clear_parent=item.parent_id == "",
+                priority=item.priority,
+                due_date=_date(item.due_date) if item.due_date else None,
+                due_time=_time(item.due_time) if item.due_time else None,
+                clear_due_date=item.due_date == "",
+                clear_due_time=item.due_time == "",
+                recurrence=_recurrence(item.recurrence) if item.recurrence else None,
+                clear_recurrence=item.recurrence == "",
+                reminder_offsets=item.reminders,
+                default_reminders=item.default_reminders,
+                reminders_enabled=item.reminders_enabled,
+                tags=item.tags,
+            ),
+        )
+    )
+
+
+async def _each[T](
+    session: AsyncSession, items: list[T], run: Callable[[T], Awaitable[dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    """Runs `run` for every item and reports each one's result or error — one bad item
+    doesn't stop the rest (each is saved as soon as it's done)."""
+    if len(items) > MAX_BATCH:
+        raise ToolError(f"At most {MAX_BATCH} tasks per call")
+    results: list[dict[str, Any]] = []
+    for index, item in enumerate(items):
+        try:
+            results.append({"index": index, "ok": True, "task": await run(item)})
+        except ToolError as exc:
+            await session.rollback()
+            results.append({"index": index, "ok": False, "error": str(exc)})
+    return results
+
+
+MAX_BATCH = 100
+
 
 @server.tool()
 async def list_tasks(
-    view: str | None = None, list_id: str | None = None, status: str = "open"
+    view: str | None = None,
+    list_id: str | None = None,
+    status: str = "open",
+    tag: str | None = None,
 ) -> list[dict[str, Any]]:
     """List the user's top-level tasks. `view`: "today" (overdue + due today), "upcoming"
-    (due today or later), or omit for all matching `status` ("open", "done", "all")."""
+    (due today or later), or omit for all matching `status` ("open", "done", "all").
+    `tag` keeps only tasks with that tag (see `list_tags`). Ordered by due date, then by
+    their order in the list (`position`, see `reorder_tasks`)."""
     user_id = current_user_id()
     async with async_session_factory() as session:
         user = await session.get(User, user_id)
@@ -374,6 +545,7 @@ async def list_tasks(
                 list_id=_uuid(list_id, "list") if list_id else None,
                 view=view,
                 status_filter=status,
+                tag=tag,
                 timezone=timezone,
             )
         )
@@ -382,52 +554,72 @@ async def list_tasks(
 
 @server.tool()
 async def get_task(task_id: str) -> dict[str, Any]:
-    """Get a task's full detail, including subtasks and linked notes."""
+    """Get a task's full detail: description, recurrence, reminders, tags, subtasks and
+    linked notes."""
     user_id = current_user_id()
     async with async_session_factory() as session:
         task, counts, subtasks = await _run(
             tasks_service.get_task_detail(session, user_id, _uuid(task_id, "task"))
         )
         return {
-            **_task_detail(task),
+            **await _task_out(session, task),
             "subtasks_done": counts.done,
             "subtasks_total": counts.total,
             "subtasks": [_task_summary(s) for s in subtasks],
         }
 
 
-@server.tool()
+@server.tool(
+    description=f"""Create a task. `priority`: "none"|"low"|"medium"|"high". Dates are
+ISO (`due_date`: YYYY-MM-DD, `due_time`: HH:MM). Omit `list_id` for the Inbox;
+`parent_id` makes it a subtask of that (top-level) task, in the parent's list. `tags`:
+names like "work" or "home/repairs" (no `#`). `note_ids` links notes to the task.
+
+{_RECURRENCE_DOC}
+
+{_REMINDERS_DOC} `reminders_enabled=false` turns all of them off.
+
+To create several tasks at once, use `create_tasks`."""
+)
 async def create_task(
     title: str,
     list_id: str | None = None,
+    parent_id: str | None = None,
     priority: str = "none",
     due_date: str | None = None,
     due_time: str | None = None,
     description: str | None = None,
+    recurrence: str | None = None,
+    reminders: list[int] | None = None,
+    reminders_enabled: bool = True,
+    tags: list[str] | None = None,
+    note_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Create a task. `priority`: "none"|"low"|"medium"|"high". Dates are ISO
-    (`due_date`: YYYY-MM-DD, `due_time`: HH:MM). Omit `list_id` for the Inbox."""
     user_id = current_user_id()
+    item = NewTask(**{k: v for k, v in locals().items() if k in NewTask.model_fields})
     async with async_session_factory() as session:
-        task = await _run(
-            tasks_service.create_task(
-                session,
-                user_id,
-                _validated(
-                    TaskCreate,
-                    title=title,
-                    description=description,
-                    list_id=_uuid(list_id, "list") if list_id else None,
-                    priority=priority,
-                    due_date=_date(due_date),
-                    due_time=_time(due_time),
-                ),
-            )
-        )
-        return _task_detail(task)
+        return await _task_out(session, await _create_task(session, user_id, item))
 
 
-@server.tool()
+@server.tool(
+    description=f"""Update a task. Only the fields you pass are changed.
+
+- `due_date=""` clears the due date (and time), `due_time=""` just the time.
+- `list_id` moves it (with its subtasks) to another list (from `list_task_lists`).
+- `parent_id` makes it a subtask of another top-level task; `parent_id=""` makes it a
+  top-level task again.
+- `recurrence` sets how it repeats; `recurrence=""` stops it repeating.
+- `reminders` replaces its reminders; `default_reminders=true` goes back to the defaults;
+  `reminders_enabled` turns them all off or on.
+- `tags` replaces its tags (`[]` removes them all).
+
+{_RECURRENCE_DOC}
+
+{_REMINDERS_DOC}
+
+Use `update_tasks` to change several tasks at once, `reorder_tasks` to change their
+order, and `link_note_to_task` to link notes."""
+)
 async def update_task(
     task_id: str,
     title: str | None = None,
@@ -436,44 +628,80 @@ async def update_task(
     due_date: str | None = None,
     due_time: str | None = None,
     list_id: str | None = None,
+    parent_id: str | None = None,
+    recurrence: str | None = None,
+    reminders: list[int] | None = None,
+    default_reminders: bool = False,
+    reminders_enabled: bool | None = None,
+    tags: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Update a task. Only the fields you pass are changed; pass `due_date=""` to clear
-    the due date (also clears `due_time`). `list_id` moves it to another list (from
-    `list_task_lists`)."""
+    user_id = current_user_id()
+    item = TaskChanges(**{k: v for k, v in locals().items() if k in TaskChanges.model_fields})
+    async with async_session_factory() as session:
+        return await _task_out(session, await _update_task(session, user_id, item))
+
+
+@server.tool()
+async def create_tasks(tasks: list[NewTask]) -> list[dict[str, Any]]:
+    """Create several tasks in one call (up to 100); each item takes the same fields as
+    `create_task`. Returns one result per item, in order — `{"ok": true, "task": ...}` or
+    `{"ok": false, "error": ...}`; the others are created even if one fails. To create
+    a task with subtasks, create the parent first and pass its id as `parent_id`."""
+    user_id = current_user_id()
+    async with async_session_factory() as session:
+
+        async def run(item: NewTask) -> dict[str, Any]:
+            return _task_detail(await _create_task(session, user_id, item))
+
+        return await _each(session, tasks, run)
+
+
+@server.tool()
+async def update_tasks(updates: list[TaskChanges]) -> list[dict[str, Any]]:
+    """Change several tasks in one call (up to 100) — e.g. move a batch to another list
+    or another date. Each item has a `task_id` plus the same fields as `update_task`.
+    Returns one result per item, in order; the others still apply if one fails."""
+    user_id = current_user_id()
+    async with async_session_factory() as session:
+
+        async def run(item: TaskChanges) -> dict[str, Any]:
+            return _task_detail(await _update_task(session, user_id, item))
+
+        return await _each(session, updates, run)
+
+
+@server.tool()
+async def complete_task(task_id: str, complete_subtasks: bool = False) -> dict[str, Any]:
+    """Mark a task done. A recurring task advances to its next occurrence instead. A task
+    with open subtasks fails unless `complete_subtasks` is true (which ticks them too)."""
     user_id = current_user_id()
     async with async_session_factory() as session:
         task = await _run(
-            tasks_service.update_task(
-                session,
-                user_id,
-                _uuid(task_id, "task"),
-                _validated(
-                    TaskUpdate,
-                    title=title,
-                    description=description,
-                    list_id=_uuid(list_id, "list") if list_id else None,
-                    priority=priority,
-                    due_date=_date(due_date) if due_date else None,
-                    due_time=_time(due_time) if due_time else None,
-                    clear_due_date=due_date == "",
-                    clear_due_time=due_time == "",
-                ),
+            tasks_service.complete_task(
+                session, user_id, _uuid(task_id, "task"), complete_subtasks=complete_subtasks
             )
         )
         return _task_detail(task)
 
 
 @server.tool()
-async def complete_task(task_id: str) -> dict[str, Any]:
-    """Mark a task done. A recurring task advances to its next occurrence instead."""
+async def complete_tasks(
+    task_ids: list[str], complete_subtasks: bool = False
+) -> list[dict[str, Any]]:
+    """Mark several tasks done in one call (up to 100), like `complete_task` for each.
+    Returns one result per id, in order; the others still complete if one fails."""
     user_id = current_user_id()
     async with async_session_factory() as session:
-        task = await _run(
-            tasks_service.complete_task(
-                session, user_id, _uuid(task_id, "task"), complete_subtasks=False
+
+        async def run(task_id: str) -> dict[str, Any]:
+            task = await _run(
+                tasks_service.complete_task(
+                    session, user_id, _uuid(task_id, "task"), complete_subtasks=complete_subtasks
+                )
             )
-        )
-        return _task_detail(task)
+            return _task_detail(task)
+
+        return await _each(session, task_ids, run)
 
 
 @server.tool()
@@ -483,6 +711,46 @@ async def reopen_task(task_id: str) -> dict[str, Any]:
     async with async_session_factory() as session:
         task = await _run(tasks_service.reopen_task(session, user_id, _uuid(task_id, "task")))
         return _task_detail(task)
+
+
+@server.tool()
+async def reorder_tasks(task_ids: list[str]) -> list[dict[str, Any]]:
+    """Set the order of tasks within their list (or of subtasks within their parent): the
+    given tasks go first, in this order, and the rest keep their order after them. All
+    ids must be in the same list (top-level tasks) or under the same parent. Returns the
+    whole list in its new order."""
+    user_id = current_user_id()
+    async with async_session_factory() as session:
+        tasks = await _run(tasks_service.reorder_tasks(session, user_id, _uuids(task_ids, "task")))
+        return [_task_summary(t) for t in await tasks_service.attach_counts(session, tasks)]
+
+
+@server.tool()
+async def link_note_to_task(task_id: str, note_id: str) -> dict[str, Any]:
+    """Link a note to a task (shown on both in the app). Linking twice is harmless."""
+    user_id = current_user_id()
+    tid = _uuid(task_id, "task")
+    async with async_session_factory() as session:
+        await _run(
+            task_note_links_service.link_note_to_task(session, user_id, tid, _uuid(note_id, "note"))
+        )
+        task = await _run(tasks_service.get_task_detail(session, user_id, tid))
+        return await _task_out(session, task[0])
+
+
+@server.tool()
+async def unlink_note_from_task(task_id: str, note_id: str) -> dict[str, Any]:
+    """Remove the link between a note and a task; neither is deleted."""
+    user_id = current_user_id()
+    tid = _uuid(task_id, "task")
+    async with async_session_factory() as session:
+        await _run(
+            task_note_links_service.unlink_note_from_task(
+                session, user_id, tid, _uuid(note_id, "note")
+            )
+        )
+        task = await _run(tasks_service.get_task_detail(session, user_id, tid))
+        return await _task_out(session, task[0])
 
 
 @server.tool()

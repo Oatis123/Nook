@@ -85,13 +85,20 @@ export const TaskRow = memo(function TaskRow({
             </span>
           )}
         </div>
-        {task.due_date && (
-          <span
-            className={clsx('text-xs', isOverdue(task, today) ? 'text-danger' : 'text-text-muted')}
-          >
-            {formatDate(task.due_date)}
-            {task.due_time && ` ${task.due_time.slice(0, 5)}`}
-          </span>
+        {(task.due_date || task.tags.length > 0) && (
+          <div className="flex flex-wrap items-center gap-x-2 text-xs">
+            {task.due_date && (
+              <span className={isOverdue(task, today) ? 'text-danger' : 'text-text-muted'}>
+                {formatDate(task.due_date)}
+                {task.due_time && ` ${task.due_time.slice(0, 5)}`}
+              </span>
+            )}
+            {task.tags.map((tag) => (
+              <span key={tag} className="text-text-muted">
+                #{tag}
+              </span>
+            ))}
+          </div>
         )}
       </button>
 

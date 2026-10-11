@@ -2,8 +2,8 @@ import enum
 import uuid
 from datetime import date, datetime, time
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, Time
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, Time, text
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPKMixin
@@ -45,16 +45,20 @@ class Task(UUIDPKMixin, TimestampMixin, Base):
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_time: Mapped[time | None] = mapped_column(Time, nullable=True)
 
-    # Recurrence columns exist from Stage 8's migration (one `tasks` table, per the spec's
-    # data model) but aren't yet settable through the API — expansion, `task_completions`,
-    # and the quick-add/bot "every ..." parsing land in Stage 9 (agent's discretion, see
-    # DECISIONS.md).
     is_recurring: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     rrule: Mapped[str | None] = mapped_column(String(255), nullable=True)
     dtstart_local: Mapped[datetime | None] = mapped_column(DateTime(timezone=False), nullable=True)
     recurrence_end: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     reminders_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Minutes before the due moment, one reminder each (0 = at the due moment). NULL keeps
+    # the defaults (see app/services/reminders.py); an empty list means no reminders.
+    reminder_offsets: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
+    # Same rules as note tags, but stored on the task itself: tasks have no Markdown body
+    # to parse them out of, and a handful per task doesn't need the join table.
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(String(255)), nullable=False, default=list, server_default=text("'{}'")
+    )
     status: Mapped[TaskStatus] = mapped_column(
         Enum(TaskStatus, name="task_status"), nullable=False, default=TaskStatus.open
     )

@@ -15,7 +15,8 @@ function byPriorityThenDate(a: Task, b: Task): number {
     return (pa === -1 ? NO_PRIORITY_WEIGHT : pa) - (pb === -1 ? NO_PRIORITY_WEIGHT : pb)
   const da = a.due_date ?? '9999-99-99'
   const db = b.due_date ?? '9999-99-99'
-  return da.localeCompare(db)
+  // Then the order set in the list (position — e.g. by an agent over MCP).
+  return da.localeCompare(db) || a.position - b.position
 }
 
 export function groupByPriority(tasks: Task[]): TaskGroup[] {

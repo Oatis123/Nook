@@ -115,8 +115,10 @@ directly:
 - **Notes** — list (by folder or tag), search, read, create, edit, move between folders, trash;
   backlinks (`get_backlinks`) and tags with counts (`list_tags`).
 - **Folders** — list, create, rename, move, trash (with the notes in them).
-- **Tasks** — list (today, upcoming, by list), read, create, edit, move between lists,
-  complete, reopen, delete.
+- **Tasks** — list (today, upcoming, by list or tag), read, create, edit, move between lists,
+  complete, reopen, delete; repeat rules (RRULE), per-task reminders ("2 hours and 15
+  minutes before"), tags, subtasks (`parent_id`), linked notes, order within a list
+  (`reorder_tasks`), and batches (`create_tasks`, `update_tasks`, `complete_tasks`).
 - **Task lists** — list, create, rename/recolor, delete (tasks go to the Inbox or with it).
 
 1. In the web app, go to **Settings → API tokens → New token**, name it (e.g. "Claude

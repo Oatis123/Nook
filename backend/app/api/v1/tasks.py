@@ -11,6 +11,7 @@ from app.schemas.task import (
     TaskCreate,
     TaskDetailOut,
     TaskOut,
+    TaskReorderRequest,
     TaskUpdate,
 )
 from app.schemas.task_note_link import LinkedNoteOut, LinkNoteRequest
@@ -38,6 +39,8 @@ def _to_out(item: TaskWithCounts) -> TaskOut:
         status=item.task.status,
         completed_at=item.task.completed_at,
         reminders_enabled=item.task.reminders_enabled,
+        reminder_offsets=item.task.reminder_offsets,
+        tags=item.task.tags,
         position=item.task.position,
         subtask_done_count=item.counts.done,
         subtask_total_count=item.counts.total,
@@ -72,6 +75,7 @@ async def list_tasks(
     view: str | None = Query(default=None, pattern="^(today|upcoming)$"),
     status_filter: str = Query(default="open", alias="status", pattern="^(open|done|all)$"),
     priority: str | None = Query(default=None, pattern="^(none|low|medium|high)$"),
+    tag: str | None = Query(default=None, max_length=255),
 ) -> list[TaskOut]:
     items = await tasks_service.list_tasks(
         session,
@@ -80,6 +84,7 @@ async def list_tasks(
         view=view,
         status_filter=status_filter,
         priority=priority,
+        tag=tag,
         timezone=user.timezone,
     )
     return [_to_out(item) for item in items]
@@ -89,6 +94,14 @@ async def list_tasks(
 async def create_task(body: TaskCreate, user: CurrentUser, session: DbSession) -> TaskOut:
     task = await tasks_service.create_task(session, user.id, body)
     return _to_out(TaskWithCounts(task=task))
+
+
+@router.post("/reorder", response_model=list[TaskOut], dependencies=[Csrf])
+async def reorder_tasks(
+    body: TaskReorderRequest, user: CurrentUser, session: DbSession
+) -> list[TaskOut]:
+    tasks = await tasks_service.reorder_tasks(session, user.id, body.task_ids)
+    return [_to_out(item) for item in await tasks_service.attach_counts(session, tasks)]
 
 
 @router.get("/calendar", response_model=list[CalendarEntryOut])

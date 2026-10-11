@@ -152,6 +152,8 @@ async def create_task_from_note(
         status=task.status,
         completed_at=task.completed_at,
         reminders_enabled=task.reminders_enabled,
+        reminder_offsets=task.reminder_offsets,
+        tags=task.tags,
         position=task.position,
         subtask_done_count=0,
         subtask_total_count=0,

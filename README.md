@@ -110,7 +110,14 @@ web app's onboarding gate will show a QR code that doesn't go anywhere useful ye
 
 Nook runs its own [MCP](https://modelcontextprotocol.io/) server (`app/mcp/` in the backend),
 so an MCP client like Claude Desktop or Claude Code can read and write your notes and tasks
-directly — list/search/create/edit notes, list/create/update/complete tasks, and so on.
+directly:
+
+- **Notes** — list (by folder or tag), search, read, create, edit, move between folders, trash;
+  backlinks (`get_backlinks`) and tags with counts (`list_tags`).
+- **Folders** — list, create, rename, move, trash (with the notes in them).
+- **Tasks** — list (today, upcoming, by list), read, create, edit, move between lists,
+  complete, reopen, delete.
+- **Task lists** — list, create, rename/recolor, delete (tasks go to the Inbox or with it).
 
 1. In the web app, go to **Settings → API tokens → New token**, name it (e.g. "Claude
    Desktop"), and copy the token shown — it's only displayed once.

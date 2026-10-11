@@ -171,3 +171,87 @@ async def test_a_users_token_cannot_reach_another_users_note(
     result = _call_tool(mcp_client, bob_token, bob_session, "get_note", {"note_id": note_id})
     assert result["result"]["isError"] is True
     assert "Not found" in result["result"]["content"][0]["text"]
+
+
+async def test_organizing_notes_folders_tags_and_backlinks(
+    mcp_client: TestClient, db_session: AsyncSession
+) -> None:
+    alice = await make_user(db_session, "alice")
+    _, token = await create_api_token(db_session, alice.id, "agent")
+    sid = _initialize(mcp_client, token)
+
+    def call(tool: str, /, **arguments: Any) -> dict:
+        response = _call_tool(mcp_client, token, sid, tool, arguments)
+        assert response["result"]["isError"] is False, response
+        return response
+
+    projects = _tool_object(call("create_folder", name="Projects"))
+    archive = _tool_object(call("create_folder", name="Archive", parent_id=projects["id"]))
+    assert archive["parent_id"] == projects["id"]
+    assert _tool_object(call("rename_folder", folder_id=archive["id"], name="Old"))["name"] == "Old"
+    assert _tool_object(call("move_folder", folder_id=archive["id"]))["parent_id"] is None
+
+    roadmap = _tool_object(call("create_note", title="Roadmap", content="Plans #work"))
+    call("create_note", title="Standup", content="See [[Roadmap#Q4]] #work #daily")
+    moved = _tool_object(call("move_note", note_id=roadmap["id"], folder_id=projects["id"]))
+    assert moved["folder_id"] == projects["id"]
+    assert _tool_object(call("move_note", note_id=roadmap["id"]))["folder_id"] is None
+
+    [backlink] = _tool_list(call("get_backlinks", note_id=roadmap["id"]))
+    assert (backlink["title"], backlink["heading"]) == ("Standup", "Q4")
+    assert _tool_list(call("list_tags")) == [
+        {"name": "daily", "note_count": 1},
+        {"name": "work", "note_count": 2},
+    ]
+    assert [n["title"] for n in _tool_list(call("list_notes", tag="daily"))] == ["Standup"]
+
+    # Renaming rewrites the links to it.
+    call("update_note", note_id=roadmap["id"], title="Plan")
+    standup = next(n for n in _tool_list(call("list_notes")) if n["title"] == "Standup")
+    assert "[[Plan#Q4]]" in _tool_object(call("get_note", note_id=standup["id"]))["content"]
+
+    # Deleting a folder trashes the notes in it.
+    call("move_note", note_id=roadmap["id"], folder_id=projects["id"])
+    call("delete_folder", folder_id=projects["id"])
+    assert [f["name"] for f in _tool_list(call("list_folders"))] == ["Old"]
+    assert [n["title"] for n in _tool_list(call("list_notes"))] == ["Standup"]
+
+    bad = _call_tool(mcp_client, token, sid, "move_folder", {"folder_id": "nope"})
+    assert bad["result"]["isError"] is True
+
+
+async def test_managing_task_lists_and_deleting_tasks(
+    mcp_client: TestClient, db_session: AsyncSession
+) -> None:
+    alice = await make_user(db_session, "alice")
+    _, token = await create_api_token(db_session, alice.id, "agent")
+    sid = _initialize(mcp_client, token)
+
+    def call(tool: str, /, **arguments: Any) -> dict:
+        response = _call_tool(mcp_client, token, sid, tool, arguments)
+        assert response["result"]["isError"] is False, response
+        return response
+
+    work = _tool_object(call("create_task_list", name="Work", icon="briefcase", color="palette-3"))
+    assert (work["icon"], work["color"]) == ("briefcase", "palette-3")
+    renamed = _tool_object(call("update_task_list", list_id=work["id"], name="Job"))
+    assert (renamed["name"], renamed["icon"]) == ("Job", "briefcase")
+
+    task = _tool_object(call("create_task", title="Report"))
+    moved = _tool_object(call("update_task", task_id=task["id"], list_id=work["id"]))
+    assert moved["list_id"] == work["id"]
+
+    call("delete_task_list", list_id=work["id"])  # its tasks go to the Inbox
+    [inbox] = _tool_list(call("list_task_lists"))
+    assert inbox["is_inbox"] is True
+    [kept] = _tool_list(call("list_tasks"))
+    assert (kept["title"], kept["list_id"]) == ("Report", inbox["id"])
+
+    call("delete_task", task_id=task["id"])
+    assert _tool_list(call("list_tasks", status="all")) == []
+
+    bad = _call_tool(mcp_client, token, sid, "create_task_list", {"name": "X", "icon": "unicorn"})
+    assert bad["result"]["isError"] is True
+    assert "icon" in bad["result"]["content"][0]["text"]
+    inbox_delete = _call_tool(mcp_client, token, sid, "delete_task_list", {"list_id": inbox["id"]})
+    assert "Inbox can't be deleted" in inbox_delete["result"]["content"][0]["text"]

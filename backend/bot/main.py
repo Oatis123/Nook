@@ -21,6 +21,7 @@ COMMANDS_MENU = [
     BotCommand(command="new", description="Новая задача"),
     BotCommand(command="week", description="Задачи на неделю"),
     BotCommand(command="idea", description="Записать идею"),
+    BotCommand(command="note", description="Найти и прочитать заметку"),
     BotCommand(command="cancel", description="Отменить создание задачи"),
     BotCommand(command="lists", description="Мои списки"),
     BotCommand(command="help", description="Справка"),

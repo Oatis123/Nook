@@ -20,6 +20,7 @@ from aiogram.types import (
     InaccessibleMessage,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    InputRichMessage,
     Message,
 )
 from fastapi import HTTPException
@@ -27,20 +28,22 @@ from pydantic import ValidationError
 
 from app.core.config import get_settings
 from app.core.db import async_session_factory
+from app.models.note import Note
 from app.models.task import Task, TaskPriority
 from app.models.task_list import TaskList
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.services import admin as admin_service
 from app.services import ideas as ideas_service
+from app.services import note_telegram, week_agenda
 from app.services import task_lists as task_lists_service
 from app.services import tasks as tasks_service
 from app.services import telegram_link as telegram_link_service
-from app.services import week_agenda
 from app.services.telegram_format import (
     MONTHS,
     PRIORITY_LABELS,
     WEEKDAYS_TITLE,
+    button_url_accepted,
     format_day,
     format_due,
 )
@@ -81,7 +84,7 @@ async def handle_start_plain(message: Message) -> None:
         await message.answer(
             f"С возвращением, {user.username}.\n\n"
             "Чтобы создать задачу, просто напишите её текст. Задачи на неделю — /week, "
-            "справка — /help."
+            "заметки — /note, справка — /help."
         )
 
 
@@ -238,6 +241,8 @@ async def handle_help(message: Message) -> None:
         "/cancel — отменить создание задачи\n"
         "/week — задачи на эту неделю; кнопками можно листать дальше, а /week 2 "
         "или /week 20.10 сразу откроет нужную неделю\n"
+        "/note <название> — найти заметку и прочитать её здесь; без названия — "
+        "последние изменённые\n"
         "/lists — ваши списки\n"
         "/help — эта справка\n"
         "/unlink — отвязать Telegram от аккаунта"
@@ -988,6 +993,81 @@ async def handle_week_callback(callback: CallbackQuery) -> None:
         if "message is not modified" not in error.message:
             raise
     await callback.answer()
+
+
+RECENT_NOTES_HEADER = "Последние заметки. Найти по названию: /note <название>"
+
+
+def _note_url(note_id: uuid.UUID) -> str:
+    return f"{settings.public_url.rstrip('/')}/notes/{note_id}"
+
+
+@router.message(Command("note", "notes"))
+async def handle_note_command(message: Message, command: CommandObject) -> None:
+    if message.from_user is None:
+        return
+    user = await _linked_user(message.from_user.id)
+    if user is None:
+        await message.answer(NOT_LINKED_TEXT)
+        return
+    query = (command.args or "").strip()
+    async with async_session_factory() as session:
+        found = await note_telegram.find_notes(session, user.id, query)
+    if not found:
+        await message.answer(f"Не нашёл заметок по «{query}»." if query else "Заметок пока нет.")
+        return
+    header = f"Заметки по «{query}»:" if query else RECENT_NOTES_HEADER
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [_button(note_telegram.button_title(note.title), f"nv:{note.id}")] for note in found
+        ]
+    )
+    await message.answer(header, reply_markup=keyboard)
+
+
+@router.callback_query(F.data.startswith("nv:"))
+async def handle_note_view(callback: CallbackQuery) -> None:
+    if callback.data is None or callback.from_user is None or callback.message is None:
+        return
+    try:
+        note_id = uuid.UUID(callback.data.removeprefix("nv:"))
+    except ValueError:
+        await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+        return
+    user = await _linked_user(callback.from_user.id)
+    if user is None:
+        await callback.answer(NOT_LINKED_TEXT, show_alert=True)
+        return
+    async with async_session_factory() as session:
+        note = await session.get(Note, note_id)
+    if note is None or note.user_id != user.id or note.deleted_at is not None:
+        await callback.answer("Заметка не найдена — возможно, её удалили.", show_alert=True)
+        return
+    await callback.answer()
+    await _send_note(callback.message, note)
+
+
+async def _send_note(chat: Message | InaccessibleMessage, note: Note) -> None:
+    """Sends the note as a rich message — headings, lists, checkboxes, tables, formulas —
+    or, if Telegram refuses it, as plain text over as many messages as it takes."""
+    url = _note_url(note.id)
+    keyboard = (
+        InlineKeyboardMarkup(
+            inline_keyboard=[[InlineKeyboardButton(text="Открыть в Nook", url=url)]]
+        )
+        if button_url_accepted(url)
+        else None
+    )
+    markdown, _ = note_telegram.note_rich_markdown(note, settings.public_url)
+    try:
+        await chat.answer_rich(InputRichMessage(markdown=markdown), reply_markup=keyboard)
+        return
+    except TelegramBadRequest as error:
+        log.warning("bot.note_rich_rejected", note_id=str(note.id), error=error.message)
+    chunks = note_telegram.note_plain_chunks(note)
+    for index, chunk in enumerate(chunks):
+        last = index == len(chunks) - 1
+        await chat.answer(chunk, reply_markup=keyboard if last else None, parse_mode=None)
 
 
 @router.message(Command("unlink"))

@@ -4,6 +4,7 @@ through Telegram. Month and weekday names are spelled out here rather than taken
 the OS locale, so the output doesn't depend on which locales the container has."""
 
 from datetime import date, time
+from urllib.parse import urlparse
 
 from app.models.task import TaskPriority
 
@@ -32,6 +33,15 @@ PRIORITY_LABELS: dict[TaskPriority, str] = {
     TaskPriority.medium: "средний",
     TaskPriority.high: "высокий",
 }
+
+
+def button_url_accepted(url: str) -> bool:
+    """Telegram rejects inline-button URLs whose host is a single label ("localhost",
+    "mypc") with 400 "Wrong HTTP URL", while IPs and dotted names (127.0.0.1, 192.168.x.x,
+    nook.local) pass — so a local-only install on the default PUBLIC_URL=http://localhost:8080
+    must send its messages without an Open button, or every one of them fails outright."""
+    host = urlparse(url).hostname
+    return host is not None and "." in host
 
 
 def plural(count: int, one: str, few: str, many: str) -> str:

@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 import signal
 from datetime import timedelta
-from urllib.parse import urlparse
 
 import structlog
 from aiogram import Bot
@@ -14,6 +13,7 @@ from app.core.db import async_session_factory
 from app.core.heartbeat import WORKER_HEARTBEAT, beat
 from app.services.reminder_dispatch import ReminderBlocked, dispatch_due_reminders
 from app.services.reminders import purge_resolved_reminders
+from app.services.telegram_format import button_url_accepted
 from app.services.telegram_link import purge_expired_tokens
 from app.services.vault_import import (
     fail_interrupted_import_jobs,
@@ -46,15 +46,6 @@ SEND_ATTEMPTS = 3
 _stop = asyncio.Event()
 
 
-def _button_url_accepted(url: str) -> bool:
-    """Telegram rejects inline-button URLs whose host is a single label ("localhost",
-    "mypc") with 400 "Wrong HTTP URL", while IPs and dotted names (127.0.0.1, 192.168.x.x,
-    nook.local) pass — so a local-only install on the default PUBLIC_URL=http://localhost:8080
-    must send reminders without the Open button, or every one of them fails outright."""
-    host = urlparse(url).hostname
-    return host is not None and "." in host
-
-
 async def _send_message(
     bot: Bot,
     chat_id: int,
@@ -84,7 +75,7 @@ async def _send_message(
 def _make_sender(bot: Bot):
     async def send(chat_id: int, text: str, url: str) -> None:
         try:
-            if not _button_url_accepted(url):
+            if not button_url_accepted(url):
                 await _send_message(bot, chat_id, text)
                 return
             keyboard = InlineKeyboardMarkup(

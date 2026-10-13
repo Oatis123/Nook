@@ -1,0 +1,496 @@
+/* Pixel skin — the house theme: strictly monochrome, 1-bit pixel art. Unifont (an 8×16
+   bitmap face, design/fonts/unifont) for text and code, Tiny5 for headings, square corners
+   everywhere, 2px ink outlines, hard offset shadows, bevelled NES-style buttons, dithered
+   checkerboard fills (backdrop, hovers), a striped classic-Mac title bar on dialogs,
+   stepped motion and pixelarticons (design/icons.tsx).
+   Token contract: design/tokens.css. Widget hooks: the `ui-*` classes on components. */
+
+:root[data-theme-skin='pixel'] {
+  /* Paper and ink — no hue anywhere; light mode is ink on paper, dark mode a phosphor-
+     free inversion of it. */
+  --bg: light-dark(#f7f7f5, #0c0c0c);
+  --surface: light-dark(#e9e9e6, #181818);
+  --surface-raised: light-dark(#ffffff, #202020);
+  --border: light-dark(#bdbdbb, #3c3c3c);
+  --text: light-dark(#111111, #ededed);
+  --text-muted: light-dark(#5c5c5c, #9a9a9a);
+  --accent: light-dark(#111111, #ededed);
+  --accent-text: light-dark(#f7f7f5, #0c0c0c);
+  /* Danger is ink too: destructive controls are told apart by their hatching, not hue. */
+  --danger: var(--text);
+  --danger-text: var(--accent-text);
+
+  /* Priority as tone steps instead of hues — still AA (4.5:1) on --surface. */
+  --priority-low: light-dark(#6a6a6a, #8a8a8a);
+  --priority-medium: light-dark(#3d3d3d, #c4c4c4);
+  --priority-high: light-dark(#000000, #ffffff);
+
+  /* Pixel-art building blocks. */
+  --px-ink: var(--text);
+  --px-shadow: light-dark(#111111, #000000);
+  --px-bevel: light-dark(#c9c9c6, #0a0a0a);
+  --px-bevel-primary: light-dark(#4d4d4d, #9e9e9e);
+  /* 2×2 checkerboard dither, the 1-bit stand-in for a translucent wash. Custom
+     properties resolve here on :root, so a recolored dither is spelled out in place. */
+  --px-dither-ink: color-mix(in srgb, var(--px-ink) 22%, transparent);
+  --px-dither: repeating-conic-gradient(var(--px-dither-ink) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+  --overlay: light-dark(rgb(0 0 0 / 0.25), rgb(0 0 0 / 0.5));
+
+  /* Unifont is a single-weight bitmap face, drawn on a 16px grid: it's only crisp at
+     16px, so body text sits exactly there. Tiny5 has one weight too — headings take
+     their size, not boldness, from the skin. */
+  --font-ui: 'Unifont', ui-monospace, monospace;
+  --font-display: 'Tiny5', var(--font-ui);
+  --font-code: var(--font-ui);
+  --font-display-weight: 400;
+  --font-display-tracking: 0.02em;
+  --font-size-body: 16px;
+
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-button: 0;
+  --radius-dialog: 0;
+
+  --shadow-popover: 4px 4px 0 0 var(--px-shadow);
+  --shadow-dialog: 6px 6px 0 0 var(--px-shadow);
+
+  /* The pixelarticons check: a stepped glyph instead of a smooth stroke. */
+  --mask-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' shape-rendering='crispEdges'%3E%3Cpath d='M10 18H8v-2h2v2Zm-2-2H6v-2h2v2Zm4-2v2h-2v-2h2Zm-6 0H4v-2h2v2Zm8 0h-2v-2h2v2Zm2-2h-2v-2h2v2Zm2-2h-2V8h2v2Zm2-2h-2V6h2v2Z'/%3E%3C/svg%3E");
+
+  /* Motion moves in frames, not curves. */
+  --ease-standard: steps(4, jump-end);
+  --ease-spring: steps(3, jump-end);
+
+  scrollbar-color: var(--text-muted) var(--surface);
+}
+
+/* Headings in the display face, snapped to Tiny5's 8px grid (see the markdown rules). */
+:root[data-theme-skin='pixel'] .font-serif:is(.text-sm, .text-base, .text-lg) {
+  font-size: 1rem;
+}
+:root[data-theme-skin='pixel'] .font-serif.text-xl {
+  font-size: 1.5rem;
+}
+:root[data-theme-skin='pixel'] .font-serif.text-3xl {
+  font-size: 2rem;
+}
+
+/* Square corners on everything — rounded utilities (rounded-full dots, rounded-xl cards)
+   included. Elements given an inline radius (the other skins' preview cards) keep it. */
+:root[data-theme-skin='pixel'] :not([style*='border-radius']),
+:root[data-theme-skin='pixel'] :not([style*='border-radius'])::before,
+:root[data-theme-skin='pixel'] :not([style*='border-radius'])::after {
+  border-radius: 0 !important;
+}
+
+:root[data-theme-skin='pixel'] ::selection {
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='pixel'] :focus-visible {
+  outline: 2px dashed var(--px-ink);
+  outline-offset: 2px;
+}
+/* Pop-ins appear in a few frames instead of a smooth fade. */
+:root[data-theme-skin='pixel'] .animate-fade-in {
+  animation-timing-function: steps(3, jump-end);
+}
+
+/* Buttons: bevelled 8-bit blocks — 2px ink outline with a notch cut out of every corner,
+   a darker band along the bottom-right edge, and on press the band flips to the top-left
+   and the label drops a pixel. */
+:root[data-theme-skin='pixel'] .ui-button {
+  --px-btn-bevel: var(--px-bevel);
+  position: relative;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 2px var(--px-ink),
+    inset -4px -4px 0 0 var(--px-btn-bevel);
+  clip-path: polygon(
+    2px 0,
+    calc(100% - 2px) 0,
+    calc(100% - 2px) 2px,
+    100% 2px,
+    100% calc(100% - 2px),
+    calc(100% - 2px) calc(100% - 2px),
+    calc(100% - 2px) 100%,
+    2px 100%,
+    2px calc(100% - 2px),
+    0 calc(100% - 2px),
+    0 2px,
+    2px 2px
+  );
+  transition-property: none;
+}
+/* The corner notches would clip an outside focus ring — draw it inside instead. */
+:root[data-theme-skin='pixel'] .ui-button:focus-visible {
+  outline-offset: -6px;
+  outline-color: currentColor;
+}
+:root[data-theme-skin='pixel'] .ui-button:active:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 2px var(--px-ink),
+    inset 4px 4px 0 0 var(--px-btn-bevel);
+  padding-top: 2px;
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='primary'] {
+  --px-btn-bevel: var(--px-bevel-primary);
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='primary']:hover:not(:disabled) {
+  opacity: 1;
+  background-image: repeating-conic-gradient(
+    color-mix(in srgb, var(--accent-text) 30%, transparent) 0 25%,
+    transparent 0 50%
+  );
+  background-size: 4px 4px;
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='secondary'] {
+  background: var(--surface-raised);
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='secondary']:hover:not(:disabled),
+:root[data-theme-skin='pixel'] .ui-button[data-variant='ghost']:hover:not(:disabled) {
+  background: var(--surface-raised) var(--px-dither);
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='ghost'] {
+  box-shadow: none;
+  clip-path: none;
+  text-decoration: underline 2px;
+  text-underline-offset: 4px;
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='ghost']:active:not(:disabled) {
+  box-shadow: none;
+}
+/* Danger: paper with ink hatching; turns solid ink on hover. */
+:root[data-theme-skin='pixel'] .ui-button[data-variant='danger'] {
+  background: var(--surface-raised)
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--px-ink) 18%, transparent) 0 2px,
+      transparent 2px 6px
+    );
+  color: var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .ui-button[data-variant='danger']:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--px-ink);
+  color: var(--accent-text);
+  --px-btn-bevel: var(--px-bevel-primary);
+}
+
+/* Icon buttons: flat until touched — dithered on hover, inverted when active. */
+:root[data-theme-skin='pixel'] .ui-icon-button,
+:root[data-theme-skin='pixel'] .ui-dialog-close {
+  transition-property: none;
+}
+:root[data-theme-skin='pixel'] .ui-icon-button:hover,
+:root[data-theme-skin='pixel'] .ui-dialog-close:hover {
+  background: var(--px-dither);
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .ui-icon-button[data-active],
+:root[data-theme-skin='pixel'] .ui-icon-button:active:not(:disabled) {
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+
+/* Switch: a square slot with a square block that jumps across in frames. */
+:root[data-theme-skin='pixel'] .ui-switch {
+  width: 40px;
+  height: 20px;
+  border: 2px solid var(--px-ink);
+  background: var(--surface-raised) var(--px-dither);
+}
+:root[data-theme-skin='pixel'] .ui-switch[data-state='checked'] {
+  border-color: var(--px-ink);
+  background: var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .ui-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  translate: 0 0;
+  background: var(--px-ink);
+  transition: translate 120ms steps(3, jump-end);
+}
+:root[data-theme-skin='pixel'] .ui-switch-thumb[data-state='checked'] {
+  translate: 20px 0;
+  background: var(--accent-text);
+}
+
+/* Tabs: the selected tab is a solid ink block sitting on a 2px rule. */
+:root[data-theme-skin='pixel'] .ui-tabs-list {
+  gap: 0.25rem;
+  border-bottom: 2px solid var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .ui-tab {
+  margin-bottom: -2px;
+  border-bottom: 2px solid transparent;
+  transition-property: none;
+}
+:root[data-theme-skin='pixel'] .ui-tab:hover {
+  background: var(--px-dither);
+  color: var(--text);
+}
+:root[data-theme-skin='pixel'] .ui-tab[data-state='active'] {
+  border-bottom-color: var(--px-ink);
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+
+/* Windows: dialogs, the palette and menus are 2px-outlined panes with a hard shadow. */
+:root[data-theme-skin='pixel'] .ui-dialog,
+:root[data-theme-skin='pixel'] .ui-palette,
+:root[data-theme-skin='pixel'] .ui-menu {
+  border: 2px solid var(--px-ink);
+}
+/* The backdrop is a 50% checkerboard, like a 1-bit desktop pattern. */
+:root[data-theme-skin='pixel'] .ui-dialog-overlay {
+  background: repeating-conic-gradient(var(--overlay) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+}
+/* Dialog title bar: horizontal pinstripes with the title on a paper plate. */
+:root[data-theme-skin='pixel'] .ui-dialog-header {
+  margin: -1.25rem -1.25rem 1rem;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  align-items: center;
+  border-bottom: 2px solid var(--px-ink);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--px-ink) 0 2px,
+    var(--surface-raised) 2px 4px
+  );
+}
+:root[data-theme-skin='pixel'] .ui-dialog-header > div,
+:root[data-theme-skin='pixel'] .ui-dialog-close {
+  background: var(--surface-raised);
+}
+:root[data-theme-skin='pixel'] .ui-dialog-header > div {
+  padding: 0.125rem 0.5rem;
+}
+:root[data-theme-skin='pixel'] .ui-dialog-title {
+  font-size: 1.5rem;
+  line-height: 1.5rem;
+}
+:root[data-theme-skin='pixel'] .ui-dialog-close {
+  box-shadow: inset 0 0 0 2px var(--px-ink);
+  color: var(--text);
+}
+
+:root[data-theme-skin='pixel'] .ui-menu {
+  padding: 2px;
+}
+:root[data-theme-skin='pixel'] .ui-menu-item {
+}
+:root[data-theme-skin='pixel'] .ui-menu-item[data-highlighted],
+:root[data-theme-skin='pixel'] [aria-selected='true'] > .ui-palette-item {
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='pixel'] [aria-selected='true'] > .ui-palette-item * {
+  color: inherit;
+}
+:root[data-theme-skin='pixel'] .ui-tooltip {
+  border: 0;
+  padding: 0.25rem 0.5rem;
+  background: var(--px-ink);
+  color: var(--accent-text);
+  box-shadow: 2px 2px 0 0 color-mix(in srgb, var(--px-shadow) 40%, transparent);
+}
+:root[data-theme-skin='pixel'] .ui-tooltip-arrow {
+  display: none;
+}
+
+/* Navigation: dithered hover, the current item inverted like a selected menu row. */
+:root[data-theme-skin='pixel'] .ui-nav-item {
+  transition-property: none;
+}
+:root[data-theme-skin='pixel'] .ui-nav-item:hover {
+  background: var(--px-dither);
+  color: var(--text);
+}
+:root[data-theme-skin='pixel']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page'])) {
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='pixel']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page']))
+  :is(a, span, svg) {
+  color: inherit !important;
+}
+
+:root[data-theme-skin='pixel'] .ui-segmented {
+  gap: 0;
+  padding: 0;
+  border: 2px solid var(--px-ink);
+  background: var(--surface-raised);
+}
+:root[data-theme-skin='pixel'] .ui-segment {
+  box-shadow: none;
+  transition-property: none;
+}
+:root[data-theme-skin='pixel'] .ui-segment + .ui-segment {
+  box-shadow: -2px 0 0 0 var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .ui-segment:hover {
+  background: var(--px-dither);
+}
+:root[data-theme-skin='pixel'] .ui-segment[data-active='true'] {
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+
+/* Shell: the sidebar as a floating 1-bit window; a heavy rule under the top bar. */
+@media (min-width: 48rem) {
+  :root[data-theme-skin='pixel'] .ui-sidebar[data-open] {
+    border: 2px solid var(--px-ink);
+    box-shadow: var(--shadow-popover);
+  }
+}
+:root[data-theme-skin='pixel'] .ui-topbar {
+  border-bottom: 2px solid var(--px-ink);
+}
+
+/* Task checkbox: a square box; done is a solid block with a stepped check. */
+:root[data-theme-skin='pixel'] .ui-check {
+  position: relative;
+  border: 2px solid var(--text-muted);
+  background: var(--surface-raised);
+  transition-property: none;
+}
+:root[data-theme-skin='pixel'] .ui-check:hover {
+  border-color: var(--px-ink);
+  background: var(--surface-raised) var(--px-dither);
+}
+:root[data-theme-skin='pixel'] .ui-check[data-checked] {
+  border-color: var(--px-ink);
+  background: var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .ui-check[data-checked]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent-text);
+  mask: var(--mask-check) center / contain no-repeat;
+}
+
+/* Note checklists: the same box. */
+:root[data-theme-skin='pixel'] .markdown-preview .task-list-item input[type='checkbox'] {
+  border: 2px solid var(--text-muted);
+  transition: none;
+}
+
+:root[data-theme-skin='pixel'] :is(input, select, textarea).border {
+  border-width: 2px;
+  border-color: var(--text-muted);
+  background-color: var(--surface-raised);
+}
+:root[data-theme-skin='pixel'] :is(input, select, textarea).border:focus-visible {
+  border-color: var(--px-ink);
+  outline-offset: 2px;
+}
+
+/* Editor: kept at Unifont's native 16px. The caret is a solid block that inverts the
+   glyph under it. */
+:root[data-theme-skin='pixel'] .cm-editor {
+  font-size: 16px;
+}
+:root[data-theme-skin='pixel'] .cm-cursorLayer {
+  mix-blend-mode: difference;
+}
+:root[data-theme-skin='pixel'] .cm-editor .cm-cursor {
+  width: 0.5em;
+  border-left: 0;
+  background: #ffffff;
+}
+
+/* Markdown preview. */
+:root[data-theme-skin='pixel'] .markdown-preview :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 400;
+}
+/* Tiny5 is drawn on a 1/8 em grid: headings snap to multiples of 8px to stay crisp. */
+:root[data-theme-skin='pixel'] .markdown-preview h1 {
+  font-size: 2em;
+}
+:root[data-theme-skin='pixel'] .markdown-preview :is(h2, h3) {
+  font-size: 1.5em;
+}
+:root[data-theme-skin='pixel'] .markdown-preview :is(h4, h5, h6) {
+  font-size: 1em;
+}
+:root[data-theme-skin='pixel'] .markdown-preview h1,
+:root[data-theme-skin='pixel'] .markdown-preview h2 {
+  padding-bottom: 0.3em;
+  background: repeating-linear-gradient(90deg, var(--px-ink) 0 4px, transparent 4px 8px) bottom /
+    100% 2px no-repeat;
+}
+:root[data-theme-skin='pixel'] .markdown-preview a {
+  text-decoration-thickness: 2px;
+}
+:root[data-theme-skin='pixel'] .markdown-preview a:hover {
+  background: var(--px-ink);
+  color: var(--accent-text);
+  text-decoration: none;
+}
+:root[data-theme-skin='pixel'] .markdown-preview a.wikilink {
+  border-bottom: 2px dotted var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .markdown-preview a.wikilink:hover {
+  border-bottom-color: var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .markdown-preview blockquote {
+  border-left: 4px solid var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .markdown-preview blockquote.callout {
+  border: 2px solid var(--px-ink);
+  border-left-width: 6px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-popover);
+}
+:root[data-theme-skin='pixel'] .markdown-preview blockquote.callout::before {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+:root[data-theme-skin='pixel']
+  .markdown-preview
+  blockquote.callout:is(
+    [data-callout-type='warning'],
+    [data-callout-type='danger'],
+    [data-callout-type='error']
+  ) {
+  background: var(--surface-raised)
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--px-ink) 10%, transparent) 0 2px,
+      transparent 2px 6px
+    );
+}
+:root[data-theme-skin='pixel'] .markdown-preview hr {
+  height: 2px;
+  border: 0;
+  background: repeating-linear-gradient(90deg, var(--px-ink) 0 2px, transparent 2px 6px);
+}
+:root[data-theme-skin='pixel'] .markdown-preview code {
+  font-size: 1em;
+}
+/* Code blocks: framed like the windows; Shiki's hues are flattened to grey levels. */
+:root[data-theme-skin='pixel'] .markdown-preview pre {
+  border: 2px solid var(--px-ink);
+  box-shadow: var(--shadow-popover);
+  font-size: 1rem;
+  line-height: 1.25;
+  filter: grayscale(1);
+}
+:root[data-theme-skin='pixel'] .markdown-preview th {
+  background: var(--px-ink);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='pixel'] .markdown-preview :is(th, td) {
+  border: 2px solid var(--px-ink);
+}
+:root[data-theme-skin='pixel'] .markdown-preview img {
+  border: 2px solid var(--px-ink);
+}

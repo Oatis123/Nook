@@ -22,10 +22,13 @@
 @import '@fontsource-variable/mona-sans/wght.css';
 @import '@fontsource-variable/google-sans-flex/wght.css';
 @import '@fontsource-variable/google-sans-code/wght.css';
+@import '@fontsource/tiny5/400.css';
+@import './design/fonts/unifont/unifont.css';
 
 @import './design/skins/telegram.css';
 @import './design/skins/github.css';
 @import './design/skins/material.css';
+@import './design/skins/pixel.css';
 
 @theme {
   /* Skin-driven (design/tokens.css): `font-serif` is really "the display face". */

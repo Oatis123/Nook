@@ -11,7 +11,7 @@
   }
   try {
     var skin = localStorage.getItem('nook-theme-skin')
-    if (skin === 'telegram' || skin === 'github' || skin === 'material') {
+    if (skin === 'telegram' || skin === 'github' || skin === 'material' || skin === 'pixel') {
       document.documentElement.setAttribute('data-theme-skin', skin)
     }
   } catch (e) {

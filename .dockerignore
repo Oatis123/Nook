@@ -1,0 +1,14 @@
+# Only the web image is built from the repo root (docker-compose.yml: web.build.context);
+# api/worker/bot use ./backend and its own .dockerignore.
+#
+# node_modules above all: frontend/Dockerfile installs dependencies inside the image and
+# then runs `COPY frontend/ .` — a host node_modules (Windows links, other platform
+# binaries) would be copied over the image's and break the build.
+**/node_modules
+frontend/dist
+frontend/test-results
+frontend/playwright-report
+.git
+.env
+backend
+docs

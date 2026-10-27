@@ -26,11 +26,14 @@
 @import '@fontsource/martian-mono/500.css';
 @import '@fontsource/silkscreen/400.css';
 @import '@fontsource-variable/commissioner/wght.css';
+@import '@fontsource/tiny5/400.css';
+@import './design/fonts/unifont/unifont.css';
 
 @import './design/skins/oatis.css';
 @import './design/skins/telegram.css';
 @import './design/skins/github.css';
 @import './design/skins/material.css';
+@import './design/skins/pixel.css';
 
 @theme {
   /* Skin-driven (design/tokens.css): `font-serif` is really "the display face". */

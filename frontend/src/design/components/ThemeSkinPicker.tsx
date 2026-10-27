@@ -162,6 +162,32 @@ const OPTIONS: {
       muted: '#cac4d0',
     },
   },
+  {
+    value: 'pixel',
+    label: 'Pixel',
+    fonts: 'Tiny5 · Unifont',
+    display: "'Tiny5', ui-monospace, monospace",
+    ui: "'Unifont', ui-monospace, monospace",
+    displayWeight: 400,
+    radius: '0',
+    buttonRadius: '0',
+    light: {
+      bg: '#f7f7f5',
+      surface: '#e9e9e6',
+      accent: '#111111',
+      accentText: '#f7f7f5',
+      text: '#111111',
+      muted: '#5c5c5c',
+    },
+    dark: {
+      bg: '#0c0c0c',
+      surface: '#181818',
+      accent: '#ededed',
+      accentText: '#0c0c0c',
+      text: '#ededed',
+      muted: '#9a9a9a',
+    },
+  },
 ]
 
 export function ThemeSkinPicker() {
@@ -173,7 +199,7 @@ export function ThemeSkinPicker() {
     <div
       role="radiogroup"
       aria-label="Theme"
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
     >
       {OPTIONS.map((option) => {
         const palette = option[mode]

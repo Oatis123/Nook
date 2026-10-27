@@ -6,7 +6,7 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 /** The overall visual theme — independent of light/dark mode. Each skin brings its own
  * light + dark palette, fonts, shapes and widget styles (design/skins/*.css) and its
  * own icon set (design/icons.tsx). */
-export type ThemeSkin = 'oatis' | 'anthropic' | 'telegram' | 'github' | 'material'
+export type ThemeSkin = 'oatis' | 'anthropic' | 'telegram' | 'github' | 'material' | 'pixel'
 
 export const THEME_SKINS: readonly ThemeSkin[] = [
   'oatis',
@@ -14,6 +14,7 @@ export const THEME_SKINS: readonly ThemeSkin[] = [
   'telegram',
   'github',
   'material',
+  'pixel',
 ]
 
 /** The skin a visitor gets until they pick one. Keep in sync with public/theme-init.js. */
@@ -30,6 +31,7 @@ const SKIN_FONTS: Record<ThemeSkin, string[]> = {
   telegram: ['400 1em Roboto', '500 1em Roboto'],
   github: ['600 1em "Mona Sans Variable"'],
   material: ['400 1em "Google Sans Flex Variable"', '1em Roboto'],
+  pixel: ['400 1em Unifont', '400 1em Tiny5'],
 }
 
 function isThemeSkin(value: unknown): value is ThemeSkin {

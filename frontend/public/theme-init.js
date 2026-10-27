@@ -13,7 +13,13 @@
     var skin = localStorage.getItem('nook-theme-skin')
     // Oatis is the default skin (DEFAULT_SKIN in src/lib/theme.ts); Anthropic is the
     // un-attributed base in design/tokens.css.
-    if (skin !== 'anthropic' && skin !== 'telegram' && skin !== 'github' && skin !== 'material') {
+    if (
+      skin !== 'anthropic' &&
+      skin !== 'telegram' &&
+      skin !== 'github' &&
+      skin !== 'material' &&
+      skin !== 'pixel'
+    ) {
       skin = 'oatis'
     }
     if (skin !== 'anthropic') document.documentElement.setAttribute('data-theme-skin', skin)

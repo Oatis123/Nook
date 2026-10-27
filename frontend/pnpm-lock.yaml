@@ -56,6 +56,9 @@ importers:
       '@fontsource/silkscreen':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource/tiny5':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.3
@@ -110,6 +113,9 @@ importers:
       mdast-util-find-and-replace:
         specifier: ^3.0.2
         version: 3.0.2
+      pixelarticons:
+        specifier: ^2.4.2
+        version: 2.4.2(react@19.3.0)
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -496,6 +502,9 @@ packages:
 
   '@fontsource/silkscreen@5.3.0':
     resolution: {integrity: sha512-M1NQ3LQH0LFNvyFPd/piHEGMImPPtpLglNnLC6Vdcq9kL0jNIOtTQmksAWCc4enbDnw1OnIpZtjNEfRqYm/QmA==}
+
+  '@fontsource/tiny5@5.3.0':
+    resolution: {integrity: sha512-29H01ByMRs6uiLeOoBnZLedf0dR3pF5A53cIBzhp1/Y6Bu5D0t5selTb4TWs3ENoc/OK71rOed5xAdvBywe4aQ==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2401,6 +2410,12 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
+  pixelarticons@2.4.2:
+    resolution: {integrity: sha512-BZKSU5ckLuioZCzES4fEmdQfnI8XEiQlHljdIVk+N6+KH7vTBQJNtMs+V0LQF7nC7cZbKT0qBXFOsT35sl8uhg==}
+    hasBin: true
+    peerDependencies:
+      react: '>=16'
+
   playwright-core@1.63.0:
     resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
     engines: {node: '>=20'}
@@ -3308,6 +3323,8 @@ snapshots:
   '@fontsource/roboto@5.3.0': {}
 
   '@fontsource/silkscreen@5.3.0': {}
+
+  '@fontsource/tiny5@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -5357,6 +5374,10 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  pixelarticons@2.4.2(react@19.3.0):
+    dependencies:
+      react: 19.3.0
 
   playwright-core@1.63.0: {}
 

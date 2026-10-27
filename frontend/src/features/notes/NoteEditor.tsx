@@ -21,6 +21,7 @@ import { createTagCompletion, createWikilinkCompletion } from '@/features/notes/
 import { createAttachmentDropHandler } from '@/features/notes/attachmentDrop'
 import { MarkdownPreview } from '@/features/notes/MarkdownPreview'
 import { type NoteMode, setNoteMode, useNoteMode } from '@/features/notes/noteMode'
+import { type CaretHint, sourceOffsetFor } from '@/features/notes/previewCaret'
 import { ConflictDialog } from '@/features/notes/ConflictDialog'
 import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import { useUploadAttachment } from '@/features/attachments/hooks'
@@ -86,6 +87,23 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     })
     return true
   }, [])
+
+  // Text clicked while reading: switch to editing with the cursor where the click was.
+  const editAt = useCallback(
+    (hint: CaretHint | null) => {
+      switchMode('edit')
+      requestAnimationFrame(() => {
+        const view = viewRef.current
+        if (!view) return
+        const at = hint ? sourceOffsetFor(view.state.doc.toString(), hint) : null
+        view.dispatch(
+          at === null ? {} : { selection: { anchor: at }, effects: EditorView.scrollIntoView(at) },
+        )
+        view.focus()
+      })
+    },
+    [switchMode],
+  )
 
   useEffect(() => {
     function handleKeydown(e: KeyboardEvent) {
@@ -248,12 +266,16 @@ export function NoteEditor({ noteId }: { noteId: string }) {
         {previewMounted && (
           <div
             className={clsx(
-              'min-w-0 flex-1 overflow-y-auto px-5 py-4 [contain:layout_paint_style]',
+              'min-w-0 flex-1 cursor-text overflow-y-auto px-5 py-4 [contain:layout_paint_style]',
               mode === 'edit' && 'hidden',
             )}
           >
             {draft.content.trim() ? (
-              <MarkdownPreview content={draft.content} onToggleTask={toggleTask} />
+              <MarkdownPreview
+                content={draft.content}
+                onToggleTask={toggleTask}
+                onEditAt={editAt}
+              />
             ) : (
               <p className="text-sm text-text-muted">This note is empty.</p>
             )}

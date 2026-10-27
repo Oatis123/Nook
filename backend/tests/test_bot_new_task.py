@@ -47,6 +47,7 @@ def _bot_uses_test_db(db_engine: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     )
     handlers._drafts.clear()
     handlers._idea_blocks.clear()
+    handlers._daily_blocks.clear()
 
 
 def _checked(markup: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup | None:
@@ -66,6 +67,7 @@ _CALLBACK_ROUTES = [
     ("qa:back:", handlers.handle_list_picker_back),
     ("qa:undo:", handlers.handle_undo),
     ("idea:undo", handlers.handle_idea_undo),
+    ("daily:undo", handlers.handle_daily_undo),
     ("wk:", handlers.handle_week_callback),
 ]
 

@@ -65,7 +65,7 @@ async def get_or_create_ideas_note(session: AsyncSession, user_id: uuid.UUID) ->
     return note
 
 
-def _hard_breaks(text: str) -> str:
+def hard_breaks(text: str) -> str:
     """Keeps the message's line breaks in the rendered note: in Markdown a lone newline is
     just a space, a line ending in two spaces is a line break."""
     lines = [line.rstrip() for line in text.strip().splitlines()]
@@ -78,7 +78,7 @@ def _hard_breaks(text: str) -> str:
 def idea_block(text: str, at: datetime) -> str:
     """'**пн, 5 окт 2026, 14:32**' on its own line, then the idea."""
     when = format_due(at.date(), at.time().replace(second=0, microsecond=0))
-    return f"**{when}**  \n{_hard_breaks(text)}"
+    return f"**{when}**  \n{hard_breaks(text)}"
 
 
 async def _rewrite(

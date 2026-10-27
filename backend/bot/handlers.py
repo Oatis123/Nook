@@ -34,6 +34,7 @@ from app.models.task_list import TaskList
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.services import admin as admin_service
+from app.services import daily as daily_service
 from app.services import ideas as ideas_service
 from app.services import note_telegram, week_agenda
 from app.services import task_lists as task_lists_service
@@ -84,7 +85,7 @@ async def handle_start_plain(message: Message) -> None:
         await message.answer(
             f"С возвращением, {user.username}.\n\n"
             "Чтобы создать задачу, просто напишите её текст. Задачи на неделю — /week, "
-            "заметки — /note, справка — /help."
+            "дневник — /daily, заметки — /note, справка — /help."
         )
 
 
@@ -238,6 +239,8 @@ async def handle_help(message: Message) -> None:
         "/new <текст> — то же самое\n"
         "/idea <текст> — записать идею в заметку «Идеи» (или кнопка «💡 Это идея» "
         "после текста)\n"
+        "/daily <текст> — записать в дневник: заметку за сегодня в папке «Дневник» "
+        "(или кнопка «📓 В дневник» после текста)\n"
         "/cancel — отменить создание задачи\n"
         "/week — задачи на эту неделю; кнопками можно листать дальше, а /week 2 "
         "или /week 20.10 сразу откроет нужную неделю\n"
@@ -278,7 +281,7 @@ TIME_PRESETS = [time(9, 0), time(12, 0), time(18, 0)]
 BOT_TASK_PRIORITY = TaskPriority.medium
 MAX_TITLE_LENGTH = 500  # TaskCreate.title's limit
 
-Step = Literal["description", "date", "time", "idea"]
+Step = Literal["description", "date", "time", "idea", "daily"]
 
 
 @dataclass
@@ -322,7 +325,7 @@ DESCRIPTION_PROMPT = (
 DESCRIPTION_KEYBOARD = InlineKeyboardMarkup(
     inline_keyboard=[
         [_button("Пропустить", "nt:skip"), _button("💡 Это идея", "nt:idea")],
-        [CANCEL_BUTTON],
+        [_button("📓 В дневник", "nt:daily"), CANCEL_BUTTON],
     ]
 )
 
@@ -563,6 +566,10 @@ async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: 
         _drafts.pop(message.from_user.id, None)
         await _drop_prompt_buttons(draft)
         await _save_idea_and_reply(message, message.from_user.id, user, text)
+    elif draft.step == "daily":
+        _drafts.pop(message.from_user.id, None)
+        await _drop_prompt_buttons(draft)
+        await _save_daily_and_reply(message, message.from_user.id, user, text)
     elif draft.step == "description":
         draft.description = text.strip() or None
         draft.step = "date"
@@ -646,7 +653,7 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
     if action == "cancel":
         _drafts.pop(telegram_user_id, None)
         await callback.message.edit_text(
-            "Отменено." if draft.step == "idea" else "Создание задачи отменено."
+            "Отменено." if draft.step in ("idea", "daily") else "Создание задачи отменено."
         )
         await callback.answer()
         return
@@ -665,6 +672,13 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
             _idea_saved_text(draft.title), reply_markup=IDEA_UNDO_KEYBOARD
         )
         _remember_idea(telegram_user_id, callback.message.message_id, block)
+    elif draft.step == "description" and action == "daily":
+        _drafts.pop(telegram_user_id, None)
+        day, block = await _save_daily(user, draft.title)
+        await callback.message.edit_text(
+            _daily_saved_text(day, draft.title), reply_markup=DAILY_UNDO_KEYBOARD
+        )
+        _remember_daily(telegram_user_id, callback.message.message_id, day, block)
     elif draft.step == "description" and action == "skip":
         draft.step = "date"
         await _prompt_by_edit(callback.message, draft, DATE_PROMPT, DATE_KEYBOARD)
@@ -797,6 +811,92 @@ async def handle_idea_undo(callback: CallbackQuery) -> None:
         await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer(
             "Не нашёл эту идею в заметке — похоже, её уже изменили.", show_alert=True
+        )
+
+
+# --- Daily notes: appended to today's note in the Дневник folder (app/services/daily.py) ---
+
+DAILY_PROMPT = "📓 Напишите запись в дневник одним сообщением."
+DAILY_UNDO_KEYBOARD = InlineKeyboardMarkup(inline_keyboard=[[_button("Отменить", "daily:undo")]])
+MAX_UNDOABLE_ENTRIES = 200
+
+# (Telegram user id, confirmation message id) -> the day and block appended, for its Undo
+# button. In memory like drafts: after a bot restart, undoing means editing the note itself.
+_daily_blocks: dict[tuple[int, int], tuple[date, str]] = {}
+
+
+def _daily_saved_text(day: date, text: str) -> str:
+    shown = text.strip()
+    if len(shown) > 300:
+        shown = shown[:300].rstrip() + "…"
+    return f"📓 Записал в дневник ({format_day(day)}):\n{shown}"
+
+
+async def _save_daily(user: User, text: str) -> tuple[date, str]:
+    at = _local_now(user)
+    async with async_session_factory() as session:
+        _, block = await daily_service.append_entry(session, user.id, text, at)
+    return at.date(), block
+
+
+def _remember_daily(telegram_user_id: int, message_id: int, day: date, block: str) -> None:
+    _daily_blocks[(telegram_user_id, message_id)] = (day, block)
+    while len(_daily_blocks) > MAX_UNDOABLE_ENTRIES:
+        del _daily_blocks[next(iter(_daily_blocks))]
+
+
+async def _save_daily_and_reply(
+    message: Message, telegram_user_id: int, user: User, text: str
+) -> None:
+    day, block = await _save_daily(user, text)
+    sent = await message.answer(_daily_saved_text(day, text), reply_markup=DAILY_UNDO_KEYBOARD)
+    _remember_daily(telegram_user_id, sent.message_id, day, block)
+
+
+@router.message(Command("daily", "day"))
+async def handle_daily_command(message: Message, command: CommandObject) -> None:
+    if message.from_user is None:
+        return
+    user = await _linked_user(message.from_user.id)
+    if user is None:
+        await message.answer(NOT_LINKED_TEXT)
+        return
+    old = _drafts.pop(message.from_user.id, None)
+    if old is not None:
+        await _drop_prompt_buttons(old)
+    text = (command.args or "").strip()
+    if text:
+        await _save_daily_and_reply(message, message.from_user.id, user, text)
+        return
+    # "/daily" alone: the next message is the entry.
+    draft = _Draft(title="", step="daily")
+    _drafts[message.from_user.id] = draft
+    draft.prompt = await message.answer(DAILY_PROMPT, reply_markup=IDEA_PROMPT_KEYBOARD)
+
+
+@router.callback_query(F.data == "daily:undo")
+async def handle_daily_undo(callback: CallbackQuery) -> None:
+    if callback.from_user is None or not isinstance(callback.message, Message):
+        return
+    key = (callback.from_user.id, callback.message.message_id)
+    entry = _daily_blocks.get(key)
+    user = await _linked_user(callback.from_user.id) if entry is not None else None
+    if entry is None or user is None:
+        await callback.answer(
+            "Отменить отсюда уже не получится — удалите запись в заметке дня.", show_alert=True
+        )
+        return
+    day, block = entry
+    async with async_session_factory() as session:
+        removed = await daily_service.remove_entry(session, user.id, day, block)
+    _daily_blocks.pop(key, None)
+    if removed:
+        await callback.message.edit_text("Запись удалена.")
+        await callback.answer()
+    else:
+        await callback.message.edit_reply_markup(reply_markup=None)
+        await callback.answer(
+            "Не нашёл эту запись в заметке — похоже, её уже изменили.", show_alert=True
         )
 
 

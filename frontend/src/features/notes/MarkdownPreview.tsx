@@ -21,6 +21,7 @@ import { useResolvedTheme } from '@/lib/theme'
 import { useFolders, useCreateNote, useNoteLinkTargets } from '@/features/notes/hooks'
 import { useAttachments } from '@/features/attachments/hooks'
 import { createPreviewSession } from '@/features/notes/previewClient'
+import { type CaretHint, caretHintAt } from '@/features/notes/previewCaret'
 import type { PreviewContext } from '@/features/notes/previewPipeline'
 
 function isExternalUrl(src: string): boolean {
@@ -100,13 +101,17 @@ interface Rendered {
 /** Renders `content` as soon as it changes: while typing, it's given the text only once
  * typing pauses (useNoteAutosave's SETTLE_MS). `onToggleTask` makes checklist boxes
  * clickable: it gets the `[ ]`'s offset in `content` (the text on screen, which the editor
- * may since have moved past) and returns whether it applied the change. */
+ * may since have moved past) and returns whether it applied the change. `onEditAt` is
+ * called when the text is clicked, with where the click landed (null if that can't be told)
+ * and the text on screen. */
 export const MarkdownPreview = memo(function MarkdownPreview({
   content,
   onToggleTask,
+  onEditAt,
 }: {
   content: string
   onToggleTask?: (offset: number, checked: boolean, content: string) => boolean
+  onEditAt?: (hint: CaretHint | null, shown: string) => void
 }) {
   const resolvedTheme = useResolvedTheme()
   const navigate = useNavigate()
@@ -186,7 +191,24 @@ export const MarkdownPreview = memo(function MarkdownPreview({
       return
     }
     const link = target.closest<HTMLAnchorElement>('a[data-wikilink]')
-    if (!link) return
+    if (!link) {
+      // Plain text: a click starts editing there. Not a link, a button or a drag that
+      // selected text (to copy it), and not a modified click (those open things).
+      if (
+        onEditAt &&
+        tree &&
+        e.button === 0 &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
+        !target.closest('a, button, input, summary, img, video, audio, .katex')
+      ) {
+        if (window.getSelection()?.isCollapsed === false) return
+        onEditAt(caretHintAt(e.currentTarget, e.clientX, e.clientY), tree.content)
+      }
+      return
+    }
     e.preventDefault()
 
     if (link.classList.contains('wikilink-dangling')) {

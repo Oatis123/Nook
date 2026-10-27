@@ -119,7 +119,7 @@ export function AppShell() {
         )}
       >
         <div className="flex items-center justify-between px-3 py-3">
-          <span className="font-serif text-base">{APP_NAME}</span>
+          <span className="ui-wordmark font-serif text-base">{APP_NAME}</span>
           <IconButton label="Collapse sidebar" onClick={toggleSidebar} className="max-md:hidden">
             <PanelLeft size={16} strokeWidth={1.5} />
           </IconButton>
@@ -233,7 +233,7 @@ export function AppShell() {
           >
             <Menu size={18} strokeWidth={1.5} />
           </IconButton>
-          <span className="font-serif text-sm md:hidden">{APP_NAME}</span>
+          <span className="ui-wordmark font-serif text-sm md:hidden">{APP_NAME}</span>
           <span className="hidden flex-1 md:block" />
           <IconButton
             label="Toggle context panel"

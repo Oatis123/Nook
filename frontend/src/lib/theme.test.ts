@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { THEME_SKINS, useThemeStore } from '@/lib/theme'
 
 describe('theme store', () => {
@@ -30,8 +30,21 @@ describe('theme store', () => {
     expect(localStorage.getItem('nook-theme')).toBe('system')
   })
 
-  it('defaults to the Anthropic skin', () => {
-    expect(useThemeStore.getState().skin).toBe('anthropic')
+  it('defaults to the Oatis skin', async () => {
+    vi.resetModules()
+    const fresh = await import('@/lib/theme')
+
+    expect(fresh.DEFAULT_SKIN).toBe('oatis')
+    expect(fresh.useThemeStore.getState().skin).toBe('oatis')
+    expect(document.documentElement.getAttribute('data-theme-skin')).toBe('oatis')
+  })
+
+  it('keeps a stored Anthropic choice instead of the default', async () => {
+    localStorage.setItem('nook-theme-skin', 'anthropic')
+    vi.resetModules()
+    const fresh = await import('@/lib/theme')
+
+    expect(fresh.useThemeStore.getState().skin).toBe('anthropic')
     expect(document.documentElement.hasAttribute('data-theme-skin')).toBe(false)
   })
 

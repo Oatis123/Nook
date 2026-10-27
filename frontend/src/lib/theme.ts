@@ -6,9 +6,18 @@ export type ThemePreference = 'light' | 'dark' | 'system'
 /** The overall visual theme — independent of light/dark mode. Each skin brings its own
  * light + dark palette, fonts, shapes and widget styles (design/skins/*.css) and its
  * own icon set (design/icons.tsx). */
-export type ThemeSkin = 'anthropic' | 'telegram' | 'github' | 'material'
+export type ThemeSkin = 'oatis' | 'anthropic' | 'telegram' | 'github' | 'material'
 
-export const THEME_SKINS: readonly ThemeSkin[] = ['anthropic', 'telegram', 'github', 'material']
+export const THEME_SKINS: readonly ThemeSkin[] = [
+  'oatis',
+  'anthropic',
+  'telegram',
+  'github',
+  'material',
+]
+
+/** The skin a visitor gets until they pick one. Keep in sync with public/theme-init.js. */
+export const DEFAULT_SKIN: ThemeSkin = 'oatis'
 
 const MODE_STORAGE_KEY = 'nook-theme'
 const SKIN_STORAGE_KEY = 'nook-theme-skin'
@@ -16,6 +25,7 @@ const SKIN_STORAGE_KEY = 'nook-theme-skin'
 /** Faces each skin renders its first frame with — loaded before the switch animation
  * starts so the new snapshot doesn't capture fallback fonts mid-swap. */
 const SKIN_FONTS: Record<ThemeSkin, string[]> = {
+  oatis: ['400 1em "Martian Mono"', '700 1em "Commissioner Variable"', '400 1em Literata'],
   anthropic: ['400 1em "IBM Plex Sans"', '400 1em Literata'],
   telegram: ['400 1em Roboto', '500 1em Roboto'],
   github: ['600 1em "Mona Sans Variable"'],
@@ -43,7 +53,7 @@ function readStoredSkin(): ThemeSkin {
   } catch {
     /* localStorage unavailable — fall back to the default skin */
   }
-  return 'anthropic'
+  return DEFAULT_SKIN
 }
 
 function applyPreferenceToDocument(pref: ThemePreference) {

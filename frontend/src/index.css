@@ -22,7 +22,12 @@
 @import '@fontsource-variable/mona-sans/wght.css';
 @import '@fontsource-variable/google-sans-flex/wght.css';
 @import '@fontsource-variable/google-sans-code/wght.css';
+@import '@fontsource/martian-mono/400.css';
+@import '@fontsource/martian-mono/500.css';
+@import '@fontsource/silkscreen/400.css';
+@import '@fontsource-variable/commissioner/wght.css';
 
+@import './design/skins/oatis.css';
 @import './design/skins/telegram.css';
 @import './design/skins/github.css';
 @import './design/skins/material.css';

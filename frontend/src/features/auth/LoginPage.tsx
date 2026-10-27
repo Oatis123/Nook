@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-center font-serif text-2xl text-text">{APP_NAME}</h1>
+        <h1 className="ui-wordmark mb-1 text-center font-serif text-2xl text-text">{APP_NAME}</h1>
         <p className="mb-8 text-center text-sm text-text-muted">
           {showTelegram ? 'Log in with Telegram' : 'Sign in to your account'}
         </p>

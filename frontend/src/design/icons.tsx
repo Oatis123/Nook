@@ -211,12 +211,13 @@ import type { OcticonProps } from '@primer/octicons-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ComponentType, CSSProperties, JSX } from 'react'
 import { clsx } from 'clsx'
+import { OATIS_ICON_FOR, oatisIconPath } from '@/design/oatisIcons'
 import { type ThemeSkin, useThemeStore } from '@/lib/theme'
 
 /* Themed icon set. Every icon the app uses is declared here once, as a lucide glyph
    plus per-skin replacements: GitHub renders Primer Octicons, Material renders
-   Material Symbols (Rounded), Telegram keeps lucide with a heavier stroke, Anthropic
-   keeps lucide as-is. Where a skin's set has no equivalent, lucide stands in.
+   Material Symbols (Rounded), Oatis renders 9×9 pixel icons (design/oatisIcons.ts),
+   Telegram keeps lucide with a heavier stroke, Anthropic keeps lucide as-is. Where a skin's set has no equivalent, lucide stands in.
 
    Import icons from '@/design/icons' rather than 'lucide-react' so they follow the
    active skin. The exports keep lucide's names so call sites read the same. */
@@ -239,6 +240,7 @@ interface SkinVariants {
 }
 
 const LUCIDE_STROKE_SCALE: Record<ThemeSkin, number> = {
+  oatis: 1.25,
   anthropic: 1,
   telegram: 1.25,
   github: 1.25,
@@ -254,6 +256,7 @@ function materialPath(svg: string): string {
 function themedIcon(name: string, Lucide: LucideIcon, variants: SkinVariants): AppIcon {
   const path = materialPath(variants.material)
   const GithubIcon = variants.github
+  const oatisName = OATIS_ICON_FOR[name]
 
   function Icon({ size = 24, strokeWidth = 2, className, style, ...aria }: IconProps) {
     const skin = useThemeStore((s) => s.skin)
@@ -262,6 +265,24 @@ function themedIcon(name: string, Lucide: LucideIcon, variants: SkinVariants): A
       : { 'aria-hidden': true as const }
     const classes = clsx('ui-icon shrink-0', className)
 
+    if (skin === 'oatis' && oatisName) {
+      // Pixel art only stays crisp at whole-number scales: 9, 18, 27px.
+      const px = Math.max(1, Math.round(size / 9)) * 9
+      return (
+        <svg
+          width={px}
+          height={px}
+          viewBox="0 0 9 9"
+          fill="currentColor"
+          shapeRendering="crispEdges"
+          className={classes}
+          style={style}
+          {...a11y}
+        >
+          <path d={oatisIconPath(oatisName)} />
+        </svg>
+      )
+    }
     if (skin === 'github' && GithubIcon) {
       return <GithubIcon size={size} className={classes} style={style} {...a11y} />
     }

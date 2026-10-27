@@ -23,6 +23,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.12
         version: 6.43.12
+      '@fontsource-variable/commissioner':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource-variable/google-sans-code':
         specifier: ^5.3.1
         version: 5.3.1
@@ -41,10 +44,16 @@ importers:
       '@fontsource/literata':
         specifier: ^5.3.0
         version: 5.3.0
+      '@fontsource/martian-mono':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource/roboto':
         specifier: ^5.3.0
         version: 5.3.0
       '@fontsource/roboto-mono':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/silkscreen':
         specifier: ^5.3.0
         version: 5.3.0
       '@lezer/highlight':
@@ -455,6 +464,9 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
+  '@fontsource-variable/commissioner@5.3.0':
+    resolution: {integrity: sha512-0IEvi8SO1slc5Pc9tA4OtA01I8UiCcEq/uh12oNjfHuABU9Lnz61l2V8o2cMPUUo3BAo5MbISVK2I/DSpBRw7Q==}
+
   '@fontsource-variable/google-sans-code@5.3.1':
     resolution: {integrity: sha512-yY7wGZK9u3DUoqSMpHUoAJfnB+DMX6SfNPQvtlVeyDfua92X42Wc84gqqQOLpiamrszbDdChp2wQOj6oPfY5Nw==}
 
@@ -473,11 +485,17 @@ packages:
   '@fontsource/literata@5.3.0':
     resolution: {integrity: sha512-9JGMT5+YfBK49thoMq9ASaMRJErHT4V4QuMhAEwKHRLreOsIMP2xP6ZRLhPJ0e6YlET+kjWTJuN7LAxt9/gWGQ==}
 
+  '@fontsource/martian-mono@5.3.0':
+    resolution: {integrity: sha512-0iTnU6SZi6j5z4ymwlZGep6akvp/xWm+r+WyZO9hMfDJWX+dsFLipQp9zO02S0lkUQ+zAahcZNy3XLiNP+gVqQ==}
+
   '@fontsource/roboto-mono@5.3.0':
     resolution: {integrity: sha512-yhwplHMHW9dCk+1pZuERfcJe+K3rosGVZEoK0XktkxRSqQ9qsipSwwiuW2/8Qmtp9lzu3Ixa/ie4BMH3i8CkZQ==}
 
   '@fontsource/roboto@5.3.0':
     resolution: {integrity: sha512-BapRJOWYP+LZ21zp+wBQjfpPYKRoxc4LspJ/RLuI+HSMBD5u/X4O+ESDrSvEqDSy0rAl7GwBJ+09mdc16cVQ1Q==}
+
+  '@fontsource/silkscreen@5.3.0':
+    resolution: {integrity: sha512-M1NQ3LQH0LFNvyFPd/piHEGMImPPtpLglNnLC6Vdcq9kL0jNIOtTQmksAWCc4enbDnw1OnIpZtjNEfRqYm/QmA==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3269,6 +3287,8 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
+  '@fontsource-variable/commissioner@5.3.0': {}
+
   '@fontsource-variable/google-sans-code@5.3.1': {}
 
   '@fontsource-variable/google-sans-flex@5.3.1': {}
@@ -3281,9 +3301,13 @@ snapshots:
 
   '@fontsource/literata@5.3.0': {}
 
+  '@fontsource/martian-mono@5.3.0': {}
+
   '@fontsource/roboto-mono@5.3.0': {}
 
   '@fontsource/roboto@5.3.0': {}
+
+  '@fontsource/silkscreen@5.3.0': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

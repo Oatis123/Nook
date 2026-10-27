@@ -33,6 +33,32 @@ const OPTIONS: {
   dark: Palette
 }[] = [
   {
+    value: 'oatis',
+    label: 'Oatis',
+    fonts: 'Commissioner · Martian Mono',
+    display: "'Commissioner Variable', 'Literata', sans-serif",
+    ui: "'Martian Mono', ui-monospace, monospace",
+    displayWeight: 700,
+    radius: '0px',
+    buttonRadius: '0px',
+    light: {
+      bg: '#eceae2',
+      surface: '#e3e0d6',
+      accent: '#5d644c',
+      accentText: '#eceae2',
+      text: '#1b1b17',
+      muted: '#6e6c63',
+    },
+    dark: {
+      bg: '#080806',
+      surface: '#0f0f0c',
+      accent: '#80856d',
+      accentText: '#080806',
+      text: '#dfddd3',
+      muted: '#75746c',
+    },
+  },
+  {
     value: 'anthropic',
     label: 'Anthropic',
     fonts: 'Literata · IBM Plex Sans',
@@ -144,7 +170,11 @@ export function ThemeSkinPicker() {
   const mode = useResolvedTheme()
 
   return (
-    <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div
+      role="radiogroup"
+      aria-label="Theme"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+    >
       {OPTIONS.map((option) => {
         const palette = option[mode]
         const selected = skin === option.value

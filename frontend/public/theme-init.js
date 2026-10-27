@@ -11,10 +11,14 @@
   }
   try {
     var skin = localStorage.getItem('nook-theme-skin')
-    if (skin === 'telegram' || skin === 'github' || skin === 'material') {
-      document.documentElement.setAttribute('data-theme-skin', skin)
+    // Oatis is the default skin (DEFAULT_SKIN in src/lib/theme.ts); Anthropic is the
+    // un-attributed base in design/tokens.css.
+    if (skin !== 'anthropic' && skin !== 'telegram' && skin !== 'github' && skin !== 'material') {
+      skin = 'oatis'
     }
+    if (skin !== 'anthropic') document.documentElement.setAttribute('data-theme-skin', skin)
   } catch (e) {
     /* localStorage unavailable — fall back to the default skin */
+    document.documentElement.setAttribute('data-theme-skin', 'oatis')
   }
 })()

@@ -1,0 +1,322 @@
+/* Oatis skin — "moss / bookish": a near-black base with an olive cast and two dusty
+   accents, square corners, no shadows, stepped motion. Mono for the UI, a book serif for
+   notes, Commissioner for headings, Silkscreen for the wordmark, pixel icons
+   (design/oatisIcons.ts). Light mode is the same palette inverted with darker accents.
+   Moss = what you act on / what is selected; ochre = look here (alerts, deadlines).
+   Token contract: design/tokens.css. Widget hooks: the `ui-*` classes on components. */
+
+:root[data-theme-skin='oatis'] {
+  --bg: light-dark(#eceae2, #080806);
+  --surface: light-dark(#e3e0d6, #0f0f0c);
+  --surface-raised: light-dark(#e3e0d6, #0f0f0c);
+  --border: light-dark(#cfcbbe, #20211c);
+  --text: light-dark(#1b1b17, #dfddd3);
+  --text-muted: light-dark(#6e6c63, #75746c);
+  --accent: light-dark(#5d644c, #80856d);
+  --accent-text: light-dark(#eceae2, #080806);
+  --danger: light-dark(#7e6f53, #95876e);
+  --danger-text: light-dark(#eceae2, #080806);
+
+  /* Only the two accents carry meaning, so priority is told by how loud it is. */
+  --priority-low: light-dark(#6e6c63, #75746c);
+  --priority-medium: light-dark(#5d644c, #80856d);
+  --priority-high: light-dark(#7e6f53, #95876e);
+
+  --oatis-dim: light-dark(#afab9e, #393a34);
+  --oatis-prose: light-dark(#2a2a25, #cfcdc3);
+  --overlay: light-dark(rgb(27 27 23 / 0.45), rgb(8 8 6 / 0.72));
+
+  --font-ui: 'Martian Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-display: 'Commissioner Variable', 'Literata', ui-sans-serif, sans-serif;
+  --font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-prose: 'Literata', ui-serif, Georgia, serif;
+  --font-pixel: 'Silkscreen', 'Commissioner Variable', 'Martian Mono', monospace;
+  --font-display-weight: 700;
+  --font-display-tracking: -0.01em;
+  --font-size-body: 12px;
+
+  /* Martian Mono is wide: the small sizes shrink so a line still holds as much as in
+     the proportional skins. Headings (text-lg and up) keep their size. */
+  --text-xs: 0.625rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-button: 0;
+  --radius-dialog: 0;
+
+  --shadow-popover: none;
+  --shadow-dialog: none;
+
+  /* Stepped, never eased: the interface redraws itself in a few frames. */
+  --ease-standard: steps(3, end);
+  --ease-spring: steps(3, end);
+  --animate-fade-in: fade-in 120ms steps(3, end);
+}
+
+/* Radius 0 and no shadows, everywhere — including the utilities that hard-code a radius
+   (rounded-full dots and checkboxes, rounded-xl panels). Zero specificity, so a rule
+   below can still opt back in. */
+:where(:root[data-theme-skin='oatis']) :is(*, *::before, *::after) {
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-theme-skin='oatis'] ::selection {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='oatis'] :focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+:root[data-theme-skin='oatis'] body {
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+/* Wordmark: the app name in Silkscreen. */
+:root[data-theme-skin='oatis'] .ui-wordmark {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+/* Buttons: the one primary action is a moss fill; everything else is a hairline or plain
+   text. A press inverts the button for two frames. */
+:root[data-theme-skin='oatis'] .ui-button {
+  border: 1px solid transparent;
+  font-weight: 400;
+  transition-duration: 120ms;
+}
+:root[data-theme-skin='oatis'] .ui-button:hover:not(:disabled) {
+  opacity: 1;
+}
+:root[data-theme-skin='oatis'] .ui-button[data-variant='primary']:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+:root[data-theme-skin='oatis'] .ui-button:active:not(:disabled) {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--accent-text);
+  filter: none;
+}
+:root[data-theme-skin='oatis'] .ui-button[data-variant='secondary'] {
+  background: transparent;
+  border-color: var(--border);
+}
+:root[data-theme-skin='oatis'] .ui-button[data-variant='secondary']:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--oatis-dim);
+}
+:root[data-theme-skin='oatis'] .ui-button[data-variant='ghost']:hover:not(:disabled) {
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-color: var(--oatis-dim);
+  text-underline-offset: 3px;
+}
+:root[data-theme-skin='oatis'] .ui-button[data-variant='danger'] {
+  background: transparent;
+  color: var(--danger);
+}
+:root[data-theme-skin='oatis'] .ui-button[data-variant='danger']:hover:not(:disabled) {
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-color: var(--danger);
+  text-underline-offset: 3px;
+}
+
+:root[data-theme-skin='oatis'] .ui-icon-button:hover,
+:root[data-theme-skin='oatis'] .ui-dialog-close:hover {
+  background: transparent;
+  color: var(--text);
+}
+:root[data-theme-skin='oatis'] .ui-icon-button[data-active] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Switch: a squared track with a square knob; on = moss. */
+:root[data-theme-skin='oatis'] .ui-switch {
+  width: 34px;
+  height: 18px;
+  border-color: var(--oatis-dim);
+  background: transparent;
+}
+:root[data-theme-skin='oatis'] .ui-switch[data-state='checked'] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+:root[data-theme-skin='oatis'] .ui-switch-thumb {
+  width: 10px;
+  height: 10px;
+  translate: 3px 0;
+  background: var(--text-muted);
+  transition: translate 120ms steps(2, end);
+}
+:root[data-theme-skin='oatis'] .ui-switch-thumb[data-state='checked'] {
+  translate: 19px 0;
+  background: var(--accent-text);
+}
+
+/* Tabs: muted labels, the current one in text color over a 1px moss line. */
+:root[data-theme-skin='oatis'] .ui-tabs-list {
+  gap: 1.25rem;
+}
+:root[data-theme-skin='oatis'] .ui-tab {
+  padding-inline: 0;
+  border-bottom-width: 1px;
+}
+
+/* Dialogs, menus, palette, tooltips: flat plates with a hairline. */
+:root[data-theme-skin='oatis'] .ui-dialog,
+:root[data-theme-skin='oatis'] .ui-palette,
+:root[data-theme-skin='oatis'] .ui-menu,
+:root[data-theme-skin='oatis'] .ui-tooltip {
+  border: 1px solid var(--oatis-dim);
+  background: var(--surface);
+}
+:root[data-theme-skin='oatis'] .ui-dialog-title {
+  font-size: 1.125rem;
+  letter-spacing: -0.01em;
+}
+:root[data-theme-skin='oatis'] .ui-tooltip-arrow {
+  display: none;
+}
+
+/* Dense lists (menu, palette, task rows): a 2px moss bar on the surface, not a fill. */
+:root[data-theme-skin='oatis'] .ui-menu-item[data-highlighted],
+:root[data-theme-skin='oatis'] [aria-selected='true'] > .ui-palette-item {
+  background: var(--bg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+:root[data-theme-skin='oatis'] .ui-menu-item[data-danger] {
+  color: var(--danger);
+}
+
+/* Navigation is a short list, so the current item is a moss fill. */
+:root[data-theme-skin='oatis'] .ui-nav-item {
+  color: var(--text-muted);
+}
+:root[data-theme-skin='oatis'] .ui-nav-item:hover {
+  background: transparent;
+  color: var(--text);
+}
+:root[data-theme-skin='oatis']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page'])) {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='oatis']
+  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page']))
+  a {
+  color: var(--accent-text);
+}
+
+/* Segmented control: on/off pair, the active half filled. */
+:root[data-theme-skin='oatis'] .ui-segmented {
+  background: transparent;
+  border-color: var(--border);
+  padding: 0;
+}
+:root[data-theme-skin='oatis'] .ui-segment[data-active='true'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Shell: flat panes divided by hairlines. */
+@media (min-width: 48rem) {
+  :root[data-theme-skin='oatis'] .ui-sidebar[data-open] {
+    margin: 0;
+    border-width: 0 1px 0 0;
+  }
+}
+:root[data-theme-skin='oatis'] .ui-topbar {
+  background: var(--bg);
+}
+
+/* Task checkbox: an empty square, a moss-filled one when done. */
+:root[data-theme-skin='oatis'] .ui-check {
+  position: relative;
+  border-color: var(--oatis-dim);
+  background: transparent;
+}
+:root[data-theme-skin='oatis'] .ui-check[data-checked] {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+:root[data-theme-skin='oatis'] .ui-check[data-checked]::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--accent-text);
+  mask: var(--mask-check) center / contain no-repeat;
+}
+:root[data-theme-skin='oatis'] .markdown-preview .task-list-item input[type='checkbox'] {
+  border-width: 1px;
+  border-color: var(--oatis-dim);
+  background: transparent;
+}
+:root[data-theme-skin='oatis'] .markdown-preview .task-list-item input[type='checkbox']:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+/* Fields: a bottom line only; the active one turns moss. */
+:root[data-theme-skin='oatis'] :is(input, select, textarea).border {
+  border-width: 0 0 1px;
+  border-color: var(--oatis-dim);
+  background: transparent;
+  caret-color: var(--accent);
+}
+:root[data-theme-skin='oatis'] :is(input, select, textarea).border:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+:root[data-theme-skin='oatis'] ::placeholder {
+  color: var(--text-muted);
+}
+
+/* Notes: the serif is the voice. Headings are Commissioner Bold, prose is Literata. */
+:root[data-theme-skin='oatis'] .markdown-preview {
+  font-family: var(--font-prose);
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--oatis-prose);
+}
+:root[data-theme-skin='oatis'] .markdown-preview :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+:root[data-theme-skin='oatis'] .markdown-preview blockquote {
+  border-left: 1px solid var(--accent);
+  font-style: italic;
+  color: var(--text);
+}
+:root[data-theme-skin='oatis'] .markdown-preview :is(code, pre) {
+  font-family: var(--font-code);
+}
+:root[data-theme-skin='oatis'] .markdown-preview pre {
+  border-left: 1px solid var(--oatis-dim);
+  background: var(--surface);
+}
+:root[data-theme-skin='oatis'] .markdown-preview hr {
+  border-top-style: dotted;
+  border-top-color: var(--oatis-dim);
+}
+:root[data-theme-skin='oatis'] .markdown-preview a {
+  text-decoration-color: var(--oatis-dim);
+  color: var(--text);
+}
+:root[data-theme-skin='oatis'] .markdown-preview a:hover {
+  text-decoration-color: var(--accent);
+}
+:root[data-theme-skin='oatis'] .markdown-preview a.wikilink {
+  color: var(--accent);
+}
+:root[data-theme-skin='oatis'] .markdown-preview blockquote.callout {
+  font-style: normal;
+}

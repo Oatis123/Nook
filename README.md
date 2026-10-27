@@ -32,7 +32,7 @@ The note graph, colored by folder (dark mode):
 
 ![Note graph](docs/screenshots/graph.png)
 
-Theme skins — Telegram, GitHub and Material, each with light and dark modes:
+Theme skins — Oatis (the default: moss and ochre on near-black, mono UI, pixel icons), Anthropic, Telegram, GitHub and Material, each with light and dark modes:
 
 <table>
   <tr>

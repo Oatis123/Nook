@@ -5,57 +5,6 @@
    Moss = what you act on / what is selected; ochre = look here (alerts, deadlines).
    Token contract: design/tokens.css. Widget hooks: the `ui-*` classes on components. */
 
-:root[data-theme-skin='oatis'] {
-  --bg: light-dark(#eceae2, #080806);
-  --surface: light-dark(#e3e0d6, #0f0f0c);
-  --surface-raised: light-dark(#e3e0d6, #0f0f0c);
-  --border: light-dark(#cfcbbe, #20211c);
-  --text: light-dark(#1b1b17, #dfddd3);
-  --text-muted: light-dark(#6e6c63, #75746c);
-  --accent: light-dark(#5d644c, #80856d);
-  --accent-text: light-dark(#eceae2, #080806);
-  --danger: light-dark(#7e6f53, #95876e);
-  --danger-text: light-dark(#eceae2, #080806);
-
-  /* Only the two accents carry meaning, so priority is told by how loud it is. */
-  --priority-low: light-dark(#6e6c63, #75746c);
-  --priority-medium: light-dark(#5d644c, #80856d);
-  --priority-high: light-dark(#7e6f53, #95876e);
-
-  --oatis-dim: light-dark(#afab9e, #393a34);
-  --oatis-prose: light-dark(#2a2a25, #cfcdc3);
-  --overlay: light-dark(rgb(27 27 23 / 0.45), rgb(8 8 6 / 0.72));
-
-  --font-ui: 'Martian Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-  --font-display: 'Commissioner Variable', 'Literata', ui-sans-serif, sans-serif;
-  --font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-  --font-prose: 'Literata', ui-serif, Georgia, serif;
-  --font-pixel: 'Silkscreen', 'Commissioner Variable', 'Martian Mono', monospace;
-  --font-display-weight: 700;
-  --font-display-tracking: -0.01em;
-  --font-size-body: 12px;
-
-  /* Martian Mono is wide: the small sizes shrink so a line still holds as much as in
-     the proportional skins. Headings (text-lg and up) keep their size. */
-  --text-xs: 0.625rem;
-  --text-sm: 0.75rem;
-  --text-base: 0.8125rem;
-
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-button: 0;
-  --radius-dialog: 0;
-
-  --shadow-popover: none;
-  --shadow-dialog: none;
-
-  /* Stepped, never eased: the interface redraws itself in a few frames. */
-  --ease-standard: steps(3, end);
-  --ease-spring: steps(3, end);
-  --animate-fade-in: fade-in 120ms steps(3, end);
-}
-
 /* Radius 0 and no shadows, everywhere — including the utilities that hard-code a radius
    (rounded-full dots and checkboxes, rounded-xl panels). Zero specificity, so a rule
    below can still opt back in. */
@@ -141,29 +90,6 @@
 :root[data-theme-skin='oatis'] .ui-icon-button[data-active] {
   background: var(--accent);
   color: var(--accent-text);
-}
-
-/* Switch: a squared track with a square knob; on = moss. */
-:root[data-theme-skin='oatis'] .ui-switch {
-  width: 34px;
-  height: 18px;
-  border-color: var(--oatis-dim);
-  background: transparent;
-}
-:root[data-theme-skin='oatis'] .ui-switch[data-state='checked'] {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-:root[data-theme-skin='oatis'] .ui-switch-thumb {
-  width: 10px;
-  height: 10px;
-  translate: 3px 0;
-  background: var(--text-muted);
-  transition: translate 120ms steps(2, end);
-}
-:root[data-theme-skin='oatis'] .ui-switch-thumb[data-state='checked'] {
-  translate: 19px 0;
-  background: var(--accent-text);
 }
 
 /* Tabs: muted labels, the current one in text color over a 1px moss line. */
@@ -334,4 +260,96 @@
 }
 :root[data-theme-skin='oatis'] .markdown-preview blockquote.callout {
   font-style: normal;
+}
+
+/* Done items recede to `dim`, struck through. */
+:root[data-theme-skin='oatis'] .line-through.text-text-muted {
+  color: var(--oatis-dim);
+}
+
+/* A category's ink (a list's icon) never sits on the selection: on the moss row it takes
+   the row's own color. */
+:root[data-theme-skin='oatis']
+  .ui-nav-item:is([data-active='true'], :has([aria-current='page']))
+  .ui-icon {
+  color: currentColor !important;
+}
+
+/* The end of a note: ⁂ in moss, like the last page of a chapter. */
+:root[data-theme-skin='oatis'] .markdown-preview::after {
+  content: '⁂';
+  display: block;
+  margin-top: 2.25rem;
+  text-align: center;
+  font-family: var(--font-prose);
+  font-size: 18px;
+  color: var(--accent);
+}
+
+/* Toggles are an `on off` pair, the current one filled (design/components/Switch.tsx). */
+:root[data-theme-skin='oatis'] .ui-toggle {
+  display: inline-flex;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  cursor: pointer;
+}
+:root[data-theme-skin='oatis'] .ui-toggle > span {
+  padding: 0 4px;
+  color: var(--oatis-dim);
+}
+:root[data-theme-skin='oatis'] .ui-toggle[data-state='checked'] > [data-part='on'],
+:root[data-theme-skin='oatis'] .ui-toggle[data-state='unchecked'] > [data-part='off'] {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+:root[data-theme-skin='oatis'] .ui-toggle:hover > span:not([style]) {
+  color: var(--text-muted);
+}
+
+/* Loaders: stepped glyph animations, never a smooth spinner or shimmer. */
+.spin::after {
+  content: '▖';
+  font-family: var(--font-code);
+  color: var(--accent);
+  animation: oatis-spin 0.8s steps(1) infinite;
+}
+.typing::after {
+  content: '·';
+  animation: oatis-dots 1.2s steps(1) infinite;
+}
+@keyframes oatis-spin {
+  0% {
+    content: '▖';
+  }
+  25% {
+    content: '▘';
+  }
+  50% {
+    content: '▝';
+  }
+  75% {
+    content: '▗';
+  }
+}
+@keyframes oatis-dots {
+  0% {
+    content: '·';
+  }
+  33% {
+    content: '··';
+  }
+  66% {
+    content: '···';
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin::after,
+  .typing::after {
+    animation: none;
+  }
 }

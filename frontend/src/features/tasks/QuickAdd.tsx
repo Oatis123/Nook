@@ -82,7 +82,7 @@ export function QuickAdd({ listId, parentId }: { listId?: string; parentId?: str
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+      <div className="flex items-center gap-2 border border-border bg-surface px-3 py-2">
         <Plus size={16} strokeWidth={1.5} className="shrink-0 text-text-muted" />
         <input
           ref={inputRef}
@@ -95,32 +95,32 @@ export function QuickAdd({ listId, parentId }: { listId?: string; parentId?: str
       {showChips && (
         <div className="flex flex-wrap gap-1.5 px-1">
           {parsed.dueDate && (
-            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
+            <span className="border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
               {formatDate(parsed.dueDate)}
               {parsed.dueTime && ` ${parsed.dueTime.slice(0, 5)}`}
             </span>
           )}
           {parsed.priority && (
             <span
-              className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs"
+              className="border border-border bg-surface px-2 py-0.5 text-xs"
               style={{ color: PRIORITY_COLOR_VAR[parsed.priority as 'low' | 'medium' | 'high'] }}
             >
               {PRIORITY_LABEL[parsed.priority]}
             </span>
           )}
           {parsed.listName && matchedList && (
-            <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
+            <span className="border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
               {matchedList.name}
             </span>
           )}
           {parsed.recurrence && (
-            <span className="flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
+            <span className="flex items-center gap-1 border border-border bg-surface px-2 py-0.5 text-xs text-text-muted">
               <Repeat size={11} strokeWidth={1.5} />
               {describeRecurrenceInput(parsed.recurrence)}
             </span>
           )}
           {needsTimeForRecurrence && (
-            <span className="rounded-full border border-danger/40 bg-danger/10 px-2 py-0.5 text-xs text-danger">
+            <span className="border border-danger/40 bg-danger/10 px-2 py-0.5 text-xs text-danger">
               Add a time, e.g. “9am”
             </span>
           )}

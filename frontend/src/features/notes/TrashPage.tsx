@@ -1,4 +1,3 @@
-import { Trash2 } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { formatDateTime } from '@/lib/format'
 import {
@@ -21,7 +20,7 @@ export default function TrashPage() {
   if (!trashed.data) return <QueryState query={trashed} />
 
   if (trashed.data.length === 0) {
-    return <EmptyState icon={Trash2} title="Trash is empty" />
+    return <EmptyState title="Trash is empty" />
   }
 
   return (
@@ -52,7 +51,7 @@ export default function TrashPage() {
         {trashed.data.map((note) => (
           <li
             key={note.id}
-            className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            className="flex items-center justify-between border border-border bg-surface px-3 py-2 text-sm"
           >
             <div className="min-w-0">
               <div className="truncate text-text">{note.title}</div>

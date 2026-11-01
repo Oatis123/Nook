@@ -292,7 +292,7 @@ function buildProcessor(
               rehypeShikiFromHighlighter,
               highlighter,
               {
-                theme: context.theme === 'dark' ? 'github-dark' : 'github-light',
+                theme: context.theme === 'dark' ? 'moss-bookish-dark' : 'moss-bookish-light',
                 fallbackLanguage: 'text',
                 cache: highlightCaches[context.theme],
               },

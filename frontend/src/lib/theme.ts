@@ -44,9 +44,6 @@ export function transitionOriginFromEvent(e: MouseEvent<HTMLElement>): ThemeTran
   return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
 }
 
-/** Width of the reveal circle's soft edge, px — keep in sync with index.css. */
-const REVEAL_FEATHER = 64
-
 /** Applies a theme change behind a circular reveal that grows from `origin`, using the
  * View Transitions API. Falls back to an instant switch where unsupported (and under
  * prefers-reduced-motion), which also keeps the store synchronous in tests. */
@@ -68,13 +65,13 @@ function runThemeTransition(update: () => void, origin: ThemeTransitionOrigin | 
   const transition = document.startViewTransition(() => flushSync(update))
   transition.ready
     .then(() => {
-      // --theme-reveal is the radius of a soft-edged radial mask (index.css); the
-      // extra REVEAL_FEATHER makes sure the feathered edge fully clears the corners.
+      // --theme-reveal is the radius of the clip circle (index.css).
       root.animate(
-        { '--theme-reveal': ['0px', `${radius + REVEAL_FEATHER}px`] },
+        { '--theme-reveal': ['0px', `${radius}px`] },
         {
-          duration: 700,
-          easing: 'cubic-bezier(0.65, 0, 0.35, 1)',
+          // oatis motion is stepped, never eased: the new theme spreads in 16 frames.
+          duration: 500,
+          easing: 'steps(16, end)',
           // Hold the end state — snapping back to 0px would flash the old theme for a
           // frame before the transition tears down.
           fill: 'forwards',

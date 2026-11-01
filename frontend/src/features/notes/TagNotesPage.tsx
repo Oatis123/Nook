@@ -15,7 +15,7 @@ export default function TagNotesPage() {
   if (!notes.data) return <QueryState query={notes} />
 
   if (notes.data.length === 0) {
-    return <EmptyState icon={Hash} title={`No notes tagged #${name}`} />
+    return <EmptyState title={`No notes tagged #${name}`} />
   }
 
   return (
@@ -30,7 +30,7 @@ export default function TagNotesPage() {
             <button
               type="button"
               onClick={() => navigate(`/notes/${note.id}`)}
-              className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm hover:bg-surface"
+              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-surface"
             >
               <FileText size={15} strokeWidth={1.5} className="text-text-muted" />
               {note.title}

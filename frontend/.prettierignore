@@ -2,3 +2,5 @@ dist
 coverage
 playwright-report
 pnpm-lock.yaml
+# Vendored as-is from the oatis-style skill (assets/vivi-cloud.js).
+src/design/oatis/vivi-cloud.js

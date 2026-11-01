@@ -2,7 +2,6 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { Link2, Plus } from '@/design/icons'
-import { EmptyState } from '@/design/components/EmptyState'
 import { useBacklinks, useCreateTaskFromNote, useNote } from '@/features/notes/hooks'
 import { useCompleteTask, useReopenTask } from '@/features/tasks/hooks'
 import { useGraph } from '@/features/graph/hooks'
@@ -33,7 +32,7 @@ function OutlineSection({ content }: { content: string }) {
 
   return (
     <div>
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">Outline</h3>
+      <h3 className="mb-2 text-xs font-medium lowercase text-text-muted">Outline</h3>
       {headings.length === 0 ? (
         <p className="text-sm text-text-muted">No headings yet.</p>
       ) : (
@@ -59,9 +58,7 @@ function BacklinksSection({ noteId }: { noteId: string }) {
 
   return (
     <div>
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-        Backlinks
-      </h3>
+      <h3 className="mb-2 text-xs font-medium lowercase text-text-muted">Backlinks</h3>
       {!backlinks.data || backlinks.data.length === 0 ? (
         <p className="text-sm text-text-muted">No notes link here yet.</p>
       ) : (
@@ -71,7 +68,7 @@ function BacklinksSection({ noteId }: { noteId: string }) {
               <button
                 type="button"
                 onClick={() => navigate(`/notes/${link.source_note_id}`)}
-                className="flex items-start gap-1.5 rounded-md px-1.5 py-1 text-left text-sm text-text hover:bg-surface-raised"
+                className="flex items-start gap-1.5 px-1.5 py-1 text-left text-sm text-text hover:bg-surface-raised"
               >
                 <Link2 size={13} strokeWidth={1.5} className="mt-0.5 shrink-0 text-text-muted" />
                 <span className="truncate">
@@ -94,13 +91,13 @@ function LinkedTaskRow({ task }: { task: LinkedTask }) {
   const done = task.status === 'done'
 
   return (
-    <div className="group relative flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface-raised">
+    <div className="group relative flex items-center gap-2 px-1.5 py-1 hover:bg-surface-raised">
       <button
         type="button"
         onClick={() => (done ? reopenTask.mutate(task.id) : completeTask.mutate({ id: task.id }))}
         aria-label={done ? 'Mark as not done' : 'Mark as done'}
         className={clsx(
-          'relative z-10 h-3.5 w-3.5 shrink-0 rounded-full border transition-colors duration-150',
+          'relative z-10 h-3.5 w-3.5 shrink-0 border transition-colors duration-150',
           done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
         )}
       />
@@ -131,9 +128,7 @@ function LinkedTasksSection({ noteId, tasks }: { noteId: string; tasks: LinkedTa
 
   return (
     <div>
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-        Linked tasks
-      </h3>
+      <h3 className="mb-2 text-xs font-medium lowercase text-text-muted">Linked tasks</h3>
       {tasks.length > 0 && (
         <div className="mb-1.5 flex flex-col gap-0.5">
           {tasks.map((task) => (
@@ -152,13 +147,13 @@ function LinkedTasksSection({ noteId, tasks }: { noteId: string; tasks: LinkedTa
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="New task from this note…"
-          className="w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+          className="w-full border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
         <button
           type="submit"
           aria-label="Create task"
           disabled={!title.trim()}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border text-text-muted hover:text-text disabled:opacity-50"
+          className="flex h-7 w-7 shrink-0 items-center justify-center border border-border text-text-muted hover:text-text disabled:opacity-50"
         >
           <Plus size={14} strokeWidth={1.5} />
         </button>
@@ -174,15 +169,15 @@ function LocalGraphSection({ noteId }: { noteId: string }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-xs font-medium uppercase tracking-wide text-text-muted">Local graph</h3>
-        <div className="inline-flex rounded-md border border-border bg-bg p-0.5 text-xs">
+        <h3 className="text-xs font-medium lowercase text-text-muted">Local graph</h3>
+        <div className="inline-flex border border-border bg-bg p-0.5 text-xs">
           {([1, 2] as const).map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => setDepth(d)}
               className={clsx(
-                'rounded px-1.5 py-0.5 transition-colors duration-150',
+                'px-1.5 py-0.5 transition-colors duration-150',
                 depth === d ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text',
               )}
             >
@@ -207,7 +202,8 @@ export function NoteContextPanel({ noteId }: { noteId: string }) {
   const note = useNote(noteId)
 
   if (!note.data) {
-    return <EmptyState icon={Link2} title="Select a note" />
+    // Plain text: the side panel never gets a second Vivi next to the main pane's.
+    return <p className="p-4 text-sm text-text-muted">Select a note</p>
   }
 
   return (

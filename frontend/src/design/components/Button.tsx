@@ -30,7 +30,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       data-variant={variant}
       data-size={size}
       className={clsx(
-        'ui-button inline-flex items-center justify-center rounded-(--radius-button) font-medium',
+        'ui-button inline-flex items-center justify-center font-medium',
         'transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none',
         variantClasses[variant],
         sizeClasses[size],

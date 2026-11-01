@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Network } from '@/design/icons'
 import { clsx } from 'clsx'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Switch } from '@/design/components/Switch'
@@ -10,7 +9,7 @@ import { GraphCanvas, type ColorBy } from '@/features/graph/GraphCanvas'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 const selectClass =
-  'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
+  'h-8 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
 export default function GraphPage() {
   useDocumentTitle('Graph')
@@ -81,16 +80,16 @@ export default function GraphPage() {
           Show dangling
         </label>
 
-        <div className="inline-flex rounded-md border border-border bg-bg p-0.5 text-sm">
+        <div className="inline-flex border border-border bg-bg p-0.5 text-sm">
           {(['folder', 'tag'] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => setColorBy(mode)}
               className={clsx(
-                'rounded px-2.5 py-1 capitalize transition-colors duration-150',
+                'px-2.5 py-1 capitalize transition-colors duration-150',
                 colorBy === mode
-                  ? 'bg-surface-raised text-text shadow-sm'
+                  ? 'bg-surface-raised text-text'
                   : 'text-text-muted hover:text-text',
               )}
             >
@@ -103,7 +102,7 @@ export default function GraphPage() {
       <div ref={containerRef} className="min-h-0 flex-1">
         {graphQuery.data &&
           (graphQuery.data.nodes.length === 0 ? (
-            <EmptyState icon={Network} title="No notes to graph yet" />
+            <EmptyState title="No notes to graph yet" />
           ) : (
             size.height > 0 && (
               <GraphCanvas data={graphQuery.data} colorBy={colorBy} height={size.height} />

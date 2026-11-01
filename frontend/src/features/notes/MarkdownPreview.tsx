@@ -246,7 +246,11 @@ export const MarkdownPreview = memo(function MarkdownPreview({
   return (
     <TasksClickable.Provider value={onToggleTask !== undefined}>
       <div className="markdown-preview" onClick={handleClick}>
-        {tree?.nodes ?? <p className="text-sm text-text-muted">Loading preview…</p>}
+        {tree?.nodes ?? (
+          <p className="text-sm text-text-muted">
+            <span className="spin" /> rendering
+          </p>
+        )}
       </div>
     </TasksClickable.Provider>
   )

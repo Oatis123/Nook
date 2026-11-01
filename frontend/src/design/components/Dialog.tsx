@@ -66,12 +66,12 @@ export function Dialog({
             }
           }}
           className={[
-            'ui-dialog fixed z-50 overflow-y-auto overscroll-contain border border-border bg-surface-raised p-5 shadow-(--shadow-dialog) animate-fade-in',
+            'ui-dialog fixed z-50 overflow-y-auto overscroll-contain border border-border bg-surface-raised p-5 animate-fade-in',
             // Phones: a bottom sheet that never runs off-screen — a tall form (e.g. a
             // recurring task) scrolls inside it instead of losing its header and buttons.
-            'inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] rounded-t-(--radius-dialog) pb-[max(1.25rem,env(safe-area-inset-bottom))]',
+            'inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] pb-[max(1.25rem,env(safe-area-inset-bottom))]',
             'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[90vw] sm:max-w-md sm:max-h-[calc(100dvh-2rem)]',
-            'sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-(--radius-dialog) sm:pb-5',
+            'sm:-translate-x-1/2 sm:-translate-y-1/2 sm:pb-5',
           ].join(' ')}
         >
           <div className="ui-dialog-header mb-3 flex items-start justify-between gap-4">
@@ -89,7 +89,7 @@ export function Dialog({
               <RadixDialog.Close asChild>
                 <button
                   aria-label="Close"
-                  className="ui-dialog-close rounded-md p-1 text-text-muted hover:bg-surface hover:text-text"
+                  className="ui-dialog-close p-1 text-text-muted hover:bg-surface hover:text-text"
                 >
                   <X size={16} strokeWidth={1.5} />
                 </button>

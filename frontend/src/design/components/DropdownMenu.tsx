@@ -31,8 +31,8 @@ export function DropdownMenu({
           align="start"
           sideOffset={6}
           className={[
-            'ui-menu z-50 min-w-40 rounded-md border border-border bg-surface-raised p-1',
-            'shadow-(--shadow-popover) animate-fade-in',
+            'ui-menu z-50 min-w-40 border border-border bg-surface-raised p-1',
+            'animate-fade-in',
           ].join(' ')}
         >
           {items.map((item) => (
@@ -42,7 +42,7 @@ export function DropdownMenu({
               data-danger={item.danger || undefined}
               onSelect={item.onSelect}
               className={clsx(
-                'ui-menu-item cursor-pointer rounded px-2.5 py-1.5 text-sm outline-none',
+                'ui-menu-item cursor-pointer px-2.5 py-1.5 text-sm outline-none',
                 'data-[highlighted]:bg-surface',
                 item.danger ? 'text-danger' : 'text-text',
                 item.disabled && 'opacity-50',

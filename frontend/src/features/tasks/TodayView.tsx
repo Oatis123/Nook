@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { CalendarClock } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
 import { useToday } from '@/features/tasks/useToday'
@@ -37,7 +36,7 @@ export default function TodayView() {
       </div>
 
       {tasksQuery.data.length === 0 ? (
-        <EmptyState icon={CalendarClock} title="Nothing due today" />
+        <EmptyState title="Nothing due today" />
       ) : (
         <TaskGroupedList groups={groups} onOpenTask={openTask} emptyMessage="Nothing due today" />
       )}

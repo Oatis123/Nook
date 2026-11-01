@@ -12,7 +12,7 @@ import { DEFAULT_RECURRENCE } from '@/features/tasks/recurrenceDefaults'
 import type { RecurrenceInput, TaskPriority } from '@/lib/types'
 
 const selectClass =
-  'h-9 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
+  'h-9 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
 type TaskMode = 'once' | 'recurring'
 
@@ -111,7 +111,7 @@ export function TaskCreateDialog({
           placeholder="Task title"
           aria-label="Task title"
           maxLength={500}
-          className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+          className="h-9 border border-border bg-surface-raised px-3 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
 
         <textarea
@@ -120,7 +120,7 @@ export function TaskCreateDialog({
           placeholder="Description (markdown, optional)"
           aria-label="Description"
           rows={3}
-          className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+          className="w-full resize-none border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
 
         <div className="flex flex-wrap items-center gap-3">
@@ -163,7 +163,7 @@ export function TaskCreateDialog({
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="inline-flex w-fit rounded-md border border-border bg-surface-raised p-0.5">
+          <div className="inline-flex w-fit border border-border bg-surface-raised p-0.5">
             {(
               [
                 { value: 'once', label: 'One-time' },
@@ -176,7 +176,7 @@ export function TaskCreateDialog({
                 disabled={option.value === 'recurring' && !canRepeat}
                 onClick={() => setMode(option.value)}
                 className={clsx(
-                  'h-8 rounded-[5px] px-3 text-sm transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none',
+                  'h-8 px-3 text-sm transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none',
                   mode === option.value
                     ? 'bg-accent text-accent-text'
                     : 'text-text-muted hover:text-text',
@@ -192,7 +192,7 @@ export function TaskCreateDialog({
           )}
 
           {mode === 'recurring' && canRepeat && (
-            <div className="rounded-md border border-border bg-surface p-3">
+            <div className="border border-border bg-surface p-3">
               <RecurrenceFields value={recurrence} onChange={setRecurrence} />
             </div>
           )}

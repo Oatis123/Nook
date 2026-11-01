@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { ListTodo } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Switch } from '@/design/components/Switch'
 import { useTaskLists, useTasks } from '@/features/tasks/hooks'
@@ -31,7 +30,7 @@ export default function ListView() {
   if (!listId) return null
   if (!taskListsQuery.data) return <QueryState query={taskListsQuery} />
   const list = taskListsQuery.data.find((l) => l.id === listId)
-  if (!list) return <EmptyState icon={ListTodo} title="This list doesn't exist or was deleted." />
+  if (!list) return <EmptyState mood="glitch" title="This list doesn't exist or was deleted." />
   if (!tasksQuery.data) return <QueryState query={tasksQuery} />
 
   const Icon = LIST_ICON_COMPONENT[list.icon]
@@ -54,16 +53,16 @@ export default function ListView() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-4">
-        <div className="inline-flex rounded-md border border-border bg-bg p-0.5 text-sm">
+        <div className="inline-flex border border-border bg-bg p-0.5 text-sm">
           {(['none', 'date', 'priority'] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => setGroupBy(mode)}
               className={clsx(
-                'rounded px-2.5 py-1 capitalize transition-colors duration-150',
+                'px-2.5 py-1 capitalize transition-colors duration-150',
                 groupBy === mode
-                  ? 'bg-surface-raised text-text shadow-sm'
+                  ? 'bg-surface-raised text-text'
                   : 'text-text-muted hover:text-text',
               )}
             >
@@ -82,7 +81,7 @@ export default function ListView() {
       </div>
 
       {tasksQuery.data.length === 0 ? (
-        <EmptyState icon={Icon} title="No tasks here yet" />
+        <EmptyState title="No tasks here yet" />
       ) : (
         <TaskGroupedList groups={groups} onOpenTask={openTask} emptyMessage="No tasks here yet" />
       )}

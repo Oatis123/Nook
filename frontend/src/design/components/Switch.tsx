@@ -1,5 +1,8 @@
 import * as RadixSwitch from '@radix-ui/react-switch'
 
+/** An on/off switch drawn the oatis way: an `on off` text pair with the current one
+ * filled (design/skins/oatis.css `.ui-toggle`). Still a Radix switch underneath, so it
+ * keeps role="switch", aria-checked and keyboard toggling. */
 export function Switch({
   checked,
   onCheckedChange,
@@ -14,17 +17,14 @@ export function Switch({
       checked={checked}
       onCheckedChange={onCheckedChange}
       aria-label={label}
-      className={[
-        'ui-switch relative h-5 w-9 shrink-0 rounded-full border border-border bg-surface',
-        'transition-colors duration-150 data-[state=checked]:bg-accent data-[state=checked]:border-accent',
-      ].join(' ')}
+      className="ui-toggle shrink-0"
     >
-      <RadixSwitch.Thumb
-        className={[
-          'ui-switch-thumb block h-3.5 w-3.5 translate-x-0.5 rounded-full bg-surface-raised',
-          'transition-transform duration-150 data-[state=checked]:translate-x-[18px]',
-        ].join(' ')}
-      />
+      <span data-part="on" aria-hidden>
+        on
+      </span>
+      <span data-part="off" aria-hidden>
+        off
+      </span>
     </RadixSwitch.Root>
   )
 }

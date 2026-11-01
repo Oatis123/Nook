@@ -76,9 +76,7 @@ export function TelegramLoginPanel({ onBack }: { onBack: () => void }) {
         </>
       )}
 
-      {createToken.isPending && (
-        <div className="h-[200px] w-[200px] animate-pulse rounded-md bg-surface" />
-      )}
+      {createToken.isPending && <div className="h-[200px] w-[200px] animate-pulse bg-surface" />}
 
       {createToken.isError && (
         <div role="alert" className="flex flex-col items-center gap-2">

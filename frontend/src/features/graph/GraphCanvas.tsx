@@ -4,7 +4,7 @@ import ForceGraph2D, { type NodeObject } from 'react-force-graph-2d'
 import { useResolvedTheme } from '@/lib/theme'
 import { useElementSize } from '@/lib/useElementSize'
 import { useCreateNote } from '@/features/notes/hooks'
-import { colorForKey } from '@/features/graph/colors'
+import { INKS, type Ink, inkForKey } from '@/features/graph/colors'
 import type { GraphData, GraphNode } from '@/lib/types'
 
 export type ColorBy = 'folder' | 'tag'
@@ -49,8 +49,12 @@ export function GraphCanvas({
   const colors = useMemo(
     () => ({
       muted: readCssVar('--text-muted', theme === 'dark' ? '#75746c' : '#6e6c63'),
+      text: readCssVar('--text', theme === 'dark' ? '#dfddd3' : '#1b1b17'),
       accent: readCssVar('--accent', theme === 'dark' ? '#80856d' : '#5d644c'),
       border: readCssVar('--border', theme === 'dark' ? '#20211c' : '#cfcbbe'),
+      inks: Object.fromEntries(
+        INKS.map((ink) => [ink, readCssVar(`--ink-${ink}`, '#80856d')]),
+      ) as Record<Ink, string>,
     }),
     [theme],
   )
@@ -80,11 +84,11 @@ export function GraphCanvas({
   const nodeColorFor = useCallback(
     (node: GraphNode): string => {
       if (node.dangling) return colors.muted
-      const key =
-        colorBy === 'folder' ? (node.folder_id ?? '__root__') : (node.tags[0] ?? '__none__')
-      return colorForKey(key)
+      const key = colorBy === 'folder' ? node.folder_id : node.tags[0]
+      // No folder / no tag isn't a category, so it gets plain text color, not an ink.
+      return key ? colors.inks[inkForKey(key)] : colors.text
     },
-    [colorBy, colors.muted],
+    [colorBy, colors.muted, colors.text, colors.inks],
   )
 
   const nodeCanvasObject = useCallback(
@@ -97,8 +101,9 @@ export function GraphCanvas({
       const radius = nodeRadius(n.link_count)
 
       ctx.globalAlpha = dimmed ? 0.25 : 1
+      // Square nodes: the pixel side of the style, crisp at any zoom.
       ctx.beginPath()
-      ctx.arc(n.x, n.y, radius, 0, 2 * Math.PI)
+      ctx.rect(n.x - radius, n.y - radius, radius * 2, radius * 2)
       ctx.fillStyle = nodeColorFor(n)
       ctx.fill()
 
@@ -123,9 +128,8 @@ export function GraphCanvas({
     (node: NodeObject, color: string, ctx: CanvasRenderingContext2D) => {
       const n = node as unknown as GraphNode & { x: number; y: number }
       ctx.fillStyle = color
-      ctx.beginPath()
-      ctx.arc(n.x, n.y, nodeRadius(n.link_count), 0, 2 * Math.PI)
-      ctx.fill()
+      const r = nodeRadius(n.link_count)
+      ctx.fillRect(n.x - r, n.y - r, r * 2, r * 2)
     },
     [],
   )

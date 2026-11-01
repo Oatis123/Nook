@@ -20,7 +20,7 @@ export function TaskGroupedList({
       {groups.map((group) => (
         <div key={group.label || 'ungrouped'}>
           {group.label && (
-            <h3 className="mb-1 px-2 text-xs font-medium uppercase tracking-wide text-text-muted">
+            <h3 className="mb-1 px-2 text-xs font-medium lowercase text-text-muted">
               {group.label}
             </h3>
           )}

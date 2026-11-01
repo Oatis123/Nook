@@ -14,9 +14,7 @@ export function TagList() {
 
   return (
     <div className="mt-4 flex flex-col gap-0.5 px-2">
-      <span className="mb-1 px-1 text-xs font-medium uppercase tracking-wide text-text-muted">
-        Tags
-      </span>
+      <span className="mb-1 px-1 text-xs font-medium lowercase text-text-muted">Tags</span>
       {sorted.map((tag) => {
         const depth = tag.name.split('/').length - 1
         const label = tag.name.split('/').pop()!
@@ -27,7 +25,7 @@ export function TagList() {
             onClick={() => navigate(`/tags/${encodeURIComponent(tag.name)}`)}
             data-active={activeTag === tag.name || undefined}
             className={clsx(
-              'ui-nav-item flex items-center gap-1.5 rounded-md px-1 py-1 text-left text-sm hover:bg-surface-raised',
+              'ui-nav-item flex items-center gap-1.5 px-1 py-1 text-left text-sm hover:bg-surface-raised',
               activeTag === tag.name ? 'bg-surface-raised text-text' : 'text-text-muted',
             )}
             style={{ paddingLeft: depth * 14 + 4 }}

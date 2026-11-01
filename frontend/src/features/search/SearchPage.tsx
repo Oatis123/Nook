@@ -28,7 +28,7 @@ function renderSnippet(snippet: string) {
   }
   return parts.map((part, i) =>
     part.highlighted ? (
-      <mark key={i} className="rounded-sm bg-accent/25 text-text">
+      <mark key={i} className="bg-accent/25 text-text">
         {part.text}
       </mark>
     ) : (
@@ -61,7 +61,7 @@ export default function SearchPage() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <h1 className="mb-4 font-serif text-2xl text-text">Search</h1>
-      <div className="mb-2 flex items-center gap-2.5 rounded-md border border-border bg-surface px-3 py-2">
+      <div className="mb-2 flex items-center gap-2.5 border border-border bg-surface px-3 py-2">
         <SearchIcon size={16} strokeWidth={1.5} className="text-text-muted" />
         <input
           ref={inputRef}
@@ -77,9 +77,9 @@ export default function SearchPage() {
       </p>
 
       {query.trim().length === 0 ? (
-        <EmptyState icon={SearchIcon} title="Search across all your notes" />
+        <EmptyState title="Search across all your notes" />
       ) : results.data?.length === 0 ? (
-        <EmptyState icon={SearchIcon} title={`No results for "${query}"`} />
+        <EmptyState title={`No results for "${query}"`} />
       ) : (
         <ul className="flex flex-col gap-2">
           {(results.data ?? []).map((result) => (
@@ -87,7 +87,7 @@ export default function SearchPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/notes/${result.id}`)}
-                className="block w-full rounded-md border border-border bg-surface px-3 py-2 text-left text-sm hover:bg-surface-raised"
+                className="block w-full border border-border bg-surface px-3 py-2 text-left text-sm hover:bg-surface-raised"
               >
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-text">{result.title}</span>

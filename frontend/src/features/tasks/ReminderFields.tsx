@@ -12,7 +12,7 @@ import {
 } from '@/features/tasks/reminderOffsets'
 
 const inputClass =
-  'h-7 rounded-md border border-border bg-surface-raised px-2 text-xs outline-none focus-visible:border-accent'
+  'h-7 border border-border bg-surface-raised px-2 text-xs outline-none focus-visible:border-accent'
 
 const UNIT_MINUTES = { min: 1, h: 60, d: 24 * 60 } as const
 type Unit = keyof typeof UNIT_MINUTES
@@ -86,7 +86,7 @@ export function ReminderFields({
                   aria-pressed={on}
                   onClick={() => toggle(offset)}
                   className={clsx(
-                    'h-7 rounded-full border px-2.5 text-xs transition-colors duration-150',
+                    'h-7 border px-2.5 text-xs transition-colors duration-150',
                     on
                       ? 'border-accent bg-accent/15 text-text'
                       : 'border-border text-text-muted hover:text-text',
@@ -130,7 +130,7 @@ export function ReminderFields({
               type="button"
               onClick={addCustom}
               disabled={amount === ''}
-              className="h-7 rounded-md border border-border px-2 text-text-muted hover:text-text disabled:opacity-50"
+              className="h-7 border border-border px-2 text-text-muted hover:text-text disabled:opacity-50"
             >
               Add
             </button>

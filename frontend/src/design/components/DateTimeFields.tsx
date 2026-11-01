@@ -21,11 +21,10 @@ import { parseLocalDate, parseTypedTime } from '@/lib/dates'
    `YYYY-MM-DD` for dates, `HH:MM` for times, '' for "not set". */
 
 const triggerClass =
-  'ui-field-trigger flex items-center gap-1.5 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent data-[state=open]:border-accent'
-const popoverClass =
-  'ui-menu z-[60] rounded-md border border-border bg-surface-raised p-2 shadow-(--shadow-popover) animate-fade-in'
+  'ui-field-trigger flex items-center gap-1.5 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent data-[state=open]:border-accent'
+const popoverClass = 'ui-menu z-[60] border border-border bg-surface-raised p-2 animate-fade-in'
 const smallButtonClass =
-  'rounded px-2 py-1 text-xs text-text-muted outline-none hover:bg-surface hover:text-text focus-visible:bg-surface focus-visible:text-text'
+  'px-2 py-1 text-xs text-text-muted outline-none hover:bg-surface hover:text-text focus-visible:bg-surface focus-visible:text-text'
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
 
@@ -125,7 +124,7 @@ function Calendar({
               data-today={key === today || undefined}
               data-focused={key === focused || undefined}
               className={clsx(
-                'ui-day h-8 rounded text-sm tabular-nums transition-colors duration-150',
+                'ui-day h-8 text-sm tabular-nums transition-colors duration-150',
                 selected
                   ? 'bg-accent text-accent-text'
                   : isSameMonth(day, month)
@@ -259,7 +258,7 @@ export function TimeField({
               if (el && item === current) el.scrollIntoView({ block: 'center' })
             }}
             className={clsx(
-              'rounded px-2.5 py-1 text-sm tabular-nums',
+              'px-2.5 py-1 text-sm tabular-nums',
               item === current ? 'bg-accent text-accent-text' : 'text-text hover:bg-surface',
             )}
           >
@@ -306,7 +305,7 @@ export function TimeField({
               placeholder="Type, e.g. 9:40"
               aria-label={`${label}, typed`}
               aria-invalid={typed !== '' && parseTypedTime(typed) === null ? true : undefined}
-              className="mb-2 h-8 w-full rounded-md border border-border bg-surface px-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent aria-invalid:border-danger"
+              className="mb-2 h-8 w-full border border-border bg-surface px-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent aria-invalid:border-danger"
             />
           </form>
           <div className="flex gap-2">

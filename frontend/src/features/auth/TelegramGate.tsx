@@ -64,7 +64,7 @@ export function TelegramGate() {
       )}
 
       {createLinkToken.isPending && !createLinkToken.data && (
-        <div className="h-[200px] w-[200px] animate-pulse rounded-md bg-surface" />
+        <div className="h-[200px] w-[200px] animate-pulse bg-surface" />
       )}
 
       {createLinkToken.isError && (

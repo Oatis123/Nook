@@ -21,7 +21,7 @@ export function Toaster() {
           key={t.id}
           role={t.tone === 'error' ? 'alert' : 'status'}
           className={clsx(
-            'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-md border bg-surface-raised px-3 py-2.5 text-sm text-text shadow-(--shadow-popover) animate-fade-in',
+            'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 border bg-surface-raised px-3 py-2.5 text-sm text-text animate-fade-in',
             t.tone === 'error' ? 'border-danger' : 'border-border',
           )}
         >
@@ -35,7 +35,7 @@ export function Toaster() {
             type="button"
             onClick={() => dismiss(t.id)}
             aria-label="Dismiss"
-            className="-m-1 rounded p-1 text-text-muted hover:text-text"
+            className="-m-1 p-1 text-text-muted hover:text-text"
           >
             <X size={14} strokeWidth={1.75} />
           </button>

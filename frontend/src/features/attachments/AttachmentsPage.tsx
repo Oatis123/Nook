@@ -1,5 +1,5 @@
 import { type ChangeEvent, useRef } from 'react'
-import { Paperclip, Upload } from '@/design/icons'
+import { Upload } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Button } from '@/design/components/Button'
 import { formatDateTime, formatFileSize } from '@/lib/format'
@@ -74,13 +74,13 @@ export default function AttachmentsPage() {
       </div>
 
       {attachments.data.length === 0 ? (
-        <EmptyState icon={Paperclip} title="No attachments yet" />
+        <EmptyState title="No attachments yet" />
       ) : (
         <ul className="flex flex-col gap-2">
           {attachments.data.map((attachment) => (
             <li
               key={attachment.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+              className="flex items-center justify-between gap-3 border border-border bg-surface px-3 py-2 text-sm"
             >
               <a
                 href={attachmentDownloadUrl(attachment.id)}

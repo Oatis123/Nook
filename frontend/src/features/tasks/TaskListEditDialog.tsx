@@ -7,6 +7,7 @@ import {
   LIST_COLOR_OPTIONS,
   LIST_ICON_COMPONENT,
   LIST_ICON_OPTIONS,
+  listColorOption,
   listColorVar,
 } from '@/features/tasks/listStyle'
 import type { TaskList, TaskListColor, TaskListIcon } from '@/lib/types'
@@ -65,13 +66,11 @@ export function TaskListEditDialog({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="List name"
-          className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+          className="h-9 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
         />
 
         <div>
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-text-muted">
-            Color
-          </p>
+          <p className="mb-1.5 text-xs font-medium lowercase text-text-muted">Color</p>
           <div className="flex flex-wrap gap-2">
             {LIST_COLOR_OPTIONS.map((c) => (
               <button
@@ -79,9 +78,10 @@ export function TaskListEditDialog({
                 type="button"
                 onClick={() => setColor(c)}
                 aria-label={c}
+                aria-pressed={listColorOption(color) === c}
                 className={clsx(
-                  'h-6 w-6 rounded-full ring-offset-2 ring-offset-surface-raised transition-shadow',
-                  color === c && 'ring-2 ring-accent',
+                  'h-6 w-6 ring-offset-2 ring-offset-surface-raised transition-shadow',
+                  listColorOption(color) === c && 'ring-2 ring-accent',
                 )}
                 style={{ backgroundColor: listColorVar(c) }}
               />
@@ -90,7 +90,7 @@ export function TaskListEditDialog({
         </div>
 
         <div>
-          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-text-muted">Icon</p>
+          <p className="mb-1.5 text-xs font-medium lowercase text-text-muted">Icon</p>
           <div className="flex flex-wrap gap-1.5">
             {LIST_ICON_OPTIONS.map((iconKey) => {
               const IconComponent = LIST_ICON_COMPONENT[iconKey]
@@ -101,7 +101,7 @@ export function TaskListEditDialog({
                   onClick={() => setIcon(iconKey)}
                   aria-label={iconKey}
                   className={clsx(
-                    'flex h-8 w-8 items-center justify-center rounded-md border transition-colors duration-150',
+                    'flex h-8 w-8 items-center justify-center border transition-colors duration-150',
                     icon === iconKey
                       ? 'border-accent bg-surface text-accent'
                       : 'border-border text-text-muted hover:text-text',

@@ -114,7 +114,7 @@ export function AppShell() {
           'ui-sidebar fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface',
           'transition-transform duration-150 md:relative md:inset-auto md:transition-[width]',
           sidebarOpen
-            ? 'translate-x-0 md:m-4 md:rounded-xl md:border md:shadow-md'
+            ? 'translate-x-0 md:m-4 md:border'
             : '-translate-x-full md:w-0 md:translate-x-0 md:overflow-hidden md:border-r-0',
         )}
       >
@@ -126,15 +126,15 @@ export function AppShell() {
         </div>
 
         <div className="px-3">
-          <div className="ui-segmented inline-flex w-full rounded-md border border-border bg-bg p-0.5">
+          <div className="ui-segmented inline-flex w-full border border-border bg-bg p-0.5">
             <NavLink
               to="/notes"
               data-active={section === 'notes'}
               className={({ isActive }) =>
                 clsx(
-                  'ui-segment flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors duration-150',
+                  'ui-segment flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-sm transition-colors duration-150',
                   isActive || section === 'notes'
-                    ? 'bg-surface-raised text-text shadow-sm'
+                    ? 'bg-surface-raised text-text'
                     : 'text-text-muted hover:text-text',
                 )
               }
@@ -147,10 +147,8 @@ export function AppShell() {
               data-active={section === 'tasks'}
               className={({ isActive }) =>
                 clsx(
-                  'ui-segment flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-sm transition-colors duration-150',
-                  isActive
-                    ? 'bg-surface-raised text-text shadow-sm'
-                    : 'text-text-muted hover:text-text',
+                  'ui-segment flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-sm transition-colors duration-150',
+                  isActive ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text',
                 )
               }
             >
@@ -179,7 +177,7 @@ export function AppShell() {
                   to={to}
                   className={({ isActive }) =>
                     clsx(
-                      'ui-nav-item flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors duration-150',
+                      'ui-nav-item flex items-center gap-2.5 px-2.5 py-1.5 text-sm transition-colors duration-150',
                       isActive
                         ? 'bg-surface-raised text-text'
                         : 'text-text-muted hover:text-text hover:bg-surface-raised/60',
@@ -200,7 +198,7 @@ export function AppShell() {
               trigger={
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm text-text hover:bg-surface-raised"
+                  className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-sm text-text hover:bg-surface-raised"
                 >
                   <span className="truncate">{user.username}</span>
                   <ChevronsUpDown size={14} strokeWidth={1.5} className="text-text-muted" />
@@ -287,13 +285,13 @@ export function AppShell() {
       )}
       <div
         className={clsx(
-          'fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col rounded-t-xl border-t border-border bg-surface',
+          'fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col border-t border-border bg-surface',
           'transition-transform duration-150 md:hidden',
           rightPanelOpen ? 'translate-y-0' : 'translate-y-full',
         )}
       >
         <div className="flex justify-center pt-2">
-          <div className="h-1 w-10 rounded-full bg-border" />
+          <div className="h-1 w-10 bg-border" />
         </div>
         {/* Only one copy of the panel is ever mounted (its graph/backlink queries aren't
             free), and only while it's actually open. */}

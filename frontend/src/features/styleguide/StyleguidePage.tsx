@@ -54,7 +54,7 @@ function Swatch({ token, label }: { token: string; label: string }) {
   return (
     <div className="flex items-center gap-3">
       <div
-        className="h-10 w-10 shrink-0 rounded-md border border-border"
+        className="h-10 w-10 shrink-0 border border-border"
         style={{ background: `var(--${token})` }}
       />
       <div>
@@ -96,7 +96,7 @@ export default function StyleguidePage() {
           {paletteTokens.map((token) => (
             <div
               key={token}
-              className="h-8 w-8 rounded-full border border-border"
+              className="h-8 w-8 border border-border"
               style={{ background: `var(--${token})` }}
               title={token}
             />
@@ -113,7 +113,7 @@ export default function StyleguidePage() {
           the lazy dog. Быстрая коричневая лиса перепрыгивает через ленивую собаку.
         </p>
         <p className="mt-2 text-sm text-text-muted">Muted text for secondary information.</p>
-        <code className="mt-4 block rounded-md bg-surface px-3 py-2 font-mono text-sm">
+        <code className="mt-4 block bg-surface px-3 py-2 font-mono text-sm">
           const nook = &quot;self-hosted&quot;;
         </code>
       </Section>

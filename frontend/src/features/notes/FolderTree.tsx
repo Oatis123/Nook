@@ -177,7 +177,7 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
         onDrop={(e) => handleDrop(e, null)}
       >
         <div className="mb-1 flex items-center justify-between px-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Notes</span>
+          <span className="text-xs font-medium lowercase text-text-muted">Notes</span>
           <div className="flex gap-0.5">
             <IconButton
               label="New folder"
@@ -324,7 +324,7 @@ function MoveDialog({
             data-autofocus
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            className="h-10 rounded-md border border-border bg-surface-raised px-2 text-sm text-text outline-none focus-visible:border-accent"
+            className="h-10 border border-border bg-surface-raised px-2 text-sm text-text outline-none focus-visible:border-accent"
           >
             <option value="">Top level</option>
             {options.map((option) => (
@@ -463,7 +463,7 @@ const FolderRow = memo(function FolderRow({
           onDropOn(e, node.folder.id)
         }}
         className={clsx(
-          'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm text-text hover:bg-surface-raised',
+          'ui-nav-item group relative flex items-center gap-1 px-1 py-1 text-sm text-text hover:bg-surface-raised',
           dragOver && 'bg-surface-raised ring-1 ring-accent',
         )}
         style={{ paddingLeft: depth * 14 + 4 }}
@@ -491,7 +491,7 @@ const FolderRow = memo(function FolderRow({
               autoFocus
               defaultValue={node.folder.name}
               onBlur={() => setRenaming(null)}
-              className="w-full rounded border border-accent bg-surface-raised px-1 text-sm outline-none"
+              className="w-full border border-accent bg-surface-raised px-1 text-sm outline-none"
             />
           </form>
         ) : (
@@ -612,7 +612,7 @@ const NoteRow = memo(function NoteRow({
       onFocus={() => prefetchNote(note.id)}
       data-active={active || undefined}
       className={clsx(
-        'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        'ui-nav-item group relative flex items-center gap-1 px-1 py-1 text-sm hover:bg-surface-raised',
         active ? 'bg-surface-raised text-text' : 'text-text-muted',
       )}
       style={{ paddingLeft: depth * 14 + 22 }}
@@ -653,7 +653,7 @@ function DailyNoteRow({ activeNoteId }: { activeNoteId: string | undefined }) {
     <div
       data-active={active || undefined}
       className={clsx(
-        'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        'ui-nav-item group relative flex items-center gap-1 px-1 py-1 text-sm hover:bg-surface-raised',
         active ? 'bg-surface-raised text-text' : 'text-text-muted',
       )}
       style={{ paddingLeft: 22 }}
@@ -708,7 +708,7 @@ function IdeasNoteRow({
       onFocus={() => prefetchNote(note.id)}
       data-active={active || undefined}
       className={clsx(
-        'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        'ui-nav-item group relative flex items-center gap-1 px-1 py-1 text-sm hover:bg-surface-raised',
         active ? 'bg-surface-raised text-text' : 'text-text-muted',
       )}
       style={{ paddingLeft: 22 }}
@@ -757,7 +757,7 @@ function NoteRenameForm({ note, onDone }: { note: NoteSummary; onDone: () => voi
         autoFocus
         defaultValue={note.title}
         onBlur={onDone}
-        className="w-full rounded border border-accent bg-surface-raised px-1 text-sm text-text outline-none"
+        className="w-full border border-accent bg-surface-raised px-1 text-sm text-text outline-none"
       />
     </form>
   )

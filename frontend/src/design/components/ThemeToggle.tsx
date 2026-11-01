@@ -16,7 +16,7 @@ export function ThemeToggle() {
     <div
       role="radiogroup"
       aria-label="Theme"
-      className="ui-segmented inline-flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5"
+      className="ui-segmented inline-flex items-center gap-0.5 border border-border bg-surface p-0.5"
     >
       {OPTIONS.map(({ value, label, icon: Icon }) => (
         <button
@@ -27,9 +27,9 @@ export function ThemeToggle() {
           title={label}
           onClick={(e) => setPreference(value, transitionOriginFromEvent(e))}
           className={clsx(
-            'ui-segment inline-flex h-7 w-7 items-center justify-center rounded transition-colors duration-150',
+            'ui-segment inline-flex h-7 w-7 items-center justify-center transition-colors duration-150',
             preference === value
-              ? 'bg-surface-raised text-text shadow-sm'
+              ? 'bg-surface-raised text-text'
               : 'text-text-muted hover:text-text',
           )}
         >

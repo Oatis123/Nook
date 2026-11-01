@@ -15,14 +15,14 @@ import {
 } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Repeat } from '@/design/icons'
 import { Button } from '@/design/components/Button'
-import { useCalendar, useUpdateTask } from '@/features/tasks/hooks'
-import { PRIORITY_COLOR_VAR } from '@/features/tasks/priority'
+import { useCalendar, useTaskLists, useUpdateTask } from '@/features/tasks/hooks'
+import { listColorVar, listTintVar } from '@/features/tasks/listStyle'
 import { TaskDetailDialog } from '@/features/tasks/TaskDetailDialog'
 import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
 import { useToday } from '@/features/tasks/useToday'
 import { parseLocalDate } from '@/lib/dates'
 import { isClickDrag } from '@/lib/dragClick'
-import type { CalendarEntry } from '@/lib/types'
+import type { CalendarEntry, TaskListColor } from '@/lib/types'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 type ViewMode = 'month' | 'week'
@@ -55,7 +55,20 @@ function groupByDate(entries: CalendarEntry[]): Map<string, CalendarEntry[]> {
   return map
 }
 
-function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: () => void }) {
+/** A task on a day, in its list's colors: the list's tint behind it and a small mark in
+ * its ink (oatis-style category marks). A high-priority task's mark and title are ochre —
+ * the "look here" color — instead; a future repeat is a dashed outline with no fill. */
+function EntryChip({
+  entry,
+  listColor,
+  onOpen,
+}: {
+  entry: CalendarEntry
+  listColor: TaskListColor | undefined
+  onOpen: () => void
+}) {
+  const high = entry.priority === 'high'
+  const ink = listColor ? listColorVar(listColor) : 'var(--text-muted)'
   return (
     <button
       type="button"
@@ -69,21 +82,22 @@ function EntryChip({ entry, onOpen }: { entry: CalendarEntry; onOpen: () => void
         onOpen()
       }}
       className={clsx(
-        'flex w-full items-center gap-1 truncate rounded px-1 py-0.5 text-left text-xs hover:bg-surface-raised',
-        entry.virtual && 'border border-dashed border-border text-text-muted opacity-70',
+        'flex w-full items-center gap-1.5 truncate px-1 py-0.5 text-left text-xs text-text hover:brightness-110',
+        entry.virtual && 'border border-dashed border-(--oatis-dim) text-text-muted',
       )}
+      style={!entry.virtual && listColor ? { backgroundColor: listTintVar(listColor) } : undefined}
     >
-      {entry.priority !== 'none' && (
-        <span
-          className="h-1.5 w-1.5 shrink-0 rounded-full"
-          style={{
-            backgroundColor: PRIORITY_COLOR_VAR[entry.priority as 'low' | 'medium' | 'high'],
-          }}
-        />
+      <span
+        className="h-1.5 w-1.5 shrink-0"
+        style={{ backgroundColor: high ? 'var(--danger)' : ink }}
+      />
+      {entry.virtual && <Repeat size={9} className="shrink-0" />}
+      {entry.time && (
+        <span className="shrink-0 tabular-nums" style={{ color: entry.virtual ? undefined : ink }}>
+          {entry.time.slice(0, 5)}
+        </span>
       )}
-      {entry.virtual && <Repeat size={10} strokeWidth={1.5} className="shrink-0" />}
-      {entry.time && <span className="shrink-0 text-text-muted">{entry.time.slice(0, 5)}</span>}
-      <span className="truncate">{entry.title}</span>
+      <span className={clsx('truncate', high && 'text-danger')}>{entry.title}</span>
     </button>
   )
 }
@@ -102,6 +116,8 @@ export default function CalendarPage() {
   const [quickCreateDate, setQuickCreateDate] = useState<Date | null>(null)
 
   const range = viewMode === 'month' ? monthRange(anchorDate) : weekRange(anchorDate)
+  const taskListsQuery = useTaskLists()
+  const listColors = new Map(taskListsQuery.data?.map((l) => [l.id, l.color]))
   const calendarQuery = useCalendar(
     format(range.start, 'yyyy-MM-dd'),
     format(range.end, 'yyyy-MM-dd'),
@@ -155,16 +171,16 @@ export default function CalendarPage() {
             icon={<ChevronRight size={16} strokeWidth={1.5} />}
             label="Next"
           />
-          <div className="inline-flex rounded-md border border-border bg-bg p-0.5 text-sm">
+          <div className="inline-flex border border-border bg-bg p-0.5 text-sm">
             {(['month', 'week'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setViewMode(mode)}
                 className={clsx(
-                  'rounded px-2.5 py-1 capitalize transition-colors duration-150',
+                  'px-2.5 py-1 capitalize transition-colors duration-150',
                   viewMode === mode
-                    ? 'bg-surface-raised text-text shadow-sm'
+                    ? 'bg-surface-raised text-text'
                     : 'text-text-muted hover:text-text',
                 )}
               >
@@ -187,7 +203,7 @@ export default function CalendarPage() {
                 type="button"
                 onClick={() => handleDayClick(day)}
                 className={clsx(
-                  'flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-2 text-left',
+                  'flex min-h-11 w-full items-center justify-between gap-2 px-2 text-left',
                   format(day, 'yyyy-MM-dd') === today ? 'text-accent' : 'text-text',
                 )}
               >
@@ -200,6 +216,7 @@ export default function CalendarPage() {
                     <EntryChip
                       key={`${entry.task_id}-${entry.date}`}
                       entry={entry}
+                      listColor={listColors.get(entry.list_id)}
                       onOpen={() => setOpenTaskId(entry.task_id)}
                     />
                   ))}
@@ -210,7 +227,7 @@ export default function CalendarPage() {
         })}
       </div>
 
-      <div className="hidden min-h-0 flex-1 grid-cols-7 gap-px overflow-hidden rounded-md border border-border bg-border md:grid">
+      <div className="hidden min-h-0 flex-1 grid-cols-7 gap-px overflow-hidden border border-border bg-border md:grid">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
           <div key={label} className="bg-surface px-2 py-1 text-center text-xs text-text-muted">
             {label}
@@ -238,7 +255,7 @@ export default function CalendarPage() {
             >
               <span
                 className={clsx(
-                  'self-start rounded-full px-1.5 text-xs',
+                  'self-start px-1.5 text-xs',
                   format(day, 'yyyy-MM-dd') === today
                     ? 'bg-accent text-accent-text'
                     : 'text-text-muted',
@@ -251,6 +268,7 @@ export default function CalendarPage() {
                   <EntryChip
                     key={`${entry.task_id}-${entry.date}`}
                     entry={entry}
+                    listColor={listColors.get(entry.list_id)}
                     onOpen={() => setOpenTaskId(entry.task_id)}
                   />
                 ))}
@@ -292,7 +310,7 @@ function IconNavButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted hover:bg-surface-raised hover:text-text"
+      className="flex h-8 w-8 items-center justify-center text-text-muted hover:bg-surface-raised hover:text-text"
     >
       {icon}
     </button>

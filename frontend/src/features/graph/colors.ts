@@ -1,13 +1,15 @@
-/** Deterministic string → HSL color, so the same folder/tag always gets the same node
- * color across renders and sessions without maintaining a fixed palette/lookup table.
- * Canvas fillStyle can't resolve CSS custom properties (var(...)) the way DOM styles do,
- * so this returns a plain hsl() string rather than reaching for a design token. */
-export function colorForKey(key: string): string {
+/** The five category inks (oatis-style), in the style's order. */
+export const INKS = ['bi', 'fn', 'type', 'prop', 'kw'] as const
+export type Ink = (typeof INKS)[number]
+
+/** Deterministic string → one of the five category inks, so the same folder/tag always
+ * gets the same node color across renders and sessions. Five, not a hue per key: the
+ * style allows at most five inks on a screen, so folders share them. */
+export function inkForKey(key: string): Ink {
   let hash = 0
   for (let i = 0; i < key.length; i++) {
     hash = (hash << 5) - hash + key.charCodeAt(i)
     hash |= 0
   }
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue}, 55%, 55%)`
+  return INKS[Math.abs(hash) % INKS.length]
 }

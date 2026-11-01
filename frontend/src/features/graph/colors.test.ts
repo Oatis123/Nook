@@ -1,16 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { colorForKey } from '@/features/graph/colors'
+import { INKS, inkForKey } from '@/features/graph/colors'
 
-describe('colorForKey', () => {
+describe('inkForKey', () => {
   it('is deterministic for the same key', () => {
-    expect(colorForKey('Projects')).toBe(colorForKey('Projects'))
+    expect(inkForKey('Projects')).toBe(inkForKey('Projects'))
   })
 
-  it('differs for different keys (usually)', () => {
-    expect(colorForKey('Projects')).not.toBe(colorForKey('Personal'))
+  it('always returns one of the five category inks', () => {
+    for (const key of ['Projects', 'Personal', 'Дневник', '', '__root__']) {
+      expect(INKS).toContain(inkForKey(key))
+    }
   })
 
-  it('always returns a valid hsl() string', () => {
-    expect(colorForKey('anything')).toMatch(/^hsl\(\d+, 55%, 55%\)$/)
+  it('spreads keys over the inks', () => {
+    const used = new Set(Array.from({ length: 50 }, (_, i) => inkForKey(`folder ${i}`)))
+    expect(used.size).toBe(INKS.length)
   })
 })

@@ -40,7 +40,7 @@ export function CopyField({ value, label }: { value: string; label: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
+    <div className="flex items-center gap-2 border border-border bg-surface px-3 py-2">
       <input
         ref={inputRef}
         readOnly

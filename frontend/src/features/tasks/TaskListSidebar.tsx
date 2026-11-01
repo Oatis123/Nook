@@ -16,7 +16,7 @@ const DRAG_MIME = 'application/x-nook-task-list'
 
 const fixedNavClass = ({ isActive }: { isActive: boolean }) =>
   clsx(
-    'ui-nav-item flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors duration-150',
+    'ui-nav-item flex items-center gap-2.5 px-2 py-1.5 text-sm transition-colors duration-150',
     isActive
       ? 'bg-surface-raised text-text'
       : 'text-text-muted hover:text-text hover:bg-surface-raised/60',
@@ -75,7 +75,7 @@ export function TaskListSidebar() {
       </nav>
 
       <div className="mb-1 flex items-center justify-between px-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Lists</span>
+        <span className="text-xs font-medium lowercase text-text-muted">Lists</span>
         <IconButton label="New list" onClick={() => setCreating(true)}>
           <Plus size={14} strokeWidth={1.5} />
         </IconButton>
@@ -108,7 +108,7 @@ export function TaskListSidebar() {
             onDragLeave={() => setDragOverId((id) => (id === list.id ? null : id))}
             onDrop={(e) => handleDrop(e, list)}
             className={clsx(
-              'ui-nav-item group relative flex items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+              'ui-nav-item group relative flex items-center gap-2 px-1 py-1 text-sm hover:bg-surface-raised',
               dragOverId === list.id && 'ring-1 ring-accent',
             )}
           >
@@ -154,7 +154,7 @@ export function TaskListSidebar() {
                 return (
                   <div
                     key={list.id}
-                    className="flex items-center gap-2 rounded-md px-1 py-1 text-sm text-text-muted"
+                    className="flex items-center gap-2 px-1 py-1 text-sm text-text-muted"
                   >
                     <Icon size={14} strokeWidth={1.5} />
                     <span className="flex-1 truncate">{list.name}</span>

@@ -37,13 +37,13 @@ export function ConflictDialog({
           <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto text-xs">
             <div>
               <p className="mb-1 font-medium text-text-muted">Yours</p>
-              <pre className="whitespace-pre-wrap rounded-md border border-border bg-surface p-2 font-mono">
+              <pre className="whitespace-pre-wrap border border-border bg-surface p-2 font-mono">
                 {myContent}
               </pre>
             </div>
             <div>
               <p className="mb-1 font-medium text-text-muted">Server</p>
-              <pre className="whitespace-pre-wrap rounded-md border border-border bg-surface p-2 font-mono">
+              <pre className="whitespace-pre-wrap border border-border bg-surface p-2 font-mono">
                 {serverContent}
               </pre>
             </div>

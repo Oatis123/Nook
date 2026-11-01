@@ -8,7 +8,11 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
     // Loaded on demand: only the Telegram linking and login screens draw a QR code.
     import('qrcode')
       .then(({ default: QRCode }) =>
-        QRCode.toDataURL(value, { width: size, margin: 1, color: { dark: '#1f1e1b' } }),
+        QRCode.toDataURL(value, {
+          width: size,
+          margin: 1,
+          color: { dark: '#080806', light: '#eceae2' },
+        }),
       )
       .then((url) => {
         if (!cancelled) setDataUrl(url)
@@ -24,7 +28,7 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
   if (!dataUrl) {
     return (
       <div
-        className="animate-pulse rounded-md bg-surface"
+        className="animate-pulse bg-surface"
         style={{ width: size, height: size }}
         aria-hidden="true"
       />
@@ -32,12 +36,6 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
   }
 
   return (
-    <img
-      src={dataUrl}
-      width={size}
-      height={size}
-      alt="QR code"
-      className="rounded-md border border-border"
-    />
+    <img src={dataUrl} width={size} height={size} alt="QR code" className="border border-border" />
   )
 }

@@ -51,7 +51,7 @@
 
   --shadow-popover: var(--shadow-popover);
 
-  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-fade-in: fade-in 120ms steps(3, end);
 }
 
 @keyframes fade-in {
@@ -93,10 +93,10 @@
   }
 }
 
-/* Theme switch (src/lib/theme.ts): the new theme is revealed as a soft-edged circle
-   growing from the clicked control. JS animates --theme-reveal (the circle's radius)
-   and sets the origin; this disables the default cross-fade, stacks the new snapshot
-   on top and masks it. The 64px feather matches REVEAL_FEATHER in theme.ts. */
+/* Theme switch (src/lib/theme.ts): the new theme is revealed as a hard-edged circle
+   growing from the clicked control in a few stepped frames. JS animates --theme-reveal
+   (the circle's radius) and sets the origin; this disables the default cross-fade,
+   stacks the new snapshot on top and clips it. */
 @property --theme-reveal {
   syntax: '<length>';
   inherits: false;
@@ -112,10 +112,8 @@
 }
 :root.theme-transition::view-transition-new(root) {
   z-index: 1;
-  mask-image: radial-gradient(
-    circle at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%),
-    #000 calc(var(--theme-reveal) - 64px),
-    transparent var(--theme-reveal)
+  clip-path: circle(
+    var(--theme-reveal) at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)
   );
 }
 
@@ -202,7 +200,6 @@
   margin: 0 0.55em 0 -1.6em;
   vertical-align: -0.17em;
   border: 1.5px solid color-mix(in srgb, var(--text-muted) 55%, transparent);
-  border-radius: 0.3em;
   background: var(--bg);
   opacity: 1;
   cursor: pointer;
@@ -266,13 +263,11 @@
   font-family: var(--font-mono);
   font-size: 0.875em;
   background: var(--surface);
-  border-radius: var(--radius-sm);
   padding: 0.15em 0.35em;
 }
 .markdown-preview pre {
   margin: 0.9em 0;
   padding: 0.9em 1em;
-  border-radius: var(--radius-md);
   overflow-x: auto;
   font-size: 0.875em;
   line-height: 1.5;
@@ -298,7 +293,6 @@
 }
 .markdown-preview img {
   max-width: 100%;
-  border-radius: var(--radius-md);
 }
 
 /* Wikilinks (spec §6.3/§6.5) */
@@ -325,7 +319,6 @@
   align-items: center;
   gap: 0.3em;
   padding: 0.1em 0.5em;
-  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-muted);
   font-size: 0.9em;
@@ -340,7 +333,6 @@
 .markdown-preview blockquote.callout {
   border-left: 3px solid var(--accent);
   background: var(--surface);
-  border-radius: var(--radius-sm);
   padding: 0.7em 1em;
   color: var(--text);
 }
@@ -368,7 +360,7 @@
    there and whenever something in the row has focus. */
 .reveal-on-hover {
   opacity: 0;
-  transition: opacity 150ms;
+  transition: opacity 150ms var(--ease-standard);
 }
 .group:hover .reveal-on-hover,
 .group:focus-within .reveal-on-hover,
@@ -414,7 +406,6 @@
 .markdown-preview a.external-image {
   display: inline-block;
   border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
   padding: 0.3em 0.6em;
   font-size: 0.9em;
   color: var(--text-muted);

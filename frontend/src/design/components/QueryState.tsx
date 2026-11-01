@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { AlertTriangle } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { EmptyState } from '@/design/components/EmptyState'
 import { errorMessage } from '@/lib/errors'
@@ -27,14 +26,14 @@ export function QueryState({ query, compact }: { query: QueryLike; compact?: boo
         </div>
       )
     }
-    return <EmptyState icon={AlertTriangle} title={errorMessage(query.error)} action={retry} />
+    return <EmptyState mood="glitch" title={errorMessage(query.error)} action={retry} />
   }
   return (
     <p
       role="status"
       className={compact ? 'px-3 py-2 text-sm text-text-muted' : 'p-6 text-sm text-text-muted'}
     >
-      Loading…
+      <span className="spin" /> loading
     </p>
   )
 }

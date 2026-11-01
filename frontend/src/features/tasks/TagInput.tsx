@@ -30,21 +30,21 @@ export function TagInput({
   return (
     <div
       className={clsx(
-        'flex min-h-8 flex-wrap items-center gap-1 rounded-md border bg-surface px-1.5 py-1',
+        'flex min-h-8 flex-wrap items-center gap-1 border bg-surface px-1.5 py-1',
         invalid ? 'border-danger' : 'border-border focus-within:border-accent',
       )}
     >
       {tags.map((tag) => (
         <span
           key={tag}
-          className="flex items-center gap-0.5 rounded-full bg-surface-raised py-0.5 pl-2 pr-1 text-xs text-text"
+          className="flex items-center gap-0.5 bg-surface-raised py-0.5 pl-2 pr-1 text-xs text-text"
         >
           #{tag}
           <button
             type="button"
             onClick={() => onChange(tags.filter((t) => t !== tag))}
             aria-label={`Remove tag ${tag}`}
-            className="rounded-full p-0.5 text-text-muted hover:text-danger"
+            className="p-0.5 text-text-muted hover:text-danger"
           >
             <X size={11} strokeWidth={2} />
           </button>

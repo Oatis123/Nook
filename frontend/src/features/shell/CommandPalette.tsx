@@ -181,7 +181,7 @@ export function CommandPalette() {
         <RadixDialog.Content
           className={[
             'ui-palette fixed left-1/2 top-[20vh] z-50 w-[90vw] max-w-lg -translate-x-1/2',
-            'rounded-(--radius-dialog) border border-border bg-surface-raised shadow-(--shadow-dialog)',
+            'border border-border bg-surface-raised',
             'animate-fade-in',
           ].join(' ')}
           onKeyDown={handleKeyDown}

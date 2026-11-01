@@ -4,7 +4,7 @@ import type { RecurrenceFreq, RecurrenceInput } from '@/lib/types'
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const selectClass =
-  'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
+  'h-8 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
 /** The interval/frequency/weekday/monthly/end-condition fields shared by the inline
  * recurring-mode form (TaskCreateDialog) and the edit popup (RecurrencePicker). */
@@ -55,7 +55,7 @@ export function RecurrenceFields({
               type="button"
               onClick={() => toggleWeekday(i)}
               className={clsx(
-                'h-8 w-10 rounded-md border text-xs transition-colors duration-150',
+                'h-8 w-10 border text-xs transition-colors duration-150',
                 (value.by_weekday ?? []).includes(i)
                   ? 'border-accent bg-accent/15 text-text'
                   : 'border-border text-text-muted hover:text-text',
@@ -109,7 +109,7 @@ export function RecurrenceFields({
       )}
 
       <div>
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-text-muted">Ends</p>
+        <p className="mb-1.5 text-xs font-medium lowercase text-text-muted">Ends</p>
         <div className="flex flex-col gap-2 text-sm">
           <label className="flex items-center gap-2">
             <input

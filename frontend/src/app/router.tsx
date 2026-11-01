@@ -1,6 +1,5 @@
 import type { ComponentType } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
-import { FileText } from '@/design/icons'
 import { AppShell } from '@/features/shell/AppShell'
 import { PlaceholderPage } from '@/features/shell/PlaceholderPage'
 import LoginPage from '@/features/auth/LoginPage'
@@ -22,7 +21,11 @@ export const router = createBrowserRouter([
     element: <RequireAuth />,
     errorElement: <RouteError />,
     // Shown while a lazily loaded page's code arrives on a direct visit or reload.
-    hydrateFallbackElement: <p className="p-6 text-sm text-text-muted">Loading…</p>,
+    hydrateFallbackElement: (
+      <p className="p-6 text-sm text-text-muted">
+        <span className="spin" /> loading
+      </p>
+    ),
     children: [
       {
         path: '/',
@@ -31,11 +34,11 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <PlaceholderPage icon={FileText} title="Select or create a note" />,
+            element: <PlaceholderPage title="Select or create a note" />,
           },
           {
             path: 'notes',
-            element: <PlaceholderPage icon={FileText} title="Select or create a note" />,
+            element: <PlaceholderPage title="Select or create a note" />,
           },
           { path: 'notes/:noteId', lazy: page(() => import('@/features/notes/NoteEditorRoute')) },
           { path: 'tags/:name', lazy: page(() => import('@/features/notes/TagNotesPage')) },
@@ -54,7 +57,7 @@ export const router = createBrowserRouter([
           { path: 'settings', lazy: page(() => import('@/features/settings/SettingsPage')) },
           {
             path: '*',
-            element: <PlaceholderPage icon={FileText} title="This page doesn't exist" />,
+            element: <PlaceholderPage title="This page doesn't exist" />,
           },
           {
             element: <RequireAdmin />,

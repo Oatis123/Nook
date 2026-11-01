@@ -65,7 +65,7 @@ function ProfileSection() {
           id="timezone"
           value={user.timezone}
           onChange={(e) => updateProfile.mutate({ timezone: e.target.value })}
-          className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+          className="h-9 border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
         >
           {timezoneOptions().map((tz) => (
             <option key={tz} value={tz}>
@@ -123,7 +123,7 @@ function TelegramSection() {
                 autoFocus
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+                className="h-10 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
               />
             </label>
             {unlink.isError && (
@@ -146,8 +146,8 @@ function TelegramSection() {
         <div>
           <p className="text-sm text-text">Ideas note</p>
           <p className="text-sm text-text-muted">
-            Ideas you send the bot (the 💡 button or /idea) are added to it. Show it at the top of
-            the notes list.
+            Ideas you send the bot (the "Это идея" button or /idea) are added to it. Show it at the
+            top of the notes list.
           </p>
         </div>
         <Switch
@@ -229,7 +229,7 @@ function NewApiTokenDialog() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Claude Desktop"
-              className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+              className="h-9 border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
             />
           </div>
           <Button type="submit" variant="primary" disabled={!name.trim() || createToken.isPending}>
@@ -254,8 +254,8 @@ function ApiTokensSection() {
       </div>
       <p className="mb-4 text-sm text-text-muted">
         Connect an MCP client (Claude Desktop, Claude Code, ...) to your notes and tasks. Point it
-        at <code className="rounded bg-surface px-1 py-0.5 text-xs text-text">{mcpUrl}</code> with
-        one of the tokens below as a bearer token.
+        at <code className="bg-surface px-1 py-0.5 text-xs text-text">{mcpUrl}</code> with one of
+        the tokens below as a bearer token.
       </p>
       {(tokens.data?.length ?? 0) === 0 ? (
         <p className="text-sm text-text-muted">No tokens yet.</p>
@@ -264,7 +264,7 @@ function ApiTokensSection() {
           {tokens.data?.map((token) => (
             <li
               key={token.id}
-              className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm"
+              className="flex items-center justify-between border border-border bg-surface px-3 py-2 text-sm"
             >
               <div>
                 <div className="text-text">{token.name}</div>
@@ -370,7 +370,7 @@ function VaultSection() {
         )}
 
         {status === 'done' && report && (
-          <div className="rounded-md border border-border bg-surface px-3 py-2 text-sm">
+          <div className="border border-border bg-surface px-3 py-2 text-sm">
             <p className="text-text">
               Imported {report.notes_imported} note{report.notes_imported === 1 ? '' : 's'} and{' '}
               {report.attachments_imported} attachment{report.attachments_imported === 1 ? '' : 's'}
@@ -392,7 +392,7 @@ function VaultSection() {
         )}
 
         {status === 'failed' && (
-          <div className="rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+          <div className="border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
             Import failed.
             {report?.errors.map((err, i) => (
               <div key={i}>{err}</div>
@@ -436,7 +436,7 @@ function PasswordSection() {
             autoComplete="current-password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
-            className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+            className="h-9 border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -450,7 +450,7 @@ function PasswordSection() {
             minLength={10}
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+            className="h-9 border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
           />
         </div>
 
@@ -503,7 +503,7 @@ function SessionsSection() {
         {sessions.data?.map((session) => (
           <li
             key={session.id}
-            className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-sm"
+            className="flex items-center justify-between border border-border bg-surface px-3 py-2 text-sm"
           >
             <div>
               <div className="text-text">

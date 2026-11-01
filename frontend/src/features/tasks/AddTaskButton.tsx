@@ -30,7 +30,7 @@ export function AddTaskButton({ listId }: { listId?: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-left text-sm text-text-muted transition-colors duration-150 hover:text-text"
+        className="flex w-full items-center gap-2 border border-border bg-surface px-3 py-2 text-left text-sm text-text-muted transition-colors duration-150 hover:text-text"
       >
         <Plus size={16} strokeWidth={1.5} className="shrink-0" />
         Add a task… (Q)

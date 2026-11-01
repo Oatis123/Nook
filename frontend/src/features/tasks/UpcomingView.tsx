@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
 import { addDays, format } from 'date-fns'
-import { CalendarRange } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useTasks } from '@/features/tasks/hooks'
 import { useToday } from '@/features/tasks/useToday'
@@ -59,7 +58,7 @@ export default function UpcomingView() {
       </div>
 
       {tasksQuery.data.length === 0 ? (
-        <EmptyState icon={CalendarRange} title="Nothing coming up" />
+        <EmptyState title="Nothing coming up" />
       ) : (
         <TaskGroupedList groups={groups} onOpenTask={openTask} emptyMessage="Nothing coming up" />
       )}

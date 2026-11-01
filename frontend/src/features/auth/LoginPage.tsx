@@ -48,7 +48,7 @@ export default function LoginPage() {
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+                  className="h-10 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
                 />
               </div>
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+                  className="h-10 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
                 />
               </div>
 

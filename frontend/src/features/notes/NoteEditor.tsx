@@ -4,7 +4,7 @@ import { markdown } from '@codemirror/lang-markdown'
 import { EditorView } from '@codemirror/view'
 import { autocompletion } from '@codemirror/autocomplete'
 import { clsx } from 'clsx'
-import { Download, Eye, Link2, Paperclip, Pencil } from '@/design/icons'
+import { Download, Eye, Paperclip, Pencil } from '@/design/icons'
 import { EmptyState } from '@/design/components/EmptyState'
 import { IconButton } from '@/design/components/IconButton'
 import { Tooltip } from '@/design/components/Tooltip'
@@ -175,7 +175,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   // mid-deploy) must not replace an open editor, and its undo history, with an error.
   if (noteQuery.isError && !noteQuery.data) {
     if (noteQuery.error instanceof ApiError && noteQuery.error.status === 404) {
-      return <EmptyState icon={Link2} title="This note doesn't exist or was deleted." />
+      return <EmptyState mood="glitch" title="This note doesn't exist or was deleted." />
     }
     return <QueryState query={noteQuery} />
   }
@@ -231,7 +231,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               download
               aria-label="Export as .md"
               title="Export as .md"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text"
+              className="inline-flex h-9 w-9 items-center justify-center text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text"
             >
               <Download size={16} strokeWidth={1.5} />
             </a>
@@ -357,7 +357,7 @@ function ModeSwitch({ mode, onChange }: { mode: NoteMode; onChange: (mode: NoteM
       <div
         role="radiogroup"
         aria-label="Mode"
-        className="ui-segmented inline-flex items-center gap-0.5 rounded-md border border-border bg-surface p-0.5"
+        className="ui-segmented inline-flex items-center gap-0.5 border border-border bg-surface p-0.5"
       >
         {MODES.map(({ value, label, icon: Icon }) => (
           <button
@@ -369,10 +369,8 @@ function ModeSwitch({ mode, onChange }: { mode: NoteMode; onChange: (mode: NoteM
             data-active={mode === value}
             onClick={() => onChange(value)}
             className={clsx(
-              'ui-segment inline-flex h-7 items-center justify-center gap-1.5 rounded px-2 text-sm transition-colors duration-150',
-              mode === value
-                ? 'bg-surface-raised text-text shadow-sm'
-                : 'text-text-muted hover:text-text',
+              'ui-segment inline-flex h-7 items-center justify-center gap-1.5 px-2 text-sm transition-colors duration-150',
+              mode === value ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text',
             )}
           >
             <Icon size={15} strokeWidth={1.5} />

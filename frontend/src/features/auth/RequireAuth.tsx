@@ -1,5 +1,4 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { AlertTriangle } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { EmptyState } from '@/design/components/EmptyState'
 import { useCurrentUser } from '@/features/auth/hooks'
@@ -11,7 +10,7 @@ function ServerUnreachable({ error, retry }: { error: unknown; retry: () => unkn
   return (
     <div className="h-dvh bg-bg">
       <EmptyState
-        icon={AlertTriangle}
+        mood="glitch"
         title={errorMessage(error)}
         action={
           <Button variant="secondary" onClick={() => retry()}>

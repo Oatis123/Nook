@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { Mail, Plus } from '@/design/icons'
+import { Plus } from '@/design/icons'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
@@ -78,7 +78,7 @@ function NewInviteDialog() {
               id="comment"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="h-9 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+              className="h-9 border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -92,7 +92,7 @@ function NewInviteDialog() {
               max={365}
               value={expiresInDays}
               onChange={(e) => setExpiresInDays(e.target.value)}
-              className="h-9 w-24 rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
+              className="h-9 w-24 border border-border bg-surface-raised px-3 text-sm outline-none focus-visible:border-accent"
             />
           </div>
           <Button type="submit" variant="primary" disabled={createInvite.isPending}>
@@ -115,7 +115,7 @@ export function InvitesPanel() {
       </div>
 
       {invites.data?.length === 0 && (
-        <EmptyState icon={Mail} title="No invites yet. Create one to add a person." />
+        <EmptyState title="No invites yet. Create one to add a person." />
       )}
 
       {invites.data && invites.data.length > 0 && (

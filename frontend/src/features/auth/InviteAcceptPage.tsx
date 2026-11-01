@@ -4,7 +4,6 @@ import { APP_NAME } from '@/lib/env'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/design/components/Button'
 import { EmptyState } from '@/design/components/EmptyState'
-import { AlertTriangle } from '@/design/icons'
 import { useAcceptInvite, useInvitePreview } from '@/features/auth/hooks'
 
 export default function InviteAcceptPage() {
@@ -21,7 +20,7 @@ export default function InviteAcceptPage() {
   if (preview.isError) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
-        <EmptyState icon={AlertTriangle} title="This invite link is invalid or has expired." />
+        <EmptyState mood="glitch" title="This invite link is invalid or has expired." />
       </div>
     )
   }
@@ -54,7 +53,7 @@ export default function InviteAcceptPage() {
               pattern="[a-z0-9_]{3,32}"
               title="3-32 characters: lowercase letters, digits, underscore"
               required
-              className="h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+              className="h-10 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
             />
           </div>
 
@@ -70,7 +69,7 @@ export default function InviteAcceptPage() {
               onChange={(e) => setPassword(e.target.value)}
               minLength={10}
               required
-              className="h-10 rounded-md border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
+              className="h-10 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
             />
             <span className="text-xs text-text-muted">At least 10 characters.</span>
           </div>

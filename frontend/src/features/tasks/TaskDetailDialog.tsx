@@ -30,7 +30,7 @@ import type { RecurrenceInput, Task, TaskDetail, TaskPriority } from '@/lib/type
 import { confirmAction } from '@/lib/confirm'
 
 const selectClass =
-  'h-8 rounded-md border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
+  'h-8 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
 
 function SubtaskRow({ subtask }: { subtask: Task }) {
   const completeTask = useCompleteTask()
@@ -39,7 +39,7 @@ function SubtaskRow({ subtask }: { subtask: Task }) {
   const done = subtask.status === 'done'
 
   return (
-    <div className="group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface">
+    <div className="group flex items-center gap-2 px-1.5 py-1 hover:bg-surface">
       <button
         type="button"
         onClick={() =>
@@ -47,7 +47,7 @@ function SubtaskRow({ subtask }: { subtask: Task }) {
         }
         aria-label={done ? 'Mark as not done' : 'Mark as done'}
         className={clsx(
-          'h-3.5 w-3.5 shrink-0 rounded-full border transition-colors duration-150',
+          'h-3.5 w-3.5 shrink-0 border transition-colors duration-150',
           done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
         )}
       />
@@ -88,15 +88,13 @@ function LinkedNotesSection({ task }: { task: TaskDetail }) {
 
   return (
     <div>
-      <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-        Linked notes
-      </h3>
+      <h3 className="mb-2 text-xs font-medium lowercase text-text-muted">Linked notes</h3>
       {task.linked_notes.length > 0 && (
         <div className="mb-1.5 flex flex-col gap-0.5">
           {task.linked_notes.map((note) => (
             <div
               key={note.id}
-              className="group flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-surface"
+              className="group flex items-center gap-2 px-1.5 py-1 hover:bg-surface"
             >
               <button
                 type="button"
@@ -128,10 +126,10 @@ function LinkedNotesSection({ task }: { task: TaskDetail }) {
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
           placeholder="Link a note…"
-          className="w-full rounded-md border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+          className="w-full border border-border bg-surface px-2.5 py-1.5 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
         {open && results.length > 0 && (
-          <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-surface-raised py-1 shadow-(--shadow-popover)">
+          <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-y-auto border border-border bg-surface-raised py-1">
             {results.map((note) => (
               <li key={note.id}>
                 <button
@@ -234,7 +232,7 @@ export function TaskDetailDialog({
             onClick={handleToggleDone}
             aria-label={task.status === 'done' ? 'Mark as not done' : 'Mark as done'}
             className={clsx(
-              'touch-target mt-1 h-4 w-4 shrink-0 rounded-full border transition-colors duration-150',
+              'touch-target mt-1 h-4 w-4 shrink-0 border transition-colors duration-150',
               task.status === 'done'
                 ? 'border-accent bg-accent'
                 : 'border-border hover:border-accent',
@@ -260,7 +258,7 @@ export function TaskDetailDialog({
           aria-label="Description"
           placeholder="Description (markdown)"
           rows={3}
-          className="w-full resize-none rounded-md border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
+          className="w-full resize-none border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-text-muted focus-visible:border-accent"
         />
 
         <div className="flex flex-wrap items-center gap-3">
@@ -329,7 +327,7 @@ export function TaskDetailDialog({
                 type="button"
                 onClick={() => setRecurrenceOpen(true)}
                 className={clsx(
-                  'flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm transition-colors duration-150',
+                  'flex h-8 items-center gap-1.5 border px-2 text-sm transition-colors duration-150',
                   task.is_recurring
                     ? 'border-accent text-accent'
                     : 'border-border text-text-muted hover:text-text',
@@ -346,7 +344,7 @@ export function TaskDetailDialog({
               <button
                 type="button"
                 onClick={() => skipTask.mutate(task.id)}
-                className="flex h-8 items-center gap-1.5 rounded-md border border-border px-2 text-sm text-text-muted hover:text-text"
+                className="flex h-8 items-center gap-1.5 border border-border px-2 text-sm text-text-muted hover:text-text"
               >
                 <SkipForward size={13} strokeWidth={1.5} />
                 Skip
@@ -377,9 +375,7 @@ export function TaskDetailDialog({
 
         {!task.parent_id && (
           <div>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-              Subtasks
-            </h3>
+            <h3 className="mb-2 text-xs font-medium lowercase text-text-muted">Subtasks</h3>
             <div className="flex flex-col gap-0.5">
               {task.subtasks.map((subtask) => (
                 <SubtaskRow key={subtask.id} subtask={subtask} />

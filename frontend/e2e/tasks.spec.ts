@@ -14,15 +14,15 @@ test.beforeEach(async ({ page }) => {
 
 test('a task created for today lands on Today', async ({ page }) => {
   const title = `E2E Task ${Date.now()}`
-  // The seeded admin's profile timezone is UTC, so "today" for it is the UTC date.
-  const today = new Date().toISOString().slice(0, 10)
-
   await page.goto('/tasks/today')
   await page.getByRole('button', { name: /Add a task/ }).click()
 
   const dialog = page.getByRole('dialog')
   await dialog.getByLabel('Task title').fill(title)
-  await dialog.getByLabel('Due date').fill(today)
+  // The date picker's Today follows the profile's timezone (UTC for the seeded admin),
+  // like the Today view does.
+  await dialog.getByRole('button', { name: 'Due date' }).click()
+  await page.getByRole('button', { name: 'Today', exact: true }).click()
   await dialog.getByLabel('Priority').selectOption('high')
 
   const created = page.waitForResponse(

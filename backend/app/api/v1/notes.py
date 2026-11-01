@@ -1,4 +1,6 @@
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import FileResponse
@@ -10,6 +12,7 @@ from app.schemas.note import NoteCreate, NoteDetail, NoteSummary, NoteUpdate
 from app.schemas.note_link import BacklinkOut, RenameImpact
 from app.schemas.task import TaskOut
 from app.schemas.task_note_link import NewTaskFromNoteRequest
+from app.services import daily as daily_service
 from app.services import note_links as note_links_service
 from app.services import notes as notes_service
 from app.services import task_note_links as task_note_links_service
@@ -45,6 +48,15 @@ async def create_note(body: NoteCreate, user: CurrentUser, session: DbSession) -
     note = await notes_service.create_note(
         session, user.id, body.title, body.folder_id, body.content
     )
+    return await notes_service.build_note_detail(session, note)
+
+
+@router.post("/daily", response_model=NoteDetail, dependencies=[Csrf])
+async def open_daily_note(user: CurrentUser, session: DbSession) -> NoteDetail:
+    """Today's daily note (by the user's own timezone) — the same one the Telegram bot's
+    /daily writes to, created on first use."""
+    today = datetime.now(ZoneInfo(user.timezone)).date()
+    note = await daily_service.get_or_create_daily_note(session, user.id, today)
     return await notes_service.build_note_detail(session, note)
 
 

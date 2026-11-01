@@ -32,15 +32,7 @@ The note graph, colored by folder (dark mode):
 
 ![Note graph](docs/screenshots/graph.png)
 
-Theme skins — Oatis (the default: moss and ochre on near-black, mono UI, pixel icons), Anthropic, Telegram, GitHub and Material, each with light and dark modes:
-
-<table>
-  <tr>
-    <td><img src="docs/screenshots/theme-telegram.png" alt="Telegram skin, dark"></td>
-    <td><img src="docs/screenshots/theme-github.png" alt="GitHub skin, light"></td>
-    <td><img src="docs/screenshots/theme-material.png" alt="Material skin, light"></td>
-  </tr>
-</table>
+One theme, Oatis — moss and ochre on near-black, a mono UI, a book serif for notes and pixel icons — in light and dark modes.
 
 ## Stack
 

@@ -119,6 +119,11 @@ export function useCreateNote() {
   return useMutation({ mutationFn: notesApi.createNote, onSuccess: invalidate })
 }
 
+export function useOpenDailyNote() {
+  const invalidate = useInvalidateNotesAndTags()
+  return useMutation({ mutationFn: notesApi.openDailyNote, onSuccess: invalidate })
+}
+
 export function useUpdateNote(id: string) {
   const queryClient = useQueryClient()
   const invalidate = useInvalidateNotesAndTags()

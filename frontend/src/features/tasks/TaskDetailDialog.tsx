@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { FileText, Repeat, SkipForward, Trash2, X } from '@/design/icons'
+import { DateField, TimeField } from '@/design/components/DateTimeFields'
 import { Dialog } from '@/design/components/Dialog'
 import { Tooltip } from '@/design/components/Tooltip'
 import { ApiError } from '@/lib/api'
@@ -283,29 +284,27 @@ export function TaskDetailDialog({
             ))}
           </select>
 
-          <input
-            type="date"
-            aria-label="Due date"
+          <DateField
+            label="Due date"
             value={task.due_date ?? ''}
-            onChange={(e) =>
-              e.target.value
-                ? updateTask.mutate({ id: task.id, due_date: e.target.value })
+            onChange={(date) =>
+              date
+                ? updateTask.mutate({ id: task.id, due_date: date })
                 : updateTask.mutate({ id: task.id, clear_due_date: true })
             }
-            className={selectClass}
+            className="h-8"
           />
 
           {task.due_date && (
-            <input
-              type="time"
-              aria-label="Due time"
+            <TimeField
+              label="Due time"
               value={task.due_time?.slice(0, 5) ?? ''}
-              onChange={(e) =>
-                e.target.value
-                  ? updateTask.mutate({ id: task.id, due_time: `${e.target.value}:00` })
+              onChange={(time) =>
+                time
+                  ? updateTask.mutate({ id: task.id, due_time: `${time}:00` })
                   : updateTask.mutate({ id: task.id, clear_due_time: true })
               }
-              className={selectClass}
+              className="h-8"
             />
           )}
 

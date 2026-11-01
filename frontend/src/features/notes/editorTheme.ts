@@ -16,6 +16,8 @@ export const editorTheme = EditorView.theme({
     padding: '1rem 1.25rem',
     caretColor: 'var(--accent)',
     maxWidth: '72ch',
+    // Centered like the rendered note, so the text stays in place when switching modes.
+    margin: '0 auto',
   },
   '.cm-scroller': {
     lineHeight: '1.7',
@@ -34,6 +36,43 @@ export const editorTheme = EditorView.theme({
   },
   '.cm-placeholder': {
     color: 'var(--text-muted)',
+  },
+  // The [[link]] and #tag suggestions. CodeMirror's own tooltip is a light grey plate
+  // that kept the editor's (light, in dark mode) text color: white on near-white.
+  '.cm-tooltip': {
+    backgroundColor: 'var(--surface)',
+    color: 'var(--text)',
+    border: '1px solid var(--oatis-dim, var(--border))',
+    borderRadius: 'var(--radius-md)',
+    boxShadow: 'var(--shadow-popover)',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+    fontFamily: 'var(--font-ui)',
+    fontSize: 'var(--text-sm)',
+    maxHeight: '16rem',
+    padding: '2px 0',
+  },
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+    padding: '4px 10px',
+    lineHeight: '1.5',
+  },
+  // A dense list: the current suggestion gets the moss bar, like menus and the palette.
+  '.cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+    backgroundColor: 'var(--bg)',
+    color: 'var(--text)',
+    boxShadow: 'inset 2px 0 0 var(--accent)',
+  },
+  '.cm-completionMatchedText': {
+    textDecoration: 'none',
+    fontWeight: '600',
+  },
+  '.cm-completionDetail': {
+    color: 'var(--text-muted)',
+    fontStyle: 'normal',
+    marginLeft: '0.75em',
+  },
+  '.cm-completionIcon': {
+    display: 'none',
   },
 })
 

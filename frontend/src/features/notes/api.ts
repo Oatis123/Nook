@@ -30,6 +30,10 @@ export const listNotes = (
 export const createNote = (input: { title: string; folder_id?: string | null; content?: string }) =>
   apiFetch<NoteDetail>('/notes', { method: 'POST', body: input })
 
+/** Today's daily note (the user's timezone), created on first use — the one the
+ * Telegram bot's /daily writes to. */
+export const openDailyNote = () => apiFetch<NoteDetail>('/notes/daily', { method: 'POST' })
+
 export const getNote = (id: string) => apiFetch<NoteDetail>(`/notes/${id}`)
 
 export const updateNote = (

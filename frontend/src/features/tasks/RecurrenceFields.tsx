@@ -1,4 +1,5 @@
 import { clsx } from 'clsx'
+import { DateField } from '@/design/components/DateTimeFields'
 import type { RecurrenceFreq, RecurrenceInput } from '@/lib/types'
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -125,14 +126,12 @@ export function RecurrenceFields({
               onChange={() => onChange({ ...value, end_type: 'on_date' })}
             />
             On date
-            <input
-              type="date"
-              aria-label="End date"
+            <DateField
+              label="End date"
               value={value.end_date ?? ''}
-              onChange={(e) =>
-                onChange({ ...value, end_type: 'on_date', end_date: e.target.value })
-              }
-              className={selectClass}
+              clearable={false}
+              onChange={(date) => onChange({ ...value, end_type: 'on_date', end_date: date })}
+              className="h-8"
             />
           </label>
           <label className="flex items-center gap-2">

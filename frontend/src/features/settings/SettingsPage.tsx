@@ -4,7 +4,6 @@ import { Download, Plus, Upload } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
 import { Switch } from '@/design/components/Switch'
-import { ThemeSkinPicker } from '@/design/components/ThemeSkinPicker'
 import { ThemeToggle } from '@/design/components/ThemeToggle'
 import { ApiError } from '@/lib/api'
 import { errorMessage } from '@/lib/errors'
@@ -40,10 +39,6 @@ function AppearanceSection() {
     <section className="border-b border-border py-8 first:pt-0">
       <h2 className="mb-4 font-serif text-lg text-text">Appearance</h2>
       <div className="flex flex-col gap-5">
-        <div>
-          <p className="mb-2 text-sm text-text-muted">Theme</p>
-          <ThemeSkinPicker />
-        </div>
         <div>
           <p className="mb-2 text-sm text-text-muted">Mode</p>
           <ThemeToggle />

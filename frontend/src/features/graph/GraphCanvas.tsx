@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ForceGraph2D, { type NodeObject } from 'react-force-graph-2d'
-import { useResolvedTheme, useThemeStore } from '@/lib/theme'
+import { useResolvedTheme } from '@/lib/theme'
 import { useElementSize } from '@/lib/useElementSize'
 import { useCreateNote } from '@/features/notes/hooks'
 import { colorForKey } from '@/features/graph/colors'
@@ -38,7 +38,6 @@ export function GraphCanvas({
   const navigate = useNavigate()
   const createNote = useCreateNote()
   const theme = useResolvedTheme()
-  const skin = useThemeStore((s) => s.skin)
   const hoverNodeIdRef = useRef<string | null>(null)
   // react-force-graph auto-detects its canvas width from the nearest ancestor with a
   // definite width — inside a narrow flex/aside column (the local graph panel) that
@@ -49,13 +48,11 @@ export function GraphCanvas({
 
   const colors = useMemo(
     () => ({
-      muted: readCssVar('--text-muted', theme === 'dark' ? '#9c998f' : '#6b6860'),
-      accent: readCssVar('--accent', theme === 'dark' ? '#d9805a' : '#c2663f'),
-      border: readCssVar('--border', theme === 'dark' ? '#363430' : '#e5e2d9'),
+      muted: readCssVar('--text-muted', theme === 'dark' ? '#75746c' : '#6e6c63'),
+      accent: readCssVar('--accent', theme === 'dark' ? '#80856d' : '#5d644c'),
+      border: readCssVar('--border', theme === 'dark' ? '#20211c' : '#cfcbbe'),
     }),
-    // skin isn't read inside — it's listed because switching it changes the tokens.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [theme, skin],
+    [theme],
   )
 
   const adjacency = useMemo(() => {

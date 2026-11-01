@@ -18,7 +18,7 @@ import {
 import { useUIStore } from '@/lib/ui-store'
 import { fuzzyFilter } from '@/lib/fuzzy'
 import { useCurrentUser } from '@/features/auth/hooks'
-import { useCreateNote, useNotes } from '@/features/notes/hooks'
+import { useCreateNote, useNotes, useOpenDailyNote } from '@/features/notes/hooks'
 import { uniqueNoteTitle } from '@/features/notes/tree'
 import { useTasks } from '@/features/tasks/hooks'
 
@@ -37,6 +37,7 @@ export function CommandPalette() {
   const notesQuery = useNotes()
   const tasksQuery = useTasks({})
   const createNote = useCreateNote()
+  const openDaily = useOpenDailyNote()
   const { data: user } = useCurrentUser()
   const [query, setQuery] = useState('')
   const [lastQuery, setLastQuery] = useState('')
@@ -81,6 +82,12 @@ export function CommandPalette() {
 
   const commands: Entry[] = [
     { key: 'cmd-new-note', label: 'New note', icon: Plus, onSelect: createAndOpenNote },
+    {
+      key: 'cmd-daily',
+      label: "Open today's daily note",
+      icon: Calendar,
+      onSelect: () => openDaily.mutate(undefined, { onSuccess: (note) => go(`/notes/${note.id}`) }),
+    },
     { key: 'cmd-notes', label: 'Go to Notes', icon: FileText, onSelect: () => go('/notes') },
     { key: 'cmd-tasks', label: 'Go to Tasks', icon: ListTodo, onSelect: () => go('/tasks') },
     {

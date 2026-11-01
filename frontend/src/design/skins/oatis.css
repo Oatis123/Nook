@@ -71,6 +71,11 @@
   outline: 1px solid var(--accent);
   outline-offset: 2px;
 }
+/* The note editor's text area counts as focus-visible even after a click; its caret
+   already shows focus, and the outline drew two lines down the sides of the column. */
+:root[data-theme-skin='oatis'] .cm-content:focus-visible {
+  outline: none;
+}
 :root[data-theme-skin='oatis'] body {
   font-variant-numeric: tabular-nums;
   line-height: 1.6;
@@ -272,6 +277,16 @@
   caret-color: var(--accent);
 }
 :root[data-theme-skin='oatis'] :is(input, select, textarea).border:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+/* The date and time pickers' buttons read as the same kind of field. */
+:root[data-theme-skin='oatis'] .ui-field-trigger {
+  border-width: 0 0 1px;
+  border-color: var(--oatis-dim);
+  background: transparent;
+}
+:root[data-theme-skin='oatis'] .ui-field-trigger:is(:focus-visible, [data-state='open']) {
   border-color: var(--accent);
   outline: none;
 }

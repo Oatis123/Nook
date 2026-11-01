@@ -14,6 +14,7 @@ import {
 import { useNavigate, useParams } from 'react-router-dom'
 import { clsx } from 'clsx'
 import {
+  Calendar,
   ChevronRight,
   File,
   Folder as FolderIcon,
@@ -43,6 +44,7 @@ import {
   notesKey,
   useFolders,
   useNotes,
+  useOpenDailyNote,
   usePrefetchNote,
   useUpdateFolder,
   useUpdateNote,
@@ -199,6 +201,8 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
             </IconButton>
           </div>
         </div>
+
+        <DailyNoteRow activeNoteId={activeNoteId} />
 
         {ideasNote && (
           <IdeasNoteRow
@@ -637,6 +641,43 @@ const NoteRow = memo(function NoteRow({
 
 /** The Ideas note, pinned at the top: it can't be moved or deleted, only hidden (brought
  * back in Settings). */
+/** Opens today's daily note — the "Дневник" note the Telegram bot's /daily writes to —
+ * creating it (and the folder) on first use. */
+function DailyNoteRow({ activeNoteId }: { activeNoteId: string | undefined }) {
+  const navigate = useNavigate()
+  const openDaily = useOpenDailyNote()
+  const [todayNoteId, setTodayNoteId] = useState<string | null>(null)
+  const active = todayNoteId !== null && todayNoteId === activeNoteId
+
+  return (
+    <div
+      data-active={active || undefined}
+      className={clsx(
+        'ui-nav-item group relative flex items-center gap-1 rounded-md px-1 py-1 text-sm hover:bg-surface-raised',
+        active ? 'bg-surface-raised text-text' : 'text-text-muted',
+      )}
+      style={{ paddingLeft: 22 }}
+    >
+      <Calendar size={14} strokeWidth={1.5} className="shrink-0" />
+      <button
+        type="button"
+        disabled={openDaily.isPending}
+        onClick={() =>
+          openDaily.mutate(undefined, {
+            onSuccess: (note) => {
+              setTodayNoteId(note.id)
+              navigate(`/notes/${note.id}`)
+            },
+          })
+        }
+        className="row-link flex-1 truncate text-left"
+      >
+        Daily note
+      </button>
+    </div>
+  )
+}
+
 function IdeasNoteRow({
   note,
   active,

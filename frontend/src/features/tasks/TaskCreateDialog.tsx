@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
+import { DateField, TimeField } from '@/design/components/DateTimeFields'
 import { Dialog } from '@/design/components/Dialog'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
@@ -141,21 +142,9 @@ export function TaskCreateDialog({
             ))}
           </select>
 
-          <input
-            type="date"
-            aria-label="Due date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className={selectClass}
-          />
+          <DateField label="Due date" value={dueDate} onChange={setDueDate} className="h-9" />
 
-          <input
-            type="time"
-            aria-label="Due time"
-            value={dueTime}
-            onChange={(e) => setDueTime(e.target.value)}
-            className={selectClass}
-          />
+          <TimeField label="Due time" value={dueTime} onChange={setDueTime} className="h-9" />
 
           {taskListsQuery.data && taskListsQuery.data.length > 0 && (
             <select

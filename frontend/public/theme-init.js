@@ -9,22 +9,6 @@
   } catch (e) {
     /* localStorage unavailable (private mode, blocked storage) — fall back to system */
   }
-  try {
-    var skin = localStorage.getItem('nook-theme-skin')
-    // Oatis is the default skin (DEFAULT_SKIN in src/lib/theme.ts); Anthropic is the
-    // un-attributed base in design/tokens.css.
-    if (
-      skin !== 'anthropic' &&
-      skin !== 'telegram' &&
-      skin !== 'github' &&
-      skin !== 'material' &&
-      skin !== 'pixel'
-    ) {
-      skin = 'oatis'
-    }
-    if (skin !== 'anthropic') document.documentElement.setAttribute('data-theme-skin', skin)
-  } catch (e) {
-    /* localStorage unavailable — fall back to the default skin */
-    document.documentElement.setAttribute('data-theme-skin', 'oatis')
-  }
+  // The one visual theme (SKIN in src/lib/theme.ts).
+  document.documentElement.setAttribute('data-theme-skin', 'oatis')
 })()

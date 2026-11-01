@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
 from freezegun import freeze_time
+from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,7 +11,7 @@ from app.models.user import User
 from app.services import daily as daily_service
 from app.services import notes as notes_service
 from bot import handlers
-from tests.conftest import make_user
+from tests.conftest import csrf_token, login, make_user
 from tests.test_bot_new_task import NOW, _bot_uses_test_db, _chat, _tasks  # noqa: F401
 
 MORNING = datetime(2026, 10, 5, 9, 7, 30)
@@ -167,3 +168,22 @@ async def test_daily_uses_the_users_timezone(db_session: AsyncSession) -> None:
     await chat.command("daily", "Вечер")
 
     assert await _daily_notes(db_session) == {"2026-10-02": "**19:00**  \nВечер\n"}
+
+
+async def test_web_daily_button_opens_todays_note_in_the_users_timezone(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await client.get("/health")  # build the app's schemas before freezing time
+    user = await make_user(db_session, "alice")
+    user.timezone = "Asia/Novosibirsk"  # UTC+7: 20:00 UTC on the 5th is already the 6th
+    await db_session.commit()
+    with freeze_time("2026-10-05T20:00:00+00:00"):
+        await login(client, "alice")
+        headers = {"x-csrf-token": await csrf_token(client)}
+        first = await client.post("/api/v1/notes/daily", headers=headers)
+        again = await client.post("/api/v1/notes/daily", headers=headers)
+
+    assert first.status_code == 200, first.text
+    assert first.json()["title"] == "2026-10-06"
+    assert again.json()["id"] == first.json()["id"]
+    assert await _daily_notes(db_session) == {"2026-10-06": ""}

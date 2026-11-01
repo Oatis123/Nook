@@ -81,3 +81,12 @@ export function nowIn(timeZone?: string | null, now: Date = new Date()): Date {
     get('second'),
   )
 }
+
+const TYPED_TIME_RE = /^([01]?\d|2[0-3])[:.]?([0-5]\d)$/
+
+/** A typed time — "930", "9:30", "09.30" — as `HH:MM`; null if it isn't one. */
+export function parseTypedTime(text: string): string | null {
+  const match = TYPED_TIME_RE.exec(text.trim())
+  if (!match) return null
+  return `${match[1].padStart(2, '0')}:${match[2]}`
+}

@@ -6,9 +6,9 @@
    pins it. That keeps each skin to a single block instead of three near-identical
    copies (light / OS-dark media query / explicit dark).
 
-   Skin: the values below are the default Anthropic skin; design/skins/*.css override
-   tokens (colors, fonts, shapes, motion) and restyle widgets per skin. Components hang
-   those overrides off stable `ui-*` hook classes. */
+   Skin: the values below are the token contract with neutral fallbacks; the app's one
+   theme, design/skins/oatis.css, overrides them (colors, fonts, shapes, motion) and
+   restyles widgets through the stable `ui-*` hook classes. */
 
 :root {
   color-scheme: light dark;
@@ -21,7 +21,7 @@
 }
 
 :root {
-  /* Anthropic (default skin) */
+  /* Fallbacks — overridden by design/skins/oatis.css. */
   --bg: light-dark(#faf9f5, #1c1b19);
   --surface: light-dark(#f3f1ea, #252421);
   --surface-raised: light-dark(#ffffff, #2c2b28);

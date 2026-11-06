@@ -1,6 +1,6 @@
 # Decisions
 
-One line per decision left to the agent's discretion by TECH_SPEC.md, in the format:
+One line per decision left open during implementation, in the format:
 `YYYY-MM-DD — decision — reason`.
 
 - 2026-09-17 — Working name "Nook" is exposed as a single `APP_NAME` env var (see `.env.example`), read by frontend/backend/bot so it can be renamed without code changes — spec §0 requires this.

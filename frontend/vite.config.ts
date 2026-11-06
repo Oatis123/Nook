@@ -65,7 +65,7 @@ export default defineConfig({
   // The dev server pre-bundles dependencies without the plugins above; left out of that
   // bundle, the package is resolved through domFreeEntityDecoding like any other import.
   optimizeDeps: { exclude: ['decode-named-character-reference'] },
-  // Single source of truth for APP_NAME is the repo-root .env (see TECH_SPEC.md §0 / .env.example).
+  // Single source of truth for APP_NAME is the repo-root .env (see .env.example).
   envDir: path.resolve(rootDir, '..'),
   envPrefix: ['VITE_', 'APP_NAME'],
   resolve: {

@@ -1,4 +1,4 @@
-/* Design tokens — spec TECH_SPEC.md §10.3. See src/lib/theme.ts for how data-theme
+/* Design tokens. See src/lib/theme.ts for how data-theme
    (light/dark mode) and data-theme-skin (visual theme) are set on <html>.
 
    Mode: every color token is written as light-dark(<light>, <dark>), resolved against

@@ -1,8 +1,7 @@
 # Nook
 
 Self-hosted notes + tasks, with a Telegram bot for reminders and quick task capture.
-See [TECH_SPEC.md](TECH_SPEC.md) for the full specification and [docs/DECISIONS.md](docs/DECISIONS.md)
-for implementation decisions left to the agent's discretion by the spec.
+See [docs/DECISIONS.md](docs/DECISIONS.md) for implementation decisions left to the agent's discretion.
 
 "Nook" is a working name, configured via the single `APP_NAME` environment variable
 (see `.env.example`) so it can be renamed without touching code.

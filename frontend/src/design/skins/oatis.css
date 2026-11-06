@@ -285,14 +285,13 @@
 
 /* The note page: a fixed-width working column over the time-of-day scenery in the
    gutters (features/notes/NoteBackdrop). The scenes are decor zones only — the column
-   is opaque, so no text ever crosses the dither. Each gutter is capped at 22rem so an
-   ultrawide monitor gets plain bg beyond the scenery, not a full-page wallpaper. */
+   is opaque, so no text ever crosses the dither. The gutters run all the way to the
+   edge of an ultrawide monitor; the wider the gutter, the wider the scene composition
+   (features/notes/dayPhase.ts), so the moon and the skyline stay in frame. */
 .note-stage {
   position: relative;
   height: 100%;
   overflow: hidden;
-  /* Scenes need room to read as scenery; the query below hides them before the gutter
-     gets thinner than ~6rem. */
   container-type: inline-size;
 }
 .note-frame {
@@ -310,11 +309,27 @@
   inset: 0;
   pointer-events: none;
 }
-.note-scene {
+.note-gutter {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: clamp(0rem, calc(50% - 28rem), 22rem);
+  width: max(0rem, calc(50% - 28rem));
+  /* The scene copies below query this, not the whole page: the composition follows the
+     gutter's own width. */
+  container-type: inline-size;
+}
+/* One scene, mirrored: the busier side (the moon, the skyline) faces outwards, and the
+   quiet sky sits next to the column on both sides. */
+.note-gutter[data-side='left'] {
+  right: calc(50% + 28rem);
+  transform: scaleX(-1);
+}
+.note-gutter[data-side='right'] {
+  left: calc(50% + 28rem);
+}
+.note-scene {
+  position: absolute;
+  inset: 0;
   background-color: var(--bg);
   background-position: right bottom;
   background-repeat: no-repeat;
@@ -322,21 +337,25 @@
   image-rendering: pixelated;
   image-rendering: crisp-edges;
 }
-/* One scene, mirrored: the busier side (the moon, the skyline) faces outwards, and the
-   quiet sky sits next to the column on both sides. */
-.note-scene[data-side='left'] {
-  right: calc(50% + 28rem);
-  transform: scaleX(-1);
-}
-.note-scene[data-side='right'] {
-  left: calc(50% + 28rem);
+.note-scene--wide {
+  display: none;
 }
 /* Below this the column takes the whole page, so there is nothing to show — and no
    one-pixel scene slivers as it approaches full width. A gutter under ~6rem reads as a
    stripe, not as a scene. */
-@container (max-width: 67.999rem) {
+@container (max-width: 5.999rem) {
   .note-scene {
     display: none;
+  }
+}
+/* A wider gutter gets the 16:9 composition: the 9:16 one would have to zoom in so far
+   that most of the scene fell outside the crop. */
+@container (min-width: 28rem) {
+  .note-scene--tall {
+    display: none;
+  }
+  .note-scene--wide {
+    display: block;
   }
 }
 @container (min-width: 68rem) {

@@ -1,5 +1,24 @@
 import { useResolvedTheme } from '@/lib/theme'
-import { sceneFor, useDayPhase } from '@/features/notes/dayPhase'
+import { type NoteScene, sceneFor, useDayPhase } from '@/features/notes/dayPhase'
+
+/** One side of the page's scenery. Both compositions are mounted; a container query on
+ * the gutter shows the one that fits its width (see .note-gutter in
+ * design/skins/oatis.css), so resizing from a laptop to an ultrawide swaps composition
+ * without reloading anything. */
+function Gutter({ side, scene }: { side: 'left' | 'right'; scene: NoteScene }) {
+  return (
+    <div className="note-gutter" data-side={side}>
+      <div
+        className="note-scene note-scene--tall"
+        style={{ backgroundImage: `url(${scene.tall})` }}
+      />
+      <div
+        className="note-scene note-scene--wide"
+        style={{ backgroundImage: `url(${scene.wide})` }}
+      />
+    </div>
+  )
+}
 
 /** The note page's side scenery: one oatis scene, mirrored across the working column,
  * picked by the local time of day and drawn in the active theme. Purely decorative —
@@ -7,12 +26,12 @@ import { sceneFor, useDayPhase } from '@/features/notes/dayPhase'
 export function NoteBackdrop() {
   const phase = useDayPhase()
   const theme = useResolvedTheme()
-  const image = `url(${sceneFor(phase, theme)})`
+  const scene = sceneFor(phase, theme)
 
   return (
     <div aria-hidden className="note-backdrop" data-phase={phase}>
-      <div data-side="left" className="note-scene" style={{ backgroundImage: image }} />
-      <div data-side="right" className="note-scene" style={{ backgroundImage: image }} />
+      <Gutter side="left" scene={scene} />
+      <Gutter side="right" scene={scene} />
     </div>
   )
 }

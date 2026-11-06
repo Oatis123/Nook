@@ -3,7 +3,7 @@
 ;(function () {
   try {
     var pref = localStorage.getItem('nook-theme') || 'system'
-    if (pref === 'light' || pref === 'dark') {
+    if (pref === 'light' || pref === 'dark' || pref === 'cyber') {
       document.documentElement.setAttribute('data-theme', pref)
     }
   } catch (e) {

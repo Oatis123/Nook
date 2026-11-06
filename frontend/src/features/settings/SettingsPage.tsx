@@ -40,7 +40,7 @@ function AppearanceSection() {
       <h2 className="mb-4 font-serif text-lg text-text">Appearance</h2>
       <div className="flex flex-col gap-5">
         <div>
-          <p className="mb-2 text-sm text-text-muted">Mode</p>
+          <p className="mb-2 text-sm text-text-muted">Theme</p>
           <ThemeToggle />
         </div>
       </div>

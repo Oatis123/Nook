@@ -21,7 +21,7 @@
    think = "churn": the core boils (swirl speeds up, slows, reverses; bright clumps flare) while three small
            thought-clouds circle on a flat orbit and swell one after another like "…".
 
-   Options: size (grid px, default 96) · particles · state · theme ('auto'|'dark'|'light')
+   Options: size (grid px, default 96) · particles · state · theme ('auto'|'dark'|'light'|'cyber')
             · transparent (no bg, for OBS overlays) · interactive (cursor + poke, default true) · seed · ms (frame, 60)
    prefers-reduced-motion: renders one still frame of the state, no loop.
 */
@@ -29,7 +29,8 @@
   'use strict';
   var PAL = {
     dark: { bg: '#080806', h1: '#2A2D21', h2: '#3A3E30', m1: '#565C45', dm: '#393A34', mu: '#75746C', ms: '#80856D', oc: '#95876E', lt: '#B5B8A4', tx: '#DFDDD3' },
-    light: { bg: '#ECEAE2', h1: '#CDCDBB', h2: '#AFB39E', m1: '#7A806A', dm: '#AFAB9E', mu: '#6E6C63', ms: '#5D644C', oc: '#7E6F53', lt: '#4A4F3C', tx: '#1B1B17' }
+    light: { bg: '#ECEAE2', h1: '#CDCDBB', h2: '#AFB39E', m1: '#7A806A', dm: '#AFAB9E', mu: '#6E6C63', ms: '#5D644C', oc: '#7E6F53', lt: '#4A4F3C', tx: '#1B1B17' },
+    cyber: { bg: '#09080F', h1: '#141B3C', h2: '#1B2A57', m1: '#2B5A92', dm: '#3A3656', mu: '#7C7A9E', ms: '#22E1EE', oc: '#FF3355', lt: '#A8F5FA', tx: '#E8E6F5' }  // cyan body: the system color
   };
   var STATES = ['idle', 'talk', 'think', 'sleep', 'annoyed', 'happy', 'glitch'];
   var RGB = {};
@@ -38,7 +39,7 @@
   function themeName(o) {
     if (o.theme && o.theme !== 'auto') return o.theme;
     var t = document.documentElement.getAttribute('data-theme');
-    if (t) return t === 'light' ? 'light' : 'dark';
+    if (t) return t === 'light' ? 'light' : t === 'cyber' ? 'cyber' : 'dark';
     return root.matchMedia && root.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   }
   function flow(x, y, t) {

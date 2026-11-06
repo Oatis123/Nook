@@ -7,7 +7,8 @@
    copies (light / OS-dark media query / explicit dark).
 
    The values are the Oatis theme (the app's only one); design/skins/oatis.css restyles
-   widgets through the stable `ui-*` hook classes. */
+   widgets through the stable `ui-*` hook classes. Cyber is a third, dark-only mode of the
+   same system: `data-theme="cyber"` overrides the color tokens below, roles unchanged. */
 
 :root {
   color-scheme: light dark;
@@ -16,6 +17,9 @@
   color-scheme: light;
 }
 :root[data-theme='dark'] {
+  color-scheme: dark;
+}
+:root[data-theme='cyber'] {
   color-scheme: dark;
 }
 
@@ -124,6 +128,50 @@
 
   /* Check-mark glyph for CSS-drawn checkboxes (used as a mask, so it takes any color). */
   --mask-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+/* Cyber — "the same book, at night in a neon city" (oatis-style's cyber palette). The
+   two accents keep their jobs, only the hues change: moss = volt yellow (action,
+   selection), ochre = red (alerts, high priority). Cyan is the system color: it lives in
+   the bi ink (lists, graph nodes) and Vivi, never on buttons, links or headings. Dark-only:
+   color-scheme is pinned above, and every color token is overridden so no light-dark()
+   variant can leak through. */
+:root[data-theme='cyber'] {
+  --bg: #09080f;
+  --surface: #100e1a;
+  --surface-raised: #100e1a;
+  --border: #1e1b30;
+  --text: #e8e6f5;
+  --text-muted: #7c7a9e;
+  --accent: #fcee0a;
+  --accent-text: #09080f;
+  --danger: #ff3355;
+  --danger-text: #09080f;
+
+  --priority-low: var(--text-muted);
+  --priority-medium: var(--accent);
+  --priority-high: var(--danger);
+
+  --oatis-dim: #3a3656;
+
+  --ink-bi: #22e1ee;
+  --ink-bi-tint: #0c262e;
+  --ink-bi-mid: #16747e;
+  --ink-fn: #5c8dff;
+  --ink-fn-tint: #151b31;
+  --ink-fn-mid: #324a87;
+  --ink-type: #ff9e3d;
+  --ink-type-tint: #2b1d15;
+  --ink-type-mid: #845326;
+  --ink-prop: #ff5cc8;
+  --ink-prop-tint: #2b1429;
+  --ink-prop-mid: #84326c;
+  --ink-kw: #a878ff;
+  --ink-kw-tint: #1f1831;
+  --ink-kw-mid: #584087;
+
+  --oatis-prose: #d3d1e6;
+  --overlay: rgb(9 8 15 / 0.72);
 }
 
 @media (prefers-reduced-motion: reduce) {

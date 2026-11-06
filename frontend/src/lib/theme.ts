@@ -2,19 +2,23 @@ import { type MouseEvent, useSyncExternalStore } from 'react'
 import { flushSync } from 'react-dom'
 import { create } from 'zustand'
 
-export type ThemePreference = 'light' | 'dark' | 'system'
+export type ThemePreference = 'light' | 'dark' | 'cyber' | 'system'
+/** The theme actually in effect; `system` resolves to the OS's light or dark. */
+export type ResolvedTheme = Exclude<ThemePreference, 'system'>
 
 const MODE_STORAGE_KEY = 'nook-theme'
 
-/** Nook has one visual theme, the Oatis skin (design/skins/oatis.css), in light and dark.
- * Its styles hang off `data-theme-skin="oatis"` on <html>, set here and, before first
- * paint, by public/theme-init.js. */
+/** Nook has one visual theme, the Oatis skin (design/skins/oatis.css), in light, dark and
+ * cyber. Its styles hang off `data-theme-skin="oatis"` on <html>, set here and, before
+ * first paint, by public/theme-init.js. Cyber is dark-only. */
 const SKIN = 'oatis'
 
 function readStoredPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(MODE_STORAGE_KEY)
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+    if (stored === 'light' || stored === 'dark' || stored === 'cyber' || stored === 'system') {
+      return stored
+    }
   } catch {
     /* localStorage unavailable — fall back to system */
   }
@@ -111,15 +115,15 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 applyPreferenceToDocument(useThemeStore.getState().preference)
 document.documentElement.setAttribute('data-theme-skin', SKIN)
 
-function resolveTheme(preference: ThemePreference): 'light' | 'dark' {
+function resolveTheme(preference: ThemePreference): ResolvedTheme {
   if (preference !== 'system') return preference
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 /** The theme actually in effect right now ('system' resolved via the OS setting) —
- * for code that needs a concrete light/dark choice, like picking a syntax highlighting
- * theme, rather than the CSS-variable cascade the rest of the UI relies on. */
-export function useResolvedTheme(): 'light' | 'dark' {
+ * for code that needs a concrete light/dark/cyber choice, like picking a syntax
+ * highlighting theme, rather than the CSS-variable cascade the rest of the UI relies on. */
+export function useResolvedTheme(): ResolvedTheme {
   const preference = useThemeStore((s) => s.preference)
   const media = window.matchMedia('(prefers-color-scheme: dark)')
   return useSyncExternalStore(

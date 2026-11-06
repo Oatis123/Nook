@@ -32,7 +32,7 @@ The note graph, colored by folder (dark mode):
 
 ![Note graph](docs/screenshots/graph.png)
 
-One theme, Oatis — moss and ochre on near-black, a mono UI, a book serif for notes and pixel icons — in light and dark modes.
+One theme, Oatis — moss and ochre on near-black, a mono UI, a book serif for notes and pixel icons — in light, dark and cyber modes.
 
 ## Stack
 

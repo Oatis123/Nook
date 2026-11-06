@@ -82,6 +82,27 @@
   text-underline-offset: 3px;
 }
 
+/* Cyber's one extra shape: the primary action gets a 3px stepped corner cut at the
+   bottom-right, like a pixel chamfer. Everything else stays a plain rectangle. The clip
+   also cuts the outside focus ring, so cyber draws that one inside the button. */
+:root[data-theme-skin='oatis'][data-theme='cyber'] .ui-button[data-variant='primary'] {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 6px),
+    calc(100% - 3px) calc(100% - 6px),
+    calc(100% - 3px) calc(100% - 3px),
+    calc(100% - 6px) calc(100% - 3px),
+    calc(100% - 6px) 100%,
+    0 100%
+  );
+}
+:root[data-theme-skin='oatis'][data-theme='cyber']
+  .ui-button[data-variant='primary']:focus-visible {
+  outline: 1px solid var(--accent-text);
+  outline-offset: -3px;
+}
+
 :root[data-theme-skin='oatis'] .ui-icon-button:hover,
 :root[data-theme-skin='oatis'] .ui-dialog-close:hover {
   background: transparent;

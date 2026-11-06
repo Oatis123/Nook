@@ -1,10 +1,11 @@
-import { Monitor, Moon, Sun } from '@/design/icons'
+import { Monitor, Moon, Sparkles, Sun } from '@/design/icons'
 import { clsx } from 'clsx'
 import { type ThemePreference, transitionOriginFromEvent, useThemeStore } from '@/lib/theme'
 
 const OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
   { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
+  { value: 'cyber', label: 'Cyber (dark only)', icon: Sparkles },
   { value: 'system', label: 'System', icon: Monitor },
 ]
 

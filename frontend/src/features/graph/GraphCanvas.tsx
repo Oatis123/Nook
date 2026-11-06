@@ -46,18 +46,41 @@ export function GraphCanvas({
   // fixes it regardless of the surrounding layout.
   const [containerRef, containerSize] = useElementSize<HTMLDivElement>()
 
-  const colors = useMemo(
-    () => ({
-      muted: readCssVar('--text-muted', theme === 'dark' ? '#75746c' : '#6e6c63'),
-      text: readCssVar('--text', theme === 'dark' ? '#dfddd3' : '#1b1b17'),
-      accent: readCssVar('--accent', theme === 'dark' ? '#80856d' : '#5d644c'),
-      border: readCssVar('--border', theme === 'dark' ? '#20211c' : '#cfcbbe'),
+  const colors = useMemo(() => {
+    const fallback =
+      theme === 'cyber'
+        ? {
+            muted: '#7c7a9e',
+            text: '#e8e6f5',
+            accent: '#fcee0a',
+            border: '#1e1b30',
+            ink: '#22e1ee',
+          }
+        : theme === 'dark'
+          ? {
+              muted: '#75746c',
+              text: '#dfddd3',
+              accent: '#80856d',
+              border: '#20211c',
+              ink: '#80856d',
+            }
+          : {
+              muted: '#6e6c63',
+              text: '#1b1b17',
+              accent: '#5d644c',
+              border: '#cfcbbe',
+              ink: '#5d644c',
+            }
+    return {
+      muted: readCssVar('--text-muted', fallback.muted),
+      text: readCssVar('--text', fallback.text),
+      accent: readCssVar('--accent', fallback.accent),
+      border: readCssVar('--border', fallback.border),
       inks: Object.fromEntries(
-        INKS.map((ink) => [ink, readCssVar(`--ink-${ink}`, '#80856d')]),
+        INKS.map((ink) => [ink, readCssVar(`--ink-${ink}`, fallback.ink)]),
       ) as Record<Ink, string>,
-    }),
-    [theme],
-  )
+    }
+  }, [theme])
 
   const adjacency = useMemo(() => {
     const map = new Map<string, Set<string>>()

@@ -95,12 +95,20 @@ class LruCache<V> {
 const highlightCaches = {
   light: new LruCache<HastRoot>(300),
   dark: new LruCache<HastRoot>(300),
+  cyber: new LruCache<HastRoot>(300),
 }
+
+/** Shiki theme per resolved app theme. */
+const shikiThemes = {
+  light: 'moss-bookish-light',
+  dark: 'moss-bookish-dark',
+  cyber: 'moss-bookish-cyber',
+} as const
 
 /** What a render depends on besides the text: plain data, so it can be posted to the
  * worker (the lookup indexes are rebuilt from it there). */
 export interface PreviewContext {
-  theme: 'light' | 'dark'
+  theme: 'light' | 'dark' | 'cyber'
   notes: NoteLinkTarget[]
   folders: Pick<Folder, 'id' | 'name'>[]
   attachments: Pick<Attachment, 'id' | 'filename' | 'mime'>[]
@@ -292,7 +300,7 @@ function buildProcessor(
               rehypeShikiFromHighlighter,
               highlighter,
               {
-                theme: context.theme === 'dark' ? 'moss-bookish-dark' : 'moss-bookish-light',
+                theme: shikiThemes[context.theme],
                 fallbackLanguage: 'text',
                 cache: highlightCaches[context.theme],
               },

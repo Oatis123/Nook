@@ -21,6 +21,14 @@ describe('theme store', () => {
     expect(localStorage.getItem('nook-theme')).toBe('dark')
   })
 
+  it('sets the dark-only cyber theme and persists it', () => {
+    useThemeStore.getState().setPreference('cyber')
+
+    expect(useThemeStore.getState().preference).toBe('cyber')
+    expect(document.documentElement.getAttribute('data-theme')).toBe('cyber')
+    expect(localStorage.getItem('nook-theme')).toBe('cyber')
+  })
+
   it('removes data-theme when switching back to system', () => {
     useThemeStore.getState().setPreference('light')
     useThemeStore.getState().setPreference('system')

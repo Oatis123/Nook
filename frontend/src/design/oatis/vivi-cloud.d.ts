@@ -15,7 +15,7 @@ export interface ViviCloudApi {
     options?: {
       size?: number
       state?: ViviState
-      theme?: 'auto' | 'dark' | 'light'
+      theme?: 'auto' | 'dark' | 'light' | 'cyber'
       transparent?: boolean
       interactive?: boolean
       seed?: number

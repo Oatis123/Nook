@@ -103,6 +103,7 @@ export function getHighlighter(): Promise<HighlighterCore> {
     themes: [
       import('./shikiThemes/moss-bookish-light.json').then((m) => m.default as ThemeRegistration),
       import('./shikiThemes/moss-bookish-dark.json').then((m) => m.default as ThemeRegistration),
+      import('./shikiThemes/moss-bookish-cyber.json').then((m) => m.default as ThemeRegistration),
     ],
     langs: [],
     engine: createOnigurumaEngine(import('shiki/wasm')),

@@ -1,7 +1,16 @@
 import { useEffect, useState } from 'react'
+import { useResolvedTheme } from '@/lib/theme'
+
+/** The QR keeps a light plate so it stays scannable; only its ink follows the theme. */
+const QR_COLORS = {
+  light: { dark: '#080806', light: '#eceae2' },
+  dark: { dark: '#080806', light: '#eceae2' },
+  cyber: { dark: '#09080f', light: '#e8e6f5' },
+} as const
 
 export function QrCode({ value, size = 200 }: { value: string; size?: number }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
+  const theme = useResolvedTheme()
 
   useEffect(() => {
     let cancelled = false
@@ -11,7 +20,7 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
         QRCode.toDataURL(value, {
           width: size,
           margin: 1,
-          color: { dark: '#080806', light: '#eceae2' },
+          color: QR_COLORS[theme],
         }),
       )
       .then((url) => {
@@ -23,7 +32,7 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
     return () => {
       cancelled = true
     }
-  }, [value, size])
+  }, [value, size, theme])
 
   if (!dataUrl) {
     return (

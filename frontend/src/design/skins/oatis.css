@@ -283,6 +283,68 @@
   font-style: normal;
 }
 
+/* The note page: a fixed-width working column over the time-of-day scenery in the
+   gutters (features/notes/NoteBackdrop). The scenes are decor zones only — the column
+   is opaque, so no text ever crosses the dither. Each gutter is capped at 22rem so an
+   ultrawide monitor gets plain bg beyond the scenery, not a full-page wallpaper. */
+.note-stage {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  /* Scenes need room to read as scenery; the query below hides them before the gutter
+     gets thinner than ~6rem. */
+  container-type: inline-size;
+}
+.note-frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 56rem);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--bg);
+}
+.note-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.note-scene {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(0rem, calc(50% - 28rem), 22rem);
+  background-color: var(--bg);
+  background-position: right bottom;
+  background-repeat: no-repeat;
+  background-size: cover;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+/* One scene, mirrored: the busier side (the moon, the skyline) faces outwards, and the
+   quiet sky sits next to the column on both sides. */
+.note-scene[data-side='left'] {
+  right: calc(50% + 28rem);
+  transform: scaleX(-1);
+}
+.note-scene[data-side='right'] {
+  left: calc(50% + 28rem);
+}
+/* Below this the column takes the whole page, so there is nothing to show — and no
+   one-pixel scene slivers as it approaches full width. A gutter under ~6rem reads as a
+   stripe, not as a scene. */
+@container (max-width: 67.999rem) {
+  .note-scene {
+    display: none;
+  }
+}
+@container (min-width: 68rem) {
+  .note-frame {
+    border-inline: 1px solid var(--border);
+  }
+}
+
 /* Done items recede to `dim`, struck through. */
 :root[data-theme-skin='oatis'] .line-through.text-text-muted {
   color: var(--oatis-dim);

@@ -27,6 +27,7 @@ import { RenameLinksDialog } from '@/features/notes/RenameLinksDialog'
 import { useUploadAttachment } from '@/features/attachments/hooks'
 import { QueryState } from '@/design/components/QueryState'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
+import { NoteBackdrop } from '@/features/notes/NoteBackdrop'
 
 // Module-level so its identity is stable: @uiw/react-codemirror reconfigures the whole
 // editor whenever this prop (or `extensions`) changes identity, and an inline object
@@ -182,121 +183,124 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   if (noteQuery.isLoading || !draft || !editorContent) return null
 
   return (
-    <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
-        <div className="min-w-0 flex-1">
-          <input
-            value={draft.title}
-            maxLength={255}
-            onChange={(e) => autosave.setTitle(e.target.value)}
-            onBlur={handleTitleBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-            }}
-            className="w-full truncate bg-transparent font-serif text-xl text-text outline-none"
-            aria-label="Note title"
-            aria-invalid={autosave.titleError ? true : undefined}
-            aria-describedby={autosave.titleError ? 'note-title-error' : undefined}
-          />
-          {autosave.titleError && (
-            <p id="note-title-error" role="alert" className="mt-0.5 text-xs text-danger">
-              {autosave.titleError}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <SaveIndicator status={status} />
-          <Tooltip label="Attach a file">
-            <IconButton label="Attach a file" onClick={() => fileInputRef.current?.click()}>
-              <Paperclip size={16} strokeWidth={1.5} />
-            </IconButton>
-          </Tooltip>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            aria-label="Attach a file"
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? [])
-              if (files.length > 0 && viewRef.current) {
-                uploadAndInsert(files, 'cursor', viewRef.current)
-              }
-              e.target.value = ''
-            }}
-          />
-          <Tooltip label="Export as .md">
-            <a
-              href={noteExportUrl(noteId)}
-              download
-              aria-label="Export as .md"
-              title="Export as .md"
-              className="inline-flex h-9 w-9 items-center justify-center text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text"
-            >
-              <Download size={16} strokeWidth={1.5} />
-            </a>
-          </Tooltip>
-          <ModeSwitch mode={mode} onChange={switchMode} />
-        </div>
-      </header>
-
-      {autosave.fatalError && (
-        <p
-          role="alert"
-          className="border-b border-border bg-danger/10 px-6 py-2 text-sm text-danger"
-        >
-          {autosave.fatalError}
-        </p>
-      )}
-
-      <div className="flex min-h-0 flex-1">
-        {/* Hidden, not unmounted, while reading: the editor holds the text, its undo
-            history and cursor — and a checklist box ticked while reading is typed into it. */}
-        <div className={clsx('min-w-0 flex-1 overflow-y-auto', mode === 'view' && 'hidden')}>
-          <NoteCodeMirror
-            content={editorContent}
-            onChange={autosave.setContent}
-            extensions={editorExtensions}
-            viewRef={viewRef}
-          />
-        </div>
-
-        {/* Padded like the editor's text, so switching modes doesn't shift it. contain: it
-            scrolls and clips already, and its layout stays its own. */}
-        {previewMounted && (
-          <div
-            className={clsx(
-              'min-w-0 flex-1 cursor-text overflow-y-auto px-5 py-4 [contain:layout_paint_style]',
-              mode === 'edit' && 'hidden',
-            )}
-          >
-            {draft.content.trim() ? (
-              <MarkdownPreview
-                content={draft.content}
-                onToggleTask={toggleTask}
-                onEditAt={editAt}
-              />
-            ) : (
-              <p className="text-sm text-text-muted">This note is empty.</p>
+    <div className="note-stage">
+      <NoteBackdrop />
+      <div className="note-frame">
+        <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
+          <div className="min-w-0 flex-1">
+            <input
+              value={draft.title}
+              maxLength={255}
+              onChange={(e) => autosave.setTitle(e.target.value)}
+              onBlur={handleTitleBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+              }}
+              className="w-full truncate bg-transparent font-serif text-xl text-text outline-none"
+              aria-label="Note title"
+              aria-invalid={autosave.titleError ? true : undefined}
+              aria-describedby={autosave.titleError ? 'note-title-error' : undefined}
+            />
+            {autosave.titleError && (
+              <p id="note-title-error" role="alert" className="mt-0.5 text-xs text-danger">
+                {autosave.titleError}
+              </p>
             )}
           </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <SaveIndicator status={status} />
+            <Tooltip label="Attach a file">
+              <IconButton label="Attach a file" onClick={() => fileInputRef.current?.click()}>
+                <Paperclip size={16} strokeWidth={1.5} />
+              </IconButton>
+            </Tooltip>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              aria-label="Attach a file"
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? [])
+                if (files.length > 0 && viewRef.current) {
+                  uploadAndInsert(files, 'cursor', viewRef.current)
+                }
+                e.target.value = ''
+              }}
+            />
+            <Tooltip label="Export as .md">
+              <a
+                href={noteExportUrl(noteId)}
+                download
+                aria-label="Export as .md"
+                title="Export as .md"
+                className="inline-flex h-9 w-9 items-center justify-center text-text-muted transition-colors duration-150 hover:bg-surface hover:text-text"
+              >
+                <Download size={16} strokeWidth={1.5} />
+              </a>
+            </Tooltip>
+            <ModeSwitch mode={mode} onChange={switchMode} />
+          </div>
+        </header>
+
+        {autosave.fatalError && (
+          <p
+            role="alert"
+            className="border-b border-border bg-danger/10 px-6 py-2 text-sm text-danger"
+          >
+            {autosave.fatalError}
+          </p>
         )}
+
+        <div className="flex min-h-0 flex-1">
+          {/* Hidden, not unmounted, while reading: the editor holds the text, its undo
+            history and cursor — and a checklist box ticked while reading is typed into it. */}
+          <div className={clsx('min-w-0 flex-1 overflow-y-auto', mode === 'view' && 'hidden')}>
+            <NoteCodeMirror
+              content={editorContent}
+              onChange={autosave.setContent}
+              extensions={editorExtensions}
+              viewRef={viewRef}
+            />
+          </div>
+
+          {/* Padded like the editor's text, so switching modes doesn't shift it. contain: it
+            scrolls and clips already, and its layout stays its own. */}
+          {previewMounted && (
+            <div
+              className={clsx(
+                'min-w-0 flex-1 cursor-text overflow-y-auto px-5 py-4 [contain:layout_paint_style]',
+                mode === 'edit' && 'hidden',
+              )}
+            >
+              {draft.content.trim() ? (
+                <MarkdownPreview
+                  content={draft.content}
+                  onToggleTask={toggleTask}
+                  onEditAt={editAt}
+                />
+              ) : (
+                <p className="text-sm text-text-muted">This note is empty.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <ConflictDialog
+          open={autosave.conflict !== null}
+          myContent={draft.content}
+          serverContent={autosave.conflict?.content ?? ''}
+          onKeepMine={autosave.keepMine}
+          onLoadServer={autosave.loadServer}
+        />
+
+        <RenameLinksDialog
+          open={renamePrompt !== null}
+          affectedNotes={renamePrompt?.affectedNotes ?? 0}
+          onUpdateLinks={() => resolveRenamePrompt(true)}
+          onSkip={() => resolveRenamePrompt(false)}
+        />
       </div>
-
-      <ConflictDialog
-        open={autosave.conflict !== null}
-        myContent={draft.content}
-        serverContent={autosave.conflict?.content ?? ''}
-        onKeepMine={autosave.keepMine}
-        onLoadServer={autosave.loadServer}
-      />
-
-      <RenameLinksDialog
-        open={renamePrompt !== null}
-        affectedNotes={renamePrompt?.affectedNotes ?? 0}
-        onUpdateLinks={() => resolveRenamePrompt(true)}
-        onSkip={() => resolveRenamePrompt(false)}
-      />
     </div>
   )
 }

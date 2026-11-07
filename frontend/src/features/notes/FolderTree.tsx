@@ -102,6 +102,26 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
     [folders, notes],
   )
 
+  // Opening a note inside a collapsed folder (the daily note, a link, search) expands the
+  // folders down to it, so the open note is always visible in the tree. Adjusted during
+  // render, once per note, so collapsing the folder afterwards still works.
+  const activeFolderId = notes.find((n) => n.id === activeNoteId)?.folder_id ?? null
+  const revealKey = `${activeNoteId}:${activeFolderId}`
+  const [revealed, setRevealed] = useState<string | null>(null)
+  if (activeFolderId && revealed !== revealKey) {
+    setRevealed(revealKey)
+    const parentOf = new Map(folders.map((f) => [f.id, f.parent_id]))
+    const chain: string[] = []
+    for (
+      let id: string | null = activeFolderId;
+      id && !chain.includes(id);
+      id = parentOf.get(id) ?? null
+    ) {
+      chain.push(id)
+    }
+    if (chain.some((id) => !expanded.has(id))) setExpanded(new Set([...expanded, ...chain]))
+  }
+
   const toggle = useCallback((id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)

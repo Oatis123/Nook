@@ -42,7 +42,7 @@ async def test_entries_go_to_the_days_note_in_the_daily_folder(db_session: Async
     assert note.folder_id == folders[0].id
     assert await _daily_notes(db_session) == {
         "2026-10-05": "**09:07**  \nПроснулся\n\n**21:40**  \nВечер  \nв две строки\n",
-        "2026-10-06": "**08:00**  \nНовый день\n",
+        "2026-10-06": "← [[2026-10-05]]\n\n**08:00**  \nНовый день\n",
     }
 
 
@@ -187,3 +187,16 @@ async def test_web_daily_button_opens_todays_note_in_the_users_timezone(
     assert first.json()["title"] == "2026-10-06"
     assert again.json()["id"] == first.json()["id"]
     assert await _daily_notes(db_session) == {"2026-10-06": ""}
+
+
+async def test_a_new_days_note_links_to_the_previous_day(db_session: AsyncSession) -> None:
+    user = await make_user(db_session, "alice")
+    first = await daily_service.get_or_create_daily_note(db_session, user.id, date(2026, 10, 3))
+    # A note in the folder that isn't a day doesn't count, nor does a later day.
+    await notes_service.create_note(db_session, user.id, "Планы", first.folder_id, "")
+    await daily_service.get_or_create_daily_note(db_session, user.id, date(2026, 10, 9))
+
+    note = await daily_service.get_or_create_daily_note(db_session, user.id, date(2026, 10, 6))
+
+    assert first.content == ""
+    assert note.content == "← [[2026-10-03]]\n"

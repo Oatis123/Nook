@@ -1,8 +1,10 @@
 """Daily notes: one Markdown note per day, titled with its date ("2026-10-27") in a "Дневник"
 folder, that the Telegram bot appends the day's entries to, each under its time. Both the
 folder and the day's note are created with the first entry; they're ordinary notes, so they
-can be edited, moved or deleted like any other (the next entry just makes new ones)."""
+can be edited, moved or deleted like any other (the next entry just makes new ones). A new
+day's note starts with a link to the previous day's."""
 
+import re
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
@@ -19,6 +21,7 @@ from app.services import notes as notes_service
 from app.services.ideas import APPEND_ATTEMPTS, hard_breaks
 
 DAILY_FOLDER_NAME = "Дневник"
+_DATE_TITLE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def daily_title(day: date) -> str:
@@ -55,6 +58,29 @@ async def _get_note(
     )
 
 
+def previous_link(title: str) -> str:
+    """The line a day's note starts with, linking it to the day before it that has a note,
+    so the days form a chain in backlinks and the graph."""
+    return f"← [[{title}]]"
+
+
+async def _previous_day_title(
+    session: AsyncSession, user_id: uuid.UUID, folder_id: uuid.UUID, day: date
+) -> str | None:
+    """The latest day before `day` with a note in the folder. ISO dates sort as text, so
+    the newest such title wins; notes there that aren't titled with a date are skipped."""
+    titles = await session.scalars(
+        select(Note.title).where(
+            Note.user_id == user_id,
+            Note.folder_id == folder_id,
+            Note.title < daily_title(day),
+            Note.deleted_at.is_(None),
+        )
+    )
+    days = [t for t in titles if _DATE_TITLE.fullmatch(t)]
+    return max(days, default=None)
+
+
 async def get_daily_note(session: AsyncSession, user_id: uuid.UUID, day: date) -> Note | None:
     folder = await session.scalar(
         select(Folder.id).where(
@@ -75,8 +101,10 @@ async def get_or_create_daily_note(session: AsyncSession, user_id: uuid.UUID, da
     note = await _get_note(session, user_id, folder.id, title)
     if note is not None:
         return note
+    previous = await _previous_day_title(session, user_id, folder.id, day)
+    content = f"{previous_link(previous)}\n" if previous else ""
     try:
-        return await notes_service.create_note(session, user_id, title, folder.id, "")
+        return await notes_service.create_note(session, user_id, title, folder.id, content)
     except CodedHTTPException as exc:
         # Another request created the day's note first: use that one.
         if exc.code != "duplicate_title":

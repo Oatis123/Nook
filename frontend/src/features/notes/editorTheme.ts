@@ -9,7 +9,8 @@ export const editorTheme = EditorView.theme({
     backgroundColor: 'var(--bg)',
     color: 'var(--text)',
     height: '100%',
-    fontSize: '14px',
+    // 14px -> 15.4px: 10% larger, matching the note preview's default size bump.
+    fontSize: '15.4px',
   },
   '.cm-content': {
     fontFamily: 'var(--font-mono)',

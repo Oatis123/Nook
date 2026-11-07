@@ -244,7 +244,8 @@
 /* Notes: the serif is the voice. Headings are Commissioner Bold, prose is Literata. */
 :root[data-theme-skin='oatis'] .markdown-preview {
   font-family: var(--font-prose);
-  font-size: 15px;
+  /* 15px -> 16.5px: the default note size is 10% larger than the original skin. */
+  font-size: 16.5px;
   line-height: 1.75;
   color: var(--oatis-prose);
 }

@@ -196,7 +196,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
-              className="w-full truncate bg-transparent font-serif text-xl text-text outline-none"
+              className="w-full truncate bg-transparent font-serif text-[1.375rem] text-text outline-none"
               aria-label="Note title"
               aria-invalid={autosave.titleError ? true : undefined}
               aria-describedby={autosave.titleError ? 'note-title-error' : undefined}

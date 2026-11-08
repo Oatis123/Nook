@@ -86,9 +86,9 @@ export function ReminderFields({
                   aria-pressed={on}
                   onClick={() => toggle(offset)}
                   className={clsx(
-                    'h-7 border px-2.5 text-xs transition-colors duration-150',
+                    'h-7 rounded-full border px-2.5 text-xs transition-colors duration-150',
                     on
-                      ? 'border-accent bg-accent/15 text-text'
+                      ? 'border-transparent bg-(--accent-wash) text-accent'
                       : 'border-border text-text-muted hover:text-text',
                   )}
                 >

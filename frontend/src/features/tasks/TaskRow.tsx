@@ -45,7 +45,7 @@ export const TaskRow = memo(function TaskRow({
   }
 
   return (
-    <div className="group relative flex items-start gap-2.5 px-2 py-1.5 hover:bg-surface-raised">
+    <div className="ui-task-row group relative flex items-start gap-2.5 px-3 py-2 hover:bg-surface-raised">
       <button
         type="button"
         onClick={handleToggle}

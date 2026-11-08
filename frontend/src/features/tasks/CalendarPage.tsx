@@ -82,13 +82,13 @@ function EntryChip({
         onOpen()
       }}
       className={clsx(
-        'flex w-full items-center gap-1.5 truncate px-1 py-0.5 text-left text-xs text-text hover:brightness-110',
+        'flex w-full items-center gap-1.5 truncate rounded-sm px-1.5 py-0.5 text-left text-xs text-text hover:brightness-110',
         entry.virtual && 'border border-dashed border-(--oatis-dim) text-text-muted',
       )}
       style={!entry.virtual && listColor ? { backgroundColor: listTintVar(listColor) } : undefined}
     >
       <span
-        className="h-1.5 w-1.5 shrink-0"
+        className="h-1.5 w-1.5 shrink-0 rounded-full"
         style={{ backgroundColor: high ? 'var(--danger)' : ink }}
       />
       {entry.virtual && <Repeat size={9} className="shrink-0" />}
@@ -171,18 +171,15 @@ export default function CalendarPage() {
             icon={<ChevronRight size={16} strokeWidth={1.5} />}
             label="Next"
           />
-          <div className="inline-flex border border-border bg-bg p-0.5 text-sm">
+          <div className="ui-segmented inline-flex gap-0.5 text-sm">
             {(['month', 'week'] as const).map((mode) => (
               <button
                 key={mode}
                 type="button"
                 onClick={() => setViewMode(mode)}
-                className={clsx(
-                  'px-2.5 py-1 capitalize transition-colors duration-150',
-                  viewMode === mode
-                    ? 'bg-surface-raised text-text'
-                    : 'text-text-muted hover:text-text',
-                )}
+                aria-pressed={viewMode === mode}
+                data-active={viewMode === mode}
+                className="ui-segment px-2.5 py-1 capitalize text-text-muted hover:text-text"
               >
                 {mode}
               </button>
@@ -227,7 +224,7 @@ export default function CalendarPage() {
         })}
       </div>
 
-      <div className="hidden min-h-0 flex-1 grid-cols-7 gap-px overflow-hidden border border-border bg-border md:grid">
+      <div className="hidden min-h-0 flex-1 grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border md:grid">
         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label) => (
           <div key={label} className="bg-surface px-2 py-1 text-center text-xs text-text-muted">
             {label}
@@ -255,7 +252,7 @@ export default function CalendarPage() {
             >
               <span
                 className={clsx(
-                  'self-start px-1.5 text-xs',
+                  'self-start rounded-full px-1.5 text-xs',
                   format(day, 'yyyy-MM-dd') === today
                     ? 'bg-accent text-accent-text'
                     : 'text-text-muted',

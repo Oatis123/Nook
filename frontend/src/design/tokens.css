@@ -1,67 +1,55 @@
-/* Design tokens. See src/lib/theme.ts for how data-theme
-   (light/dark mode) and data-theme-skin (visual theme) are set on <html>.
-
-   Mode: every color token is written as light-dark(<light>, <dark>), resolved against
-   the root's color-scheme — "system" (no data-theme) follows the OS, an explicit choice
-   pins it. That keeps each skin to a single block instead of three near-identical
-   copies (light / OS-dark media query / explicit dark).
-
-   The values are the Oatis theme (the app's only one); design/skins/oatis.css restyles
-   widgets through the stable `ui-*` hook classes. Cyber is a third, dark-only mode of the
-   same system: `data-theme="cyber"` overrides the color tokens below, roles unchanged. */
-
+/* Oatis v2.1 palette and category inks from oatis-style/assets/tokens.json.
+   System mode resolves light-dark() against the OS color scheme. */
 :root {
   color-scheme: light dark;
 }
 :root[data-theme='light'] {
   color-scheme: light;
 }
-:root[data-theme='dark'] {
-  color-scheme: dark;
-}
-:root[data-theme='cyber'] {
+:root:is([data-theme='dark'], [data-theme='cyber']) {
   color-scheme: dark;
 }
 
 :root {
-  /* Oatis — "moss / bookish" (the oatis-style palette). Moss = what you act on / what is
-     selected; ochre (--danger) = look here: alerts, deadlines, destructive actions. */
-  --bg: light-dark(#eceae2, #080806);
-  --surface: light-dark(#e3e0d6, #0f0f0c);
-  --surface-raised: light-dark(#e3e0d6, #0f0f0c);
-  --border: light-dark(#cfcbbe, #20211c);
-  --text: light-dark(#1b1b17, #dfddd3);
-  --text-muted: light-dark(#6e6c63, #75746c);
-  --accent: light-dark(#5d644c, #80856d);
-  --accent-text: light-dark(#eceae2, #080806);
-  --danger: light-dark(#7e6f53, #95876e);
-  --danger-text: light-dark(#eceae2, #080806);
+  --bg: light-dark(#f4f1e8, #0f100c);
+  --surface: light-dark(#fbf9f3, #161711);
+  --surface-raised: light-dark(#ffffff, #1f2118);
+  --border: light-dark(#dedacb, #2b2d23);
+  --oatis-dim: light-dark(#b7b3a2, #4c4e42);
+  --text-muted: light-dark(#6a6757, #8e8d80);
+  --text: light-dark(#1a1a15, #eeece0);
+  --oatis-prose: light-dark(#2b2b24, #dad8cc);
+  --accent: light-dark(#566f1f, #a6b96a);
+  --danger: light-dark(#a85a0e, #e5a04b);
+  --accent-text: light-dark(#f7f5ec, #11120c);
+  --accent-wash: light-dark(#dedfcc, #272b1b);
+  --danger-wash: light-dark(#ebdfce, #312716);
+  --ink-bi: light-dark(#006660, #67cbc3);
+  --ink-bi-tint: light-dark(#d2efeb, #122c29);
+  --ink-bi-mid: light-dark(#69ada6, #3c746f);
+  --ink-fn: light-dark(#26578b, #8bbcf3);
+  --ink-fn-tint: light-dark(#daeafc, #1b2736);
+  --ink-fn-mid: light-dark(#7fa2c9, #4f6b8b);
+  --ink-type: light-dark(#695200, #cdb66e);
+  --ink-type-tint: light-dark(#efe8d2, #2c2614);
+  --ink-type-mid: light-dark(#ae9e6c, #756840);
+  --ink-prop: light-dark(#843b40, #ee9fa0);
+  --ink-prop-tint: light-dark(#fce0e0, #352020);
+  --ink-prop-mid: light-dark(#c68d8e, #885b5c);
+  --ink-kw: light-dark(#6f4176, #d4a3dc);
+  --ink-kw-tint: light-dark(#f2e2f4, #2e2130);
+  --ink-kw-mid: light-dark(#b390b9, #795d7e);
 
-  /* Only the two accents carry meaning, so priority is told by how loud it is. */
-  --priority-low: light-dark(#6e6c63, #75746c);
-  --priority-medium: light-dark(#5d644c, #80856d);
-  --priority-high: light-dark(#7e6f53, #95876e);
-
-  --oatis-dim: light-dark(#afab9e, #393a34);
-
-  /* Category inks (oatis-style): five muted hues for things with a lasting identity —
-     here, task lists. ink = the mark or tag text, tint = a fill behind it (calendar
-     events), mid = the same category in the past. Never on buttons, selection or headings. */
-  --ink-bi: light-dark(#2d6e6a, #86ada8);
-  --ink-bi-tint: light-dark(#d9ded6, #242c2a);
-  --ink-bi-mid: light-dark(#83a6a0, #4d635f);
-  --ink-fn: light-dark(#3b5d87, #8fa6c4);
-  --ink-fn-tint: light-dark(#dadcd9, #262b30);
-  --ink-fn-mid: light-dark(#8b9cb0, #525f6f);
-  --ink-type: light-dark(#6f611a, #dcc48a);
-  --ink-type-tint: light-dark(#e0dcce, #373123);
-  --ink-type-mid: light-dark(#a79f74, #7d6f4f);
-  --ink-prop: light-dark(#9a4651, #c88a8c);
-  --ink-prop-tint: light-dark(#e4dad4, #322523);
-  --ink-prop-mid: light-dark(#bf9092, #725050);
-  --ink-kw: light-dark(#82487a, #b796b3);
-  --ink-kw-tint: light-dark(#e1dad8, #2e272c);
-  --ink-kw-mid: light-dark(#b291a9, #685665);
+  --danger-text: var(--accent-text);
+  --priority-low: var(--text-muted);
+  --priority-medium: var(--accent);
+  --priority-high: var(--danger);
+  --overlay: light-dark(rgb(26 26 21 / 0.45), rgb(15 16 12 / 0.72));
+  --glass-fill: light-dark(
+    color-mix(in srgb, var(--surface-raised) 58%, transparent),
+    color-mix(in srgb, var(--surface) 52%, transparent)
+  );
+  --glass-edge: light-dark(rgb(255 255 255 / 0.68), rgb(255 255 255 / 0.14));
 
   /* A list's stored color (palette-1..12, from before there was one theme) is one of the
      five inks, in the style's fixed order: 1 bi, 2 fn, 3 type, 4 prop, 5 kw, 6 bi, ... */
@@ -89,71 +77,56 @@
   --palette-11-tint: var(--ink-bi-tint);
   --palette-12: var(--ink-fn);
   --palette-12-tint: var(--ink-fn-tint);
-  --oatis-prose: light-dark(#2a2a25, #cfcdc3);
-  --overlay: light-dark(rgb(27 27 23 / 0.45), rgb(8 8 6 / 0.72));
 
-  --font-ui: 'Martian Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-  --font-display: 'Commissioner Variable', 'Literata', ui-sans-serif, sans-serif;
-  --font-code: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-  --font-prose: 'Literata', ui-serif, Georgia, serif;
-  --font-pixel: 'Silkscreen', 'Commissioner Variable', 'Martian Mono', monospace;
-  --font-display-weight: 700;
-  --font-display-tracking: -0.01em;
-  --font-size-body: 12px;
+  --font-ui: 'Commissioner Variable', system-ui, sans-serif;
+  --font-display: var(--font-ui);
+  --font-code: 'JetBrains Mono', ui-monospace, monospace;
+  --font-prose: 'Literata', Georgia, serif;
+  --font-pixel: 'Silkscreen', var(--font-ui);
+  --font-display-weight: 800;
+  --font-display-tracking: -0.02em;
+  --font-size-body: 15px;
 
-  /* Martian Mono is wide: the small sizes shrink so a line still holds as much as in
-     a proportional font. Headings (text-lg and up) keep their size. */
-  --text-xs: 0.625rem;
-  --text-sm: 0.75rem;
-  --text-base: 0.8125rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.9375rem;
 
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-button: 0;
-  --radius-dialog: 0;
+  --oatis-radius-sm: 10px;
+  --oatis-radius-md: 16px;
+  --oatis-radius-lg: 28px;
+  --oatis-radius-xl: 40px;
+  --radius-button: 999px;
+  --radius-check: 30%;
 
-  --shadow-popover: none;
-  --shadow-dialog: none;
+  --oatis-shadow-pop: 0 10px 30px light-dark(rgb(52 46 24 / 0.14), rgb(0 0 0 / 0.38));
 
-  /* Stepped, never eased: the interface redraws itself in a few frames. */
-  --ease-standard: steps(3, end);
-  --ease-spring: steps(3, end);
-  --animate-fade-in: fade-in 120ms steps(3, end);
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  --motion-press: 260ms;
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --oatis-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* Widget-level color roles. */
   --btn-primary-bg: var(--accent);
   --btn-primary-text: var(--accent-text);
-  --tab-indicator: var(--accent);
 
-  /* Check-mark glyph for CSS-drawn checkboxes (used as a mask, so it takes any color). */
   --mask-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
 }
 
-/* Cyber — "the same book, at night in a neon city" (oatis-style's cyber palette). The
-   two accents keep their jobs, only the hues change: moss = volt yellow (action,
-   selection), ochre = red (alerts, high priority). Cyan is the system color: it lives in
-   the bi ink (lists, graph nodes) and Vivi, never on buttons, links or headings. Dark-only:
-   color-scheme is pinned above, and every color token is overridden so no light-dark()
-   variant can leak through. */
+/* Cyber keeps the same roles with volt yellow for action, red for attention and square corners. */
 :root[data-theme='cyber'] {
-  --bg: #09080f;
-  --surface: #100e1a;
-  --surface-raised: #100e1a;
-  --border: #1e1b30;
-  --text: #e8e6f5;
-  --text-muted: #7c7a9e;
+  --bg: #0a0912;
+  --surface: #13111f;
+  --surface-raised: #1b1830;
+  --border: #2a2644;
+  --oatis-dim: #4b4770;
+  --text-muted: #8683ab;
+  --text: #edebfa;
+  --oatis-prose: #d8d6ec;
   --accent: #fcee0a;
-  --accent-text: #09080f;
-  --danger: #ff3355;
-  --danger-text: #09080f;
-
-  --priority-low: var(--text-muted);
-  --priority-medium: var(--accent);
-  --priority-high: var(--danger);
-
-  --oatis-dim: #3a3656;
-
+  --danger: #ff4262;
+  --accent-text: #0a0912;
+  --accent-wash: #312e11;
+  --danger-wash: #31121f;
   --ink-bi: #22e1ee;
   --ink-bi-tint: #0c262e;
   --ink-bi-mid: #16747e;
@@ -169,18 +142,12 @@
   --ink-kw: #a878ff;
   --ink-kw-tint: #1f1831;
   --ink-kw-mid: #584087;
+  --overlay: rgb(10 9 18 / 0.72);
 
-  --oatis-prose: #d3d1e6;
-  --overlay: rgb(9 8 15 / 0.72);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
+  --oatis-radius-sm: 0;
+  --oatis-radius-md: 0;
+  --oatis-radius-lg: 0;
+  --oatis-radius-xl: 0;
+  --radius-button: 0;
+  --radius-check: 0;
 }

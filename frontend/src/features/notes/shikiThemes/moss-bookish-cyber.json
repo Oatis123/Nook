@@ -2,22 +2,22 @@
   "name": "moss-bookish-cyber",
   "type": "dark",
   "colors": {
-    "editor.background": "#100E1A",
-    "editor.foreground": "#E8E6F5"
+    "editor.background": "#13111F",
+    "editor.foreground": "#EDEBFA"
   },
   "tokenColors": [
     {
       "name": "text",
       "scope": ["source", "variable", "variable.parameter", "meta.embedded"],
       "settings": {
-        "foreground": "#E8E6F5"
+        "foreground": "#EDEBFA"
       }
     },
     {
       "name": "comments",
       "scope": ["comment", "punctuation.definition.comment"],
       "settings": {
-        "foreground": "#7C7A9E",
+        "foreground": "#8683AB",
         "fontStyle": "italic"
       }
     },
@@ -25,7 +25,7 @@
       "name": "punctuation",
       "scope": ["punctuation", "keyword.operator", "meta.brace"],
       "settings": {
-        "foreground": "#7C7A9E"
+        "foreground": "#8683AB"
       }
     },
     {
@@ -148,7 +148,7 @@
       "name": "invalid",
       "scope": ["invalid", "invalid.illegal"],
       "settings": {
-        "foreground": "#FF3355",
+        "foreground": "#FF4262",
         "fontStyle": "underline"
       }
     },
@@ -199,7 +199,7 @@
       "name": "diff deleted",
       "scope": ["markup.deleted"],
       "settings": {
-        "foreground": "#FF3355"
+        "foreground": "#FF4262"
       }
     }
   ]

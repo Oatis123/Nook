@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Plus } from '@/design/icons'
+import { Button } from '@/design/components/Button'
 import { TaskCreateDialog } from '@/features/tasks/TaskCreateDialog'
 
 function isTypingInField(target: EventTarget | null): boolean {
@@ -27,14 +28,10 @@ export function AddTaskButton({ listId }: { listId?: string }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2 border border-border bg-surface px-3 py-2 text-left text-sm text-text-muted transition-colors duration-150 hover:text-text"
-      >
+      <Button type="button" variant="primary" onClick={() => setOpen(true)}>
         <Plus size={16} strokeWidth={1.5} className="shrink-0" />
         Add a task… (Q)
-      </button>
+      </Button>
       <TaskCreateDialog open={open} onOpenChange={setOpen} listId={listId} />
     </>
   )

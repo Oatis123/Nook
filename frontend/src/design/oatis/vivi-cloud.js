@@ -28,9 +28,9 @@
 (function (root) {
   'use strict';
   var PAL = {
-    dark: { bg: '#080806', h1: '#2A2D21', h2: '#3A3E30', m1: '#565C45', dm: '#393A34', mu: '#75746C', ms: '#80856D', oc: '#95876E', lt: '#B5B8A4', tx: '#DFDDD3' },
-    light: { bg: '#ECEAE2', h1: '#CDCDBB', h2: '#AFB39E', m1: '#7A806A', dm: '#AFAB9E', mu: '#6E6C63', ms: '#5D644C', oc: '#7E6F53', lt: '#4A4F3C', tx: '#1B1B17' },
-    cyber: { bg: '#09080F', h1: '#141B3C', h2: '#1B2A57', m1: '#2B5A92', dm: '#3A3656', mu: '#7C7A9E', ms: '#22E1EE', oc: '#FF3355', lt: '#A8F5FA', tx: '#E8E6F5' }  // cyan body: the system color
+    dark: { bg: '#0F100C', h1: '#272B1B', h2: '#393F26', m1: '#626D40', dm: '#4C4E42', mu: '#8E8D80', ms: '#A6B96A', oc: '#E5A04B', lt: '#CCD4A7', tx: '#EEECE0' },
+    light: { bg: '#F4F1E8', h1: '#D8DAC4', h2: '#BBC2A0', m1: '#85965B', dm: '#B7B3A2', mu: '#6A6757', ms: '#566F1F', oc: '#A85A0E', lt: '#3E4D1B', tx: '#1A1A15' },
+    cyber: { bg: '#0A0912', h1: '#141B3C', h2: '#1B2A57', m1: '#2B5A92', dm: '#4B4770', mu: '#8683AB', ms: '#22E1EE', oc: '#FF4262', lt: '#A8F5FA', tx: '#EDEBFA' }
   };
   var STATES = ['idle', 'talk', 'think', 'sleep', 'annoyed', 'happy', 'glitch'];
   var RGB = {};

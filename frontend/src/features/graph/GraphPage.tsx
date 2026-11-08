@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { clsx } from 'clsx'
 import { EmptyState } from '@/design/components/EmptyState'
 import { Switch } from '@/design/components/Switch'
 import { useElementSize } from '@/lib/useElementSize'
@@ -80,18 +79,15 @@ export default function GraphPage() {
           Show dangling
         </label>
 
-        <div className="inline-flex border border-border bg-bg p-0.5 text-sm">
+        <div className="ui-segmented inline-flex gap-0.5 text-sm">
           {(['folder', 'tag'] as const).map((mode) => (
             <button
               key={mode}
               type="button"
               onClick={() => setColorBy(mode)}
-              className={clsx(
-                'px-2.5 py-1 capitalize transition-colors duration-150',
-                colorBy === mode
-                  ? 'bg-surface-raised text-text'
-                  : 'text-text-muted hover:text-text',
-              )}
+              aria-pressed={colorBy === mode}
+              data-active={colorBy === mode}
+              className="ui-segment px-2.5 py-1 capitalize text-text-muted hover:text-text"
             >
               {mode}
             </button>

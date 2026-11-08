@@ -73,9 +73,8 @@ function runThemeTransition(update: () => void, origin: ThemeTransitionOrigin | 
       root.animate(
         { '--theme-reveal': ['0px', `${radius}px`] },
         {
-          // oatis motion is stepped, never eased: the new theme spreads in 16 frames.
-          duration: 500,
-          easing: 'steps(16, end)',
+          duration: 220,
+          easing: 'cubic-bezier(0.2, 0.7, 0.2, 1)',
           // Hold the end state — snapping back to 0px would flash the old theme for a
           // frame before the transition tears down.
           fill: 'forwards',

@@ -1,5 +1,4 @@
 import { type FormEvent, useState } from 'react'
-import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { DateField, TimeField } from '@/design/components/DateTimeFields'
 import { Dialog } from '@/design/components/Dialog'
@@ -163,7 +162,7 @@ export function TaskCreateDialog({
         </div>
 
         <div className="flex flex-col gap-3">
-          <div className="inline-flex w-fit border border-border bg-surface-raised p-0.5">
+          <div className="ui-segmented inline-flex w-fit gap-0.5">
             {(
               [
                 { value: 'once', label: 'One-time' },
@@ -175,12 +174,9 @@ export function TaskCreateDialog({
                 type="button"
                 disabled={option.value === 'recurring' && !canRepeat}
                 onClick={() => setMode(option.value)}
-                className={clsx(
-                  'h-8 px-3 text-sm transition-colors duration-150 disabled:opacity-50 disabled:pointer-events-none',
-                  mode === option.value
-                    ? 'bg-accent text-accent-text'
-                    : 'text-text-muted hover:text-text',
-                )}
+                aria-pressed={mode === option.value}
+                data-active={mode === option.value}
+                className="ui-segment h-8 px-3 text-sm text-text-muted hover:text-text disabled:pointer-events-none disabled:opacity-50"
               >
                 {option.label}
               </button>
@@ -192,7 +188,7 @@ export function TaskCreateDialog({
           )}
 
           {mode === 'recurring' && canRepeat && (
-            <div className="border border-border bg-surface p-3">
+            <div className="rounded-md bg-surface p-3">
               <RecurrenceFields value={recurrence} onChange={setRecurrence} />
             </div>
           )}

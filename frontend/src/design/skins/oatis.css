@@ -1,385 +1,308 @@
-/* Oatis skin — "moss / bookish": a near-black base with an olive cast and two dusty
-   accents, square corners, no shadows, stepped motion. Mono for the UI, a book serif for
-   notes, Commissioner for headings, Silkscreen for the wordmark, pixel icons
-   (design/oatisIcons.ts). Light mode is the same palette inverted with darker accents.
-   Moss = what you act on / what is selected; ochre = look here (alerts, deadlines).
-   Token contract: design/tokens.css. Widget hooks: the `ui-*` classes on components. */
-
-/* Radius 0 and no shadows, everywhere — including the utilities that hard-code a radius
-   (rounded-full dots and checkboxes, rounded-xl panels). Zero specificity, so a rule
-   below can still opt back in. */
-:where(:root[data-theme-skin='oatis']) :is(*, *::before, *::after) {
+/* Oatis v2.1 product layer. The wordmark, note scene and Vivi carry the pixel style. */
+:where(:root[data-theme='cyber']) :is(*, *::before, *::after) {
   border-radius: 0;
-  box-shadow: none;
 }
-:root[data-theme-skin='oatis'] ::selection {
+
+::selection {
   background: var(--accent);
   color: var(--accent-text);
 }
-:root[data-theme-skin='oatis'] :focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 2px;
-}
-/* The note editor's text area counts as focus-visible even after a click; its caret
-   already shows focus, and the outline drew two lines down the sides of the column. */
-:root[data-theme-skin='oatis'] .cm-content:focus-visible {
+
+.cm-content:focus-visible {
   outline: none;
 }
-:root[data-theme-skin='oatis'] body {
+
+body {
   font-variant-numeric: tabular-nums;
-  line-height: 1.6;
 }
 
-/* Wordmark: the app name in Silkscreen. */
-:root[data-theme-skin='oatis'] .ui-wordmark {
+.ui-wordmark {
   font-family: var(--font-pixel);
   font-weight: 400;
   letter-spacing: 0;
   line-height: 1;
 }
 
-/* Buttons: the one primary action is a moss fill; everything else is a hairline or plain
-   text. A press inverts the button for two frames. */
-:root[data-theme-skin='oatis'] .ui-button {
-  border: 1px solid transparent;
-  font-weight: 400;
-  transition-duration: 120ms;
+:is(.ui-button, .ui-icon-button, .ui-dialog-close, .ui-nav-item, .ui-tab, .ui-segment) {
+  border-radius: var(--radius-button);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    border-radius var(--motion-press) var(--oatis-ease-spring),
+    transform var(--motion-press) var(--oatis-ease-spring);
 }
-:root[data-theme-skin='oatis'] .ui-button:hover:not(:disabled) {
+
+:is(.ui-button, .ui-icon-button, .ui-dialog-close, .ui-nav-item, .ui-tab, .ui-segment):active:not(
+    :disabled
+  ) {
+  border-radius: var(--oatis-radius-md);
+  transform: scale(0.96);
+}
+
+.ui-button {
+  border: 1px solid transparent;
+  font-weight: 600;
+}
+
+.ui-button[data-variant='primary']:hover:not(:disabled) {
+  filter: brightness(1.08);
   opacity: 1;
 }
-:root[data-theme-skin='oatis'] .ui-button[data-variant='primary']:hover:not(:disabled) {
-  filter: brightness(1.12);
-}
-:root[data-theme-skin='oatis'] .ui-button:active:not(:disabled) {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--accent-text);
-  filter: none;
-}
-:root[data-theme-skin='oatis'] .ui-button[data-variant='secondary'] {
-  background: transparent;
-  border-color: var(--border);
-}
-:root[data-theme-skin='oatis'] .ui-button[data-variant='secondary']:hover:not(:disabled) {
-  background: transparent;
-  border-color: var(--oatis-dim);
-}
-:root[data-theme-skin='oatis'] .ui-button[data-variant='ghost']:hover:not(:disabled) {
-  background: transparent;
-  text-decoration: underline;
-  text-decoration-color: var(--oatis-dim);
-  text-underline-offset: 3px;
-}
-:root[data-theme-skin='oatis'] .ui-button[data-variant='danger'] {
-  background: transparent;
-  color: var(--danger);
-}
-:root[data-theme-skin='oatis'] .ui-button[data-variant='danger']:hover:not(:disabled) {
-  background: transparent;
-  text-decoration: underline;
-  text-decoration-color: var(--danger);
-  text-underline-offset: 3px;
-}
 
-/* Cyber's one extra shape: the primary action gets a 3px stepped corner cut at the
-   bottom-right, like a pixel chamfer. Everything else stays a plain rectangle. The clip
-   also cuts the outside focus ring, so cyber draws that one inside the button. */
-:root[data-theme-skin='oatis'][data-theme='cyber'] .ui-button[data-variant='primary'] {
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - 6px),
-    calc(100% - 3px) calc(100% - 6px),
-    calc(100% - 3px) calc(100% - 3px),
-    calc(100% - 6px) calc(100% - 3px),
-    calc(100% - 6px) 100%,
-    0 100%
-  );
-}
-:root[data-theme-skin='oatis'][data-theme='cyber']
-  .ui-button[data-variant='primary']:focus-visible {
-  outline: 1px solid var(--accent-text);
-  outline-offset: -3px;
-}
-
-:root[data-theme-skin='oatis'] .ui-icon-button:hover,
-:root[data-theme-skin='oatis'] .ui-dialog-close:hover {
-  background: transparent;
+.ui-button[data-variant='secondary']:hover:not(:disabled),
+.ui-button[data-variant='ghost']:hover:not(:disabled),
+.ui-icon-button:hover,
+.ui-dialog-close:hover {
+  background: var(--surface-raised);
   color: var(--text);
 }
-:root[data-theme-skin='oatis'] .ui-icon-button[data-active] {
-  background: var(--accent);
-  color: var(--accent-text);
-}
 
-/* Tabs: muted labels, the current one in text color over a 1px moss line. */
-:root[data-theme-skin='oatis'] .ui-tabs-list {
-  gap: 1.25rem;
-}
-:root[data-theme-skin='oatis'] .ui-tab {
-  padding-inline: 0;
-  border-bottom-width: 1px;
-}
-
-/* Dialogs, menus, palette, tooltips: flat plates with a hairline. */
-:root[data-theme-skin='oatis'] .ui-dialog,
-:root[data-theme-skin='oatis'] .ui-palette,
-:root[data-theme-skin='oatis'] .ui-menu,
-:root[data-theme-skin='oatis'] .ui-tooltip {
-  border: 1px solid var(--oatis-dim);
-  background: var(--surface);
-}
-:root[data-theme-skin='oatis'] .ui-dialog-title {
-  font-size: 1.125rem;
-  letter-spacing: -0.01em;
-}
-:root[data-theme-skin='oatis'] .ui-tooltip-arrow {
-  display: none;
-}
-
-/* Dense lists (menu, palette, task rows): a 2px moss bar on the surface, not a fill. */
-:root[data-theme-skin='oatis'] .ui-menu-item[data-highlighted],
-:root[data-theme-skin='oatis'] [aria-selected='true'] > .ui-palette-item {
-  background: var(--bg);
-  box-shadow: inset 2px 0 0 var(--accent);
-}
-:root[data-theme-skin='oatis'] .ui-menu-item[data-danger] {
+.ui-button[data-variant='danger'] {
+  background: transparent;
   color: var(--danger);
 }
 
-/* Navigation is a short list, so the current item is a moss fill. */
-:root[data-theme-skin='oatis'] .ui-nav-item {
+.ui-button[data-variant='danger']:hover:not(:disabled) {
+  background: var(--danger-wash);
+  opacity: 1;
+}
+
+:root[data-theme='cyber'] .ui-button[data-variant='primary'] {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%);
+}
+
+:root[data-theme='cyber'] .ui-button[data-variant='primary']:focus-visible {
+  outline-color: var(--accent-text);
+  outline-offset: -4px;
+}
+
+.ui-icon-button[data-active] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.ui-nav-item {
   color: var(--text-muted);
 }
-:root[data-theme-skin='oatis'] .ui-nav-item:hover {
-  background: transparent;
+
+.ui-nav-item:hover,
+.ui-tab:hover {
+  background: var(--surface-raised);
   color: var(--text);
 }
-:root[data-theme-skin='oatis']
-  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page'])) {
+
+.ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page'])),
+.ui-tab[data-state='active'] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.ui-nav-item:is([data-active='true'], :has([aria-current='page'])) :is(a, .ui-icon) {
+  color: inherit !important;
+}
+
+.ui-tabs-list {
+  flex-wrap: wrap;
+  border: 0;
+}
+
+.ui-tab {
+  border: 0;
+  font-weight: 500;
+}
+
+:is(.ui-segmented, .ui-toggle) {
+  border: 0;
+  border-radius: var(--radius-button);
+  background: var(--surface-raised);
+  padding: 3px;
+}
+
+.ui-segment {
+  font-weight: 600;
+}
+
+.ui-segment[data-active='true'],
+.ui-toggle[data-state='checked'] > [data-part='on'],
+.ui-toggle[data-state='unchecked'] > [data-part='off'] {
   background: var(--accent);
   color: var(--accent-text);
 }
-:root[data-theme-skin='oatis']
-  .ui-nav-item:is([aria-current='page'], [data-active='true'], :has([aria-current='page']))
-  a {
-  color: var(--accent-text);
+
+.ui-toggle {
+  display: inline-flex;
+  gap: 2px;
+  font-size: var(--text-xs);
+  cursor: pointer;
 }
 
-/* Segmented control: on/off pair, the active half filled. */
-:root[data-theme-skin='oatis'] .ui-segmented {
-  background: transparent;
-  border-color: var(--border);
-  padding: 0;
-}
-:root[data-theme-skin='oatis'] .ui-segment[data-active='true'] {
-  background: var(--accent);
-  color: var(--accent-text);
+.ui-toggle > span {
+  padding: 4px 9px;
+  border-radius: var(--radius-button);
+  color: var(--text-muted);
 }
 
-/* Shell: flat panes divided by hairlines. */
+.ui-sidebar {
+  border: 0;
+}
+
 @media (min-width: 48rem) {
-  :root[data-theme-skin='oatis'] .ui-sidebar[data-open] {
-    margin: 0;
-    border-width: 0 1px 0 0;
+  .ui-sidebar[data-open] {
+    margin: 12px;
+    border-radius: var(--oatis-radius-md);
+    overflow: hidden;
   }
 }
-:root[data-theme-skin='oatis'] .ui-topbar {
+
+.ui-topbar {
+  border: 0;
   background: var(--bg);
 }
 
-/* Task checkbox: an empty square, a moss-filled one when done. */
-:root[data-theme-skin='oatis'] .ui-check {
-  position: relative;
+:is(.ui-dialog, .ui-palette, .ui-menu, .ui-tooltip, .ui-toast) {
+  border-radius: var(--oatis-radius-md);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-popover);
+}
+
+.ui-dialog {
+  border-radius: var(--oatis-radius-lg) var(--oatis-radius-lg) 0 0;
+}
+
+@media (min-width: 40rem) {
+  .ui-dialog {
+    border-radius: var(--oatis-radius-lg);
+  }
+}
+
+.ui-dialog-title {
+  font-size: 1.25rem;
+  text-wrap: balance;
+}
+
+/* Glass applies to floating surfaces that sit over page content. */
+/* prettier-ignore */
+@supports (backdrop-filter:none) {
+  @media (prefers-reduced-transparency: no-preference) {
+    .ui-glass {
+      background: var(--glass-fill);
+      border-color: var(--glass-edge);
+      backdrop-filter: blur(20px) saturate(170%);
+      box-shadow: inset 0 1px var(--glass-edge), var(--shadow-popover);
+    }
+  }
+}
+
+:is(.ui-menu-item, .ui-palette-item, .ui-task-row) {
+  border-radius: var(--oatis-radius-sm);
+}
+
+.ui-menu-item[data-highlighted],
+[aria-selected='true'] > .ui-palette-item {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.ui-menu-item[data-danger] {
+  color: var(--danger);
+}
+
+.ui-menu-item[data-danger][data-highlighted] {
+  background: var(--danger-wash);
+}
+
+.ui-check,
+.markdown-preview .task-list-item input[type='checkbox'] {
+  border-radius: var(--radius-check);
   border-color: var(--oatis-dim);
   background: transparent;
 }
-:root[data-theme-skin='oatis'] .ui-check[data-checked] {
+
+.ui-check[data-checked],
+.markdown-preview .task-list-item input[type='checkbox']:checked {
   border-color: var(--accent);
   background: var(--accent);
 }
-:root[data-theme-skin='oatis'] .ui-check[data-checked]::after {
+
+.ui-check:not([data-checked]):hover,
+.markdown-preview .task-list-item input[type='checkbox']:not(:checked, :disabled):hover {
+  border-color: var(--accent);
+}
+
+.ui-check[data-checked]::after {
   content: '';
   position: absolute;
   inset: 2px;
   background: var(--accent-text);
   mask: var(--mask-check) center / contain no-repeat;
 }
-:root[data-theme-skin='oatis'] .markdown-preview .task-list-item input[type='checkbox'] {
-  border-width: 1px;
-  border-color: var(--oatis-dim);
-  background: transparent;
-}
-:root[data-theme-skin='oatis'] .markdown-preview .task-list-item input[type='checkbox']:checked {
-  border-color: var(--accent);
-  background: var(--accent);
-}
 
-/* Fields: a bottom line only; the active one turns moss. */
-:root[data-theme-skin='oatis'] :is(input, select, textarea).border {
-  border-width: 0 0 1px;
-  border-color: var(--oatis-dim);
-  background: transparent;
+:is(input, select, textarea).border,
+.ui-field-trigger {
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  background: var(--surface-raised);
   caret-color: var(--accent);
 }
-:root[data-theme-skin='oatis'] :is(input, select, textarea).border:focus-visible {
-  border-color: var(--accent);
-  outline: none;
+
+textarea.border {
+  border-radius: var(--oatis-radius-md);
 }
-/* The date and time pickers' buttons read as the same kind of field. */
-:root[data-theme-skin='oatis'] .ui-field-trigger {
-  border-width: 0 0 1px;
+
+:is(input, select, textarea).border:hover,
+.ui-field-trigger:hover {
   border-color: var(--oatis-dim);
-  background: transparent;
 }
-:root[data-theme-skin='oatis'] .ui-field-trigger:is(:focus-visible, [data-state='open']) {
+
+:is(input, select, textarea).border:focus,
+.ui-field-trigger:is(:focus-visible, [data-state='open']) {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
   outline: none;
 }
-:root[data-theme-skin='oatis'] ::placeholder {
+
+:is(input, select, textarea).border[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+::placeholder {
   color: var(--text-muted);
 }
 
-/* Notes: the serif is the voice. Headings are Commissioner Bold, prose is Literata. */
-:root[data-theme-skin='oatis'] .markdown-preview {
+.markdown-preview {
   font-family: var(--font-prose);
-  /* 15px -> 16.5px: the default note size is 10% larger than the original skin. */
-  font-size: 16.5px;
-  line-height: 1.75;
+  font-size: 17px;
+  line-height: 1.7;
   color: var(--oatis-prose);
 }
-:root[data-theme-skin='oatis'] .markdown-preview :is(h1, h2, h3, h4, h5, h6) {
-  font-weight: 700;
-  letter-spacing: -0.01em;
+
+.markdown-preview :is(h1, h2, h3, h4, h5, h6) {
+  font-weight: 800;
+  letter-spacing: var(--font-display-tracking);
+  text-wrap: balance;
   color: var(--text);
 }
-:root[data-theme-skin='oatis'] .markdown-preview blockquote {
-  border-left: 1px solid var(--accent);
+
+.markdown-preview blockquote {
+  border-left: 2px solid var(--accent);
   font-style: italic;
-  color: var(--text);
 }
-:root[data-theme-skin='oatis'] .markdown-preview :is(code, pre) {
-  font-family: var(--font-code);
-}
-:root[data-theme-skin='oatis'] .markdown-preview pre {
-  border-left: 1px solid var(--oatis-dim);
-  background: var(--surface);
-}
-:root[data-theme-skin='oatis'] .markdown-preview hr {
-  border-top-style: dotted;
-  border-top-color: var(--oatis-dim);
-}
-:root[data-theme-skin='oatis'] .markdown-preview a {
-  text-decoration-color: var(--oatis-dim);
-  color: var(--text);
-}
-:root[data-theme-skin='oatis'] .markdown-preview a:hover {
-  text-decoration-color: var(--accent);
-}
-:root[data-theme-skin='oatis'] .markdown-preview a.wikilink {
-  color: var(--accent);
-}
-:root[data-theme-skin='oatis'] .markdown-preview blockquote.callout {
+
+.markdown-preview blockquote.callout {
+  border-radius: var(--oatis-radius-sm);
   font-style: normal;
 }
 
-/* The note page: a fixed-width working column over the time-of-day scenery in the
-   gutters (features/notes/NoteBackdrop). The scenes are decor zones only — the column
-   is opaque, so no text ever crosses the dither. The gutters run all the way to the
-   edge of an ultrawide monitor; the wider the gutter, the wider the scene composition
-   (features/notes/dayPhase.ts), so the moon and the skyline stay in frame. */
-.note-stage {
-  position: relative;
-  height: 100%;
-  overflow: hidden;
-  container-type: inline-size;
-}
-.note-frame {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  width: min(100%, 56rem);
-  height: 100%;
-  margin-inline: auto;
-  background: var(--bg);
-}
-.note-backdrop {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.note-gutter {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: max(0rem, calc(50% - 28rem));
-  /* The scene copies below query this, not the whole page: the composition follows the
-     gutter's own width. */
-  container-type: inline-size;
-}
-/* One scene, mirrored: the busier side (the moon, the skyline) faces outwards, and the
-   quiet sky sits next to the column on both sides. */
-.note-gutter[data-side='left'] {
-  right: calc(50% + 28rem);
-  transform: scaleX(-1);
-}
-.note-gutter[data-side='right'] {
-  left: calc(50% + 28rem);
-}
-.note-scene {
-  position: absolute;
-  inset: 0;
-  background-color: var(--bg);
-  background-position: right bottom;
-  background-repeat: no-repeat;
-  background-size: cover;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-.note-scene--wide {
-  display: none;
-}
-/* Below this the column takes the whole page, so there is nothing to show — and no
-   one-pixel scene slivers as it approaches full width. A gutter under ~6rem reads as a
-   stripe, not as a scene. */
-@container (max-width: 5.999rem) {
-  .note-scene {
-    display: none;
-  }
-}
-/* A wider gutter gets the 16:9 composition: the 9:16 one would have to zoom in so far
-   that most of the scene fell outside the crop. */
-@container (min-width: 28rem) {
-  .note-scene--tall {
-    display: none;
-  }
-  .note-scene--wide {
-    display: block;
-  }
-}
-@container (min-width: 68rem) {
-  .note-frame {
-    border-inline: 1px solid var(--border);
-  }
+.markdown-preview :is(pre, img) {
+  border: 1px solid var(--border);
+  border-radius: var(--oatis-radius-sm);
 }
 
-/* Done items recede to `dim`, struck through. */
-:root[data-theme-skin='oatis'] .line-through.text-text-muted {
-  color: var(--oatis-dim);
+.markdown-preview :not(pre) > code {
+  background: var(--surface-raised);
 }
 
-/* A category's ink (a list's icon) never sits on the selection: on the moss row it takes
-   the row's own color. */
-:root[data-theme-skin='oatis']
-  .ui-nav-item:is([data-active='true'], :has([aria-current='page']))
-  .ui-icon {
-  color: currentColor !important;
-}
-
-/* The end of a note: ⁂ in moss, like the last page of a chapter. */
-:root[data-theme-skin='oatis'] .markdown-preview::after {
+.markdown-preview::after {
   content: '⁂';
   display: block;
   margin-top: 2.25rem;
@@ -389,70 +312,81 @@
   color: var(--accent);
 }
 
-/* Toggles are an `on off` pair, the current one filled (design/components/Switch.tsx). */
-:root[data-theme-skin='oatis'] .ui-toggle {
-  display: inline-flex;
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  line-height: 1.6;
-  cursor: pointer;
-}
-:root[data-theme-skin='oatis'] .ui-toggle > span {
-  padding: 0 4px;
-  color: var(--oatis-dim);
-}
-:root[data-theme-skin='oatis'] .ui-toggle[data-state='checked'] > [data-part='on'],
-:root[data-theme-skin='oatis'] .ui-toggle[data-state='unchecked'] > [data-part='off'] {
-  background: var(--accent);
-  color: var(--accent-text);
-}
-:root[data-theme-skin='oatis'] .ui-toggle:hover > span:not([style]) {
-  color: var(--text-muted);
+.note-stage {
+  --note-width: 56rem;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  container-type: inline-size;
 }
 
-/* Loaders: stepped glyph animations, never a smooth spinner or shimmer. */
-.spin::after {
-  content: '▖';
-  font-family: var(--font-code);
-  color: var(--accent);
-  animation: oatis-spin 0.8s steps(1) infinite;
+.note-frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, var(--note-width));
+  height: 100%;
+  margin-inline: auto;
+  background: var(--bg);
 }
-.typing::after {
-  content: '·';
-  animation: oatis-dots 1.2s steps(1) infinite;
+
+.note-backdrop {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
 }
-@keyframes oatis-spin {
-  0% {
-    content: '▖';
-  }
-  25% {
-    content: '▘';
-  }
-  50% {
-    content: '▝';
-  }
-  75% {
-    content: '▗';
-  }
-}
-@keyframes oatis-dots {
-  0% {
-    content: '·';
-  }
-  33% {
-    content: '··';
-  }
-  66% {
-    content: '···';
+
+/* Show the scenery once both gutters have at least 6rem of space. */
+@container (min-width: 68rem) {
+  .note-backdrop {
+    display: grid;
+    grid-template-columns: 1fr var(--note-width) 1fr;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .spin::after,
-  .typing::after {
-    animation: none;
+
+.note-gutter {
+  position: relative;
+  container-type: inline-size;
+}
+
+.note-gutter--left {
+  grid-column: 1;
+  transform: scaleX(-1);
+}
+
+.note-gutter--right {
+  grid-column: 3;
+}
+
+.note-scene {
+  position: absolute;
+  inset: 0;
+  background-position: right bottom;
+  background-size: cover;
+  image-rendering: pixelated;
+}
+
+.note-scene--wide {
+  display: none;
+}
+
+@container (min-width: 28rem) {
+  .note-scene--tall {
+    display: none;
   }
+
+  .note-scene--wide {
+    display: block;
+  }
+}
+
+.spin {
+  display: inline-block;
+  width: 0.8em;
+  height: 0.8em;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: var(--radius-button);
+  animation: spin 0.8s linear infinite;
 }

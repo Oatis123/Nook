@@ -20,11 +20,9 @@ export function TaskGroupedList({
       {groups.map((group) => (
         <div key={group.label || 'ungrouped'}>
           {group.label && (
-            <h3 className="mb-1 px-2 text-xs font-medium lowercase text-text-muted">
-              {group.label}
-            </h3>
+            <h3 className="mb-2 px-2 text-xs font-medium text-text-muted">{group.label}</h3>
           )}
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5 rounded-md bg-surface p-1">
             {group.tasks.map((task) => (
               <TaskRow key={task.id} task={task} onOpen={onOpenTask} />
             ))}

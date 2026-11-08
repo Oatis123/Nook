@@ -48,16 +48,17 @@ export function RecurrenceFields({
       </div>
 
       {value.freq === 'weekly' && (
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           {WEEKDAY_LABELS.map((label, i) => (
             <button
               key={label}
               type="button"
+              aria-pressed={(value.by_weekday ?? []).includes(i)}
               onClick={() => toggleWeekday(i)}
               className={clsx(
-                'h-8 w-10 border text-xs transition-colors duration-150',
+                'h-8 w-10 rounded-full border text-xs transition-colors duration-150',
                 (value.by_weekday ?? []).includes(i)
-                  ? 'border-accent bg-accent/15 text-text'
+                  ? 'border-transparent bg-(--accent-wash) text-accent'
                   : 'border-border text-text-muted hover:text-text',
               )}
             >

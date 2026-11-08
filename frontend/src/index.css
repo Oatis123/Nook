@@ -7,8 +7,6 @@
 @import '@fontsource/literata/400-italic.css';
 @import '@fontsource/jetbrains-mono/400.css';
 @import '@fontsource/jetbrains-mono/500.css';
-@import '@fontsource/martian-mono/400.css';
-@import '@fontsource/martian-mono/500.css';
 @import '@fontsource/silkscreen/400.css';
 @import '@fontsource-variable/commissioner/wght.css';
 
@@ -21,7 +19,6 @@
   --font-mono: var(--font-code);
 
   --default-transition-timing-function: var(--ease-standard);
-  --ease-spring: var(--ease-spring);
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -45,13 +42,14 @@
   --color-palette-5: var(--palette-5);
   --color-palette-6: var(--palette-6);
 
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
+  --radius-sm: var(--oatis-radius-sm);
+  --radius-md: var(--oatis-radius-md);
+  --radius-lg: var(--oatis-radius-lg);
+  --radius-xl: var(--oatis-radius-xl);
 
-  --shadow-popover: var(--shadow-popover);
+  --shadow-popover: var(--oatis-shadow-pop);
 
-  --animate-fade-in: fade-in 120ms steps(3, end);
+  --animate-fade-in: fade-in var(--motion-base) var(--ease-standard);
 }
 
 @keyframes fade-in {
@@ -72,6 +70,7 @@
 
   html {
     @apply antialiased;
+    accent-color: var(--accent);
   }
 
   body {
@@ -87,14 +86,18 @@
     letter-spacing: var(--font-display-tracking);
   }
 
+  :is(h1, h2, h3) {
+    text-wrap: balance;
+  }
+
   :focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
 }
 
-/* Theme switch (src/lib/theme.ts): the new theme is revealed as a hard-edged circle
-   growing from the clicked control in a few stepped frames. JS animates --theme-reveal
+/* Theme switch (src/lib/theme.ts): the new theme is revealed as a circle
+   growing from the clicked control. JS animates --theme-reveal
    (the circle's radius) and sets the origin; this disables the default cross-fade,
    stacks the new snapshot on top and clips it. */
 @property --theme-reveal {
@@ -131,9 +134,9 @@
   }
 }
 
-/* Markdown preview — spec §10.4: serif headings, ~72ch max width, 1.6-1.7 line height. */
+/* Markdown preview keeps the reading column at a comfortable measure. */
 .markdown-preview {
-  max-width: 72ch;
+  max-width: 68ch;
   /* Centered in the note pane, like a page. */
   margin-inline: auto;
   line-height: 1.7;
@@ -343,12 +346,11 @@
   font-weight: 600;
   margin-bottom: 0.3em;
 }
-.markdown-preview blockquote.callout[data-callout-type='warning'] {
-  border-left-color: var(--priority-medium);
-}
+.markdown-preview blockquote.callout[data-callout-type='warning'],
 .markdown-preview blockquote.callout[data-callout-type='danger'],
 .markdown-preview blockquote.callout[data-callout-type='error'] {
   border-left-color: var(--danger);
+  background: var(--danger-wash);
 }
 .markdown-preview blockquote.callout[data-callout-type='tip'],
 .markdown-preview blockquote.callout[data-callout-type='success'] {

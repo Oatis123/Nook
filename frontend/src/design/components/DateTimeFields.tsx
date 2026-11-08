@@ -22,7 +22,8 @@ import { parseLocalDate, parseTypedTime } from '@/lib/dates'
 
 const triggerClass =
   'ui-field-trigger flex items-center gap-1.5 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent data-[state=open]:border-accent'
-const popoverClass = 'ui-menu z-[60] border border-border bg-surface-raised p-2 animate-fade-in'
+const popoverClass =
+  'ui-menu ui-glass z-[60] border border-border bg-surface-raised p-2 animate-fade-in'
 const smallButtonClass =
   'px-2 py-1 text-xs text-text-muted outline-none hover:bg-surface hover:text-text focus-visible:bg-surface focus-visible:text-text'
 

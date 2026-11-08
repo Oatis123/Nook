@@ -30,14 +30,14 @@ export function TagInput({
   return (
     <div
       className={clsx(
-        'flex min-h-8 flex-wrap items-center gap-1 border bg-surface px-1.5 py-1',
+        'flex min-h-9 flex-wrap items-center gap-1 rounded-sm border bg-surface px-2.5 py-1',
         invalid ? 'border-danger' : 'border-border focus-within:border-accent',
       )}
     >
       {tags.map((tag) => (
         <span
           key={tag}
-          className="flex items-center gap-0.5 bg-surface-raised py-0.5 pl-2 pr-1 text-xs text-text"
+          className="flex items-center gap-0.5 rounded-full bg-surface-raised py-0.5 pl-2 pr-1 text-xs text-text"
         >
           #{tag}
           <button
@@ -73,7 +73,7 @@ export function TagInput({
         aria-label="Add tag"
         aria-invalid={invalid || undefined}
         placeholder={tags.length === 0 ? 'Add tags…' : ''}
-        className="h-6 min-w-20 flex-1 bg-transparent px-1 text-sm text-text outline-none placeholder:text-text-muted"
+        className="h-6 min-w-20 flex-1 bg-transparent px-1 text-sm text-text outline-none focus-visible:outline-none"
       />
     </div>
   )

@@ -50,26 +50,26 @@ export function GraphCanvas({
     const fallback =
       theme === 'cyber'
         ? {
-            muted: '#7c7a9e',
-            text: '#e8e6f5',
+            muted: '#8683AB',
+            text: '#EDEBFA',
             accent: '#fcee0a',
-            border: '#1e1b30',
+            border: '#2A2644',
             ink: '#22e1ee',
           }
         : theme === 'dark'
           ? {
-              muted: '#75746c',
-              text: '#dfddd3',
-              accent: '#80856d',
-              border: '#20211c',
-              ink: '#80856d',
+              muted: '#8E8D80',
+              text: '#EEECE0',
+              accent: '#A6B96A',
+              border: '#2B2D23',
+              ink: '#A6B96A',
             }
           : {
-              muted: '#6e6c63',
-              text: '#1b1b17',
-              accent: '#5d644c',
-              border: '#cfcbbe',
-              ink: '#5d644c',
+              muted: '#6A6757',
+              text: '#1A1A15',
+              accent: '#566F1F',
+              border: '#DEDACB',
+              ink: '#566F1F',
             }
     return {
       muted: readCssVar('--text-muted', fallback.muted),
@@ -81,6 +81,15 @@ export function GraphCanvas({
       ) as Record<Ink, string>,
     }
   }, [theme])
+
+  const traceNode = useCallback(
+    (ctx: CanvasRenderingContext2D, x: number, y: number, radius: number) => {
+      ctx.beginPath()
+      if (theme === 'cyber') ctx.rect(x - radius, y - radius, radius * 2, radius * 2)
+      else ctx.arc(x, y, radius, 0, Math.PI * 2)
+    },
+    [theme],
+  )
 
   const adjacency = useMemo(() => {
     const map = new Map<string, Set<string>>()
@@ -124,9 +133,7 @@ export function GraphCanvas({
       const radius = nodeRadius(n.link_count)
 
       ctx.globalAlpha = dimmed ? 0.25 : 1
-      // Square nodes: the pixel side of the style, crisp at any zoom.
-      ctx.beginPath()
-      ctx.rect(n.x - radius, n.y - radius, radius * 2, radius * 2)
+      traceNode(ctx, n.x, n.y, radius)
       ctx.fillStyle = nodeColorFor(n)
       ctx.fill()
 
@@ -144,17 +151,17 @@ export function GraphCanvas({
       }
       ctx.globalAlpha = 1
     },
-    [adjacency, colors, nodeColorFor],
+    [adjacency, colors, nodeColorFor, traceNode],
   )
 
   const nodePointerAreaPaint = useCallback(
     (node: NodeObject, color: string, ctx: CanvasRenderingContext2D) => {
       const n = node as unknown as GraphNode & { x: number; y: number }
       ctx.fillStyle = color
-      const r = nodeRadius(n.link_count)
-      ctx.fillRect(n.x - r, n.y - r, r * 2, r * 2)
+      traceNode(ctx, n.x, n.y, nodeRadius(n.link_count))
+      ctx.fill()
     },
-    [],
+    [traceNode],
   )
 
   const linkColor = useCallback(

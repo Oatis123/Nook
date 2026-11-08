@@ -19,7 +19,7 @@ const variantClasses: Record<Variant, string> = {
 // 44px tall below md (spec §10.8 touch-target minimum), tighter on desktop.
 const sizeClasses: Record<Size, string> = {
   sm: 'h-11 px-3 text-sm gap-1.5 md:h-8',
-  md: 'h-11 px-4 text-sm gap-2 md:h-10',
+  md: 'h-11 px-4 text-sm gap-2',
 }
 
 // `ui-button` + data-variant/data-size are the hooks design/skins/*.css restyle per skin.

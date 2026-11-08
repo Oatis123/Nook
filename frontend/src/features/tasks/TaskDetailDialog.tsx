@@ -46,10 +46,8 @@ function SubtaskRow({ subtask }: { subtask: Task }) {
           done ? reopenTask.mutate(subtask.id) : completeTask.mutate({ id: subtask.id })
         }
         aria-label={done ? 'Mark as not done' : 'Mark as done'}
-        className={clsx(
-          'h-3.5 w-3.5 shrink-0 border transition-colors duration-150',
-          done ? 'border-accent bg-accent' : 'border-border hover:border-accent',
-        )}
+        data-checked={done || undefined}
+        className="ui-check relative h-3.5 w-3.5 shrink-0 border transition-colors duration-150"
       />
       <span
         className={clsx(
@@ -231,12 +229,8 @@ export function TaskDetailDialog({
             type="button"
             onClick={handleToggleDone}
             aria-label={task.status === 'done' ? 'Mark as not done' : 'Mark as done'}
-            className={clsx(
-              'touch-target mt-1 h-4 w-4 shrink-0 border transition-colors duration-150',
-              task.status === 'done'
-                ? 'border-accent bg-accent'
-                : 'border-border hover:border-accent',
-            )}
+            data-checked={task.status === 'done' || undefined}
+            className="ui-check touch-target relative mt-1 h-4 w-4 shrink-0 border transition-colors duration-150"
           />
           <input
             value={title}

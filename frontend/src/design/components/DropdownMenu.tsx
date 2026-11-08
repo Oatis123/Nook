@@ -31,7 +31,7 @@ export function DropdownMenu({
           align="start"
           sideOffset={6}
           className={[
-            'ui-menu z-50 min-w-40 border border-border bg-surface-raised p-1',
+            'ui-menu ui-glass z-50 min-w-40 border border-border bg-surface-raised p-1',
             'animate-fade-in',
           ].join(' ')}
         >

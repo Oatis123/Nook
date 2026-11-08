@@ -17,7 +17,9 @@ const colorTokens = [
   ['text', 'Text'],
   ['text-muted', 'Text muted'],
   ['accent', 'Accent'],
+  ['accent-wash', 'Selection'],
   ['danger', 'Danger'],
+  ['danger-wash', 'Attention'],
 ] as const
 
 const priorityTokens = [
@@ -105,14 +107,17 @@ export default function StyleguidePage() {
       </Section>
 
       <Section title="Typography">
-        <h1 className="font-serif text-3xl">Heading serif 3xl</h1>
-        <h2 className="mt-2 font-serif text-2xl">Heading serif 2xl</h2>
-        <h3 className="mt-2 font-serif text-xl">Heading serif xl</h3>
+        <h1 className="font-serif text-3xl">Commissioner heading</h1>
+        <h2 className="mt-2 font-serif text-2xl">Section heading</h2>
+        <h3 className="mt-2 font-serif text-xl">Subheading</h3>
         <p className="mt-4 text-base">
           Body text uses a humanist sans-serif at 1.6 line height. The quick brown fox jumps over
           the lazy dog. Быстрая коричневая лиса перепрыгивает через ленивую собаку.
         </p>
         <p className="mt-2 text-sm text-text-muted">Muted text for secondary information.</p>
+        <p className="mt-4 font-(family-name:--font-prose) text-[17px] leading-[1.7] text-(--oatis-prose)">
+          Note text and quotations use Literata.
+        </p>
         <code className="mt-4 block bg-surface px-3 py-2 font-mono text-sm">
           const nook = &quot;self-hosted&quot;;
         </code>

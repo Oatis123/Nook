@@ -3,9 +3,9 @@ import { useResolvedTheme } from '@/lib/theme'
 
 /** The QR keeps a light plate so it stays scannable; only its ink follows the theme. */
 const QR_COLORS = {
-  light: { dark: '#080806', light: '#eceae2' },
-  dark: { dark: '#080806', light: '#eceae2' },
-  cyber: { dark: '#09080f', light: '#e8e6f5' },
+  light: { dark: '#1A1A15', light: '#FBF9F3' },
+  dark: { dark: '#0F100C', light: '#EEECE0' },
+  cyber: { dark: '#0A0912', light: '#EDEBFA' },
 } as const
 
 export function QrCode({ value, size = 200 }: { value: string; size?: number }) {
@@ -45,6 +45,12 @@ export function QrCode({ value, size = 200 }: { value: string; size?: number }) 
   }
 
   return (
-    <img src={dataUrl} width={size} height={size} alt="QR code" className="border border-border" />
+    <img
+      src={dataUrl}
+      width={size}
+      height={size}
+      alt="QR code"
+      className="rounded-sm border border-border"
+    />
   )
 }

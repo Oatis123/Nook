@@ -21,7 +21,7 @@ export function Toaster() {
           key={t.id}
           role={t.tone === 'error' ? 'alert' : 'status'}
           className={clsx(
-            'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 border bg-surface-raised px-3 py-2.5 text-sm text-text animate-fade-in',
+            'ui-toast ui-glass pointer-events-auto flex w-full max-w-sm items-start gap-2.5 border bg-surface-raised px-3 py-2.5 text-sm text-text animate-fade-in',
             t.tone === 'error' ? 'border-danger' : 'border-border',
           )}
         >

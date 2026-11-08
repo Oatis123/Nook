@@ -186,8 +186,8 @@ export function NoteEditor({ noteId }: { noteId: string }) {
     <div className="note-stage">
       <NoteBackdrop />
       <div className="note-frame">
-        <header className="flex items-center justify-between gap-4 border-b border-border px-6 py-3">
-          <div className="min-w-0 flex-1">
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border px-5 py-3">
+          <div className="min-w-0 flex-1 basis-full sm:basis-0">
             <input
               value={draft.title}
               maxLength={255}
@@ -196,7 +196,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') e.currentTarget.blur()
               }}
-              className="w-full truncate bg-transparent font-serif text-[1.375rem] text-text outline-none"
+              className="w-full truncate bg-transparent font-serif text-2xl text-text"
               aria-label="Note title"
               aria-invalid={autosave.titleError ? true : undefined}
               aria-describedby={autosave.titleError ? 'note-title-error' : undefined}

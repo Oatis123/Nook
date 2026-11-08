@@ -32,9 +32,6 @@ importers:
       '@fontsource/literata':
         specifier: ^5.3.0
         version: 5.3.0
-      '@fontsource/martian-mono':
-        specifier: ^5.3.0
-        version: 5.3.0
       '@fontsource/silkscreen':
         specifier: ^5.3.0
         version: 5.3.0
@@ -83,6 +80,9 @@ importers:
       katex:
         specifier: ^0.19.0
         version: 0.19.0
+      lucide-react:
+        specifier: ^1.46.0
+        version: 1.46.0(react@19.3.0)
       mdast-util-find-and-replace:
         specifier: ^3.0.2
         version: 3.0.2
@@ -448,9 +448,6 @@ packages:
 
   '@fontsource/literata@5.3.0':
     resolution: {integrity: sha512-9JGMT5+YfBK49thoMq9ASaMRJErHT4V4QuMhAEwKHRLreOsIMP2xP6ZRLhPJ0e6YlET+kjWTJuN7LAxt9/gWGQ==}
-
-  '@fontsource/martian-mono@5.3.0':
-    resolution: {integrity: sha512-0iTnU6SZi6j5z4ymwlZGep6akvp/xWm+r+WyZO9hMfDJWX+dsFLipQp9zO02S0lkUQ+zAahcZNy3XLiNP+gVqQ==}
 
   '@fontsource/silkscreen@5.3.0':
     resolution: {integrity: sha512-M1NQ3LQH0LFNvyFPd/piHEGMImPPtpLglNnLC6Vdcq9kL0jNIOtTQmksAWCc4enbDnw1OnIpZtjNEfRqYm/QmA==}
@@ -2123,6 +2120,11 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-react@1.46.0:
+    resolution: {integrity: sha512-Bv+FZXgZPrxc/NCl1e7JJVQFLdiCxYgxNVhqoV7X0p6I8ADJo8DxBnK1auH0fZz4AmqOJ3jgneL4f1i8LJQRAA==}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -3250,8 +3252,6 @@ snapshots:
   '@fontsource/jetbrains-mono@5.3.0': {}
 
   '@fontsource/literata@5.3.0': {}
-
-  '@fontsource/martian-mono@5.3.0': {}
 
   '@fontsource/silkscreen@5.3.0': {}
 
@@ -4861,6 +4861,10 @@ snapshots:
   lru-cache@5.1.1:
     dependencies:
       yallist: 3.1.1
+
+  lucide-react@1.46.0(react@19.3.0):
+    dependencies:
+      react: 19.3.0
 
   lz-string@1.5.0: {}
 

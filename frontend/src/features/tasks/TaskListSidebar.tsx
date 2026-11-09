@@ -1,9 +1,18 @@
 import { type DragEvent, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
-import { Calendar, CalendarClock, CalendarRange, MoreHorizontal, Plus } from '@/design/icons'
+import {
+  Calendar,
+  CalendarClock,
+  CalendarRange,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+} from '@/design/icons'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
+import { RowContextMenu } from '@/design/components/RowContextMenu'
 import { useDeleteTaskList, useTaskLists, useUpdateTaskList } from '@/features/tasks/hooks'
 import { LIST_ICON_COMPONENT, listColorVar } from '@/features/tasks/listStyle'
 import { TaskListEditDialog } from '@/features/tasks/TaskListEditDialog'
@@ -84,7 +93,7 @@ export function TaskListSidebar() {
       {active.map((list) => {
         const Icon = LIST_ICON_COMPONENT[list.icon]
         const items: DropdownMenuItem[] = [
-          { label: 'Edit', onSelect: () => setEditingList(list) },
+          { label: 'Edit', icon: Pencil, onSelect: () => setEditingList(list) },
           ...(list.is_inbox
             ? []
             : [
@@ -92,13 +101,20 @@ export function TaskListSidebar() {
                   label: 'Archive',
                   onSelect: () => updateList.mutate({ id: list.id, archived: true }),
                 },
-                { label: 'Delete', danger: true, onSelect: () => setDeletingList(list) },
+                {
+                  label: 'Delete',
+                  icon: Trash2,
+                  danger: true,
+                  onSelect: () => setDeletingList(list),
+                },
               ]),
         ]
 
         return (
-          <div
+          <RowContextMenu
             key={list.id}
+            label={`Actions for ${list.name}`}
+            items={items}
             draggable={!list.is_inbox}
             onDragStart={(e) => e.dataTransfer.setData(DRAG_MIME, list.id)}
             onDragOver={(e) => {
@@ -134,7 +150,7 @@ export function TaskListSidebar() {
                 }
               />
             </span>
-          </div>
+          </RowContextMenu>
         )
       })}
 

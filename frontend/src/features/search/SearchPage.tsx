@@ -61,13 +61,14 @@ export default function SearchPage() {
   return (
     <div className="mx-auto max-w-2xl px-6 py-8">
       <h1 className="mb-4 font-serif text-2xl text-text">Search</h1>
-      <div className="mb-2 flex items-center gap-2.5 border border-border bg-surface px-3 py-2">
+      <div className="ui-search-field ui-glass sticky top-3 z-10 mb-2 flex min-h-11 items-center gap-2.5 border border-border bg-surface-raised px-4 py-2">
         <SearchIcon size={16} strokeWidth={1.5} className="text-text-muted" />
         <input
           ref={inputRef}
           autoFocus
           value={rawQuery}
           onChange={(e) => setRawQuery(e.target.value)}
+          aria-label="Search notes"
           placeholder="Search notes…"
           className="w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
         />

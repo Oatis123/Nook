@@ -180,14 +180,14 @@ export function CommandPalette() {
         <RadixDialog.Overlay className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in" />
         <RadixDialog.Content
           className={[
-            'ui-palette fixed left-1/2 top-[20vh] z-50 w-[90vw] max-w-lg -translate-x-1/2',
+            'ui-palette ui-glass fixed left-1/2 top-[20vh] z-50 w-[90vw] max-w-lg -translate-x-1/2',
             'border border-border bg-surface-raised',
             'animate-fade-in',
           ].join(' ')}
           onKeyDown={handleKeyDown}
         >
           <RadixDialog.Title className="sr-only">Command palette</RadixDialog.Title>
-          <div className="flex items-center gap-2.5 border-b border-border px-4 py-3">
+          <div className="flex items-center gap-2.5 border-b border-border px-4 py-3 focus-within:border-accent">
             <Search size={16} strokeWidth={1.5} className="text-text-muted" />
             <input
               autoFocus

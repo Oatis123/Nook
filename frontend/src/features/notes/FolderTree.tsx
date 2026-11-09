@@ -22,11 +22,14 @@ import {
   FilePlus,
   Lightbulb,
   MoreHorizontal,
+  Pencil,
+  Trash2,
 } from '@/design/icons'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
+import { RowContextMenu } from '@/design/components/RowContextMenu'
 import { useCurrentUser, useUpdateProfile } from '@/features/auth/hooks'
 import { updateNote as updateNoteApi } from '@/features/notes/api'
 import type { Folder, NoteSummary } from '@/lib/types'
@@ -417,6 +420,7 @@ const FolderRow = memo(function FolderRow({
   const items: DropdownMenuItem[] = [
     {
       label: 'New note',
+      icon: FilePlus,
       onSelect: () =>
         createNote.mutate(
           {
@@ -434,12 +438,18 @@ const FolderRow = memo(function FolderRow({
     },
     {
       label: 'New subfolder',
+      icon: FolderPlus,
       onSelect: () => createFolder.mutate({ name: 'New folder', parent_id: node.folder.id }),
     },
-    { label: 'Rename', onSelect: () => setRenaming(`folder:${node.folder.id}`) },
-    { label: 'Move to…', onSelect: () => startMove({ type: 'folder', id: node.folder.id }) },
+    { label: 'Rename', icon: Pencil, onSelect: () => setRenaming(`folder:${node.folder.id}`) },
+    {
+      label: 'Move to…',
+      icon: FolderIcon,
+      onSelect: () => startMove({ type: 'folder', id: node.folder.id }),
+    },
     {
       label: 'Delete',
+      icon: Trash2,
       danger: true,
       onSelect: async () => {
         const ok = await confirmAction({
@@ -463,7 +473,10 @@ const FolderRow = memo(function FolderRow({
 
   return (
     <div>
-      <div
+      <RowContextMenu
+        label={`Actions for ${node.folder.name}`}
+        items={items}
+        menuDisabled={isRenaming}
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData(
@@ -534,7 +547,7 @@ const FolderRow = memo(function FolderRow({
             }
           />
         </span>
-      </div>
+      </RowContextMenu>
 
       {isOpen && (
         <div>
@@ -602,13 +615,20 @@ const NoteRow = memo(function NoteRow({
   const open = () => onOpen(note.id)
 
   const items: DropdownMenuItem[] = [
-    { label: 'Rename', onSelect: () => onStartRename(note.id) },
-    { label: 'Move to…', onSelect: () => startMove({ type: 'note', id: note.id }) },
-    { label: 'Delete', danger: true, onSelect: () => onDelete(note.id) },
+    { label: 'Rename', icon: Pencil, onSelect: () => onStartRename(note.id) },
+    {
+      label: 'Move to…',
+      icon: FolderIcon,
+      onSelect: () => startMove({ type: 'note', id: note.id }),
+    },
+    { label: 'Delete', icon: Trash2, danger: true, onSelect: () => onDelete(note.id) },
   ]
 
   return (
-    <div
+    <RowContextMenu
+      label={`Actions for ${note.title}`}
+      items={[{ label: 'Open', icon: File, onSelect: open }, ...items]}
+      menuDisabled={renaming}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(
@@ -655,7 +675,7 @@ const NoteRow = memo(function NoteRow({
           }
         />
       </span>
-    </div>
+    </RowContextMenu>
   )
 })
 
@@ -715,14 +735,18 @@ function IdeasNoteRow({
 }) {
   const navigate = useNavigate()
   const prefetchNote = usePrefetchNote()
+  const open = () => navigate(`/notes/${note.id}`)
 
   const items: DropdownMenuItem[] = [
-    { label: 'Rename', onSelect: onStartRename },
+    { label: 'Rename', icon: Pencil, onSelect: onStartRename },
     { label: 'Hide', onSelect: onHide },
   ]
 
   return (
-    <div
+    <RowContextMenu
+      label={`Actions for ${note.title}`}
+      items={[{ label: 'Open', icon: File, onSelect: open }, ...items]}
+      menuDisabled={renaming}
       // Not a drop target: a drop here falls through to the tree (the top level).
       onPointerEnter={() => prefetchNote(note.id)}
       onFocus={() => prefetchNote(note.id)}
@@ -737,11 +761,7 @@ function IdeasNoteRow({
       {renaming ? (
         <NoteRenameForm note={note} onDone={onFinishRename} />
       ) : (
-        <button
-          type="button"
-          onClick={() => navigate(`/notes/${note.id}`)}
-          className="row-link flex-1 truncate text-left"
-        >
+        <button type="button" onClick={open} className="row-link flex-1 truncate text-left">
           {note.title}
         </button>
       )}
@@ -755,7 +775,7 @@ function IdeasNoteRow({
           }
         />
       </span>
-    </div>
+    </RowContextMenu>
   )
 }
 

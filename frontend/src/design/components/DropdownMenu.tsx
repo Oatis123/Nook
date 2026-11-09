@@ -1,14 +1,9 @@
 import type { ReactNode } from 'react'
 import * as RadixDropdown from '@radix-ui/react-dropdown-menu'
-import { clsx } from 'clsx'
+import { MenuItems, menuClass, type MenuAction } from '@/design/components/MenuItems'
 import { rememberMenuTrigger } from '@/lib/focusReturn'
 
-export interface DropdownMenuItem {
-  label: string
-  onSelect?: () => void
-  danger?: boolean
-  disabled?: boolean
-}
+export type DropdownMenuItem = MenuAction
 
 export function DropdownMenu({
   trigger,
@@ -27,30 +22,8 @@ export function DropdownMenu({
         {trigger}
       </RadixDropdown.Trigger>
       <RadixDropdown.Portal>
-        <RadixDropdown.Content
-          align="start"
-          sideOffset={6}
-          className={[
-            'ui-menu ui-glass z-50 min-w-40 border border-border bg-surface-raised p-1',
-            'animate-fade-in',
-          ].join(' ')}
-        >
-          {items.map((item) => (
-            <RadixDropdown.Item
-              key={item.label}
-              disabled={item.disabled}
-              data-danger={item.danger || undefined}
-              onSelect={item.onSelect}
-              className={clsx(
-                'ui-menu-item cursor-pointer px-2.5 py-1.5 text-sm outline-none',
-                'data-[highlighted]:bg-surface',
-                item.danger ? 'text-danger' : 'text-text',
-                item.disabled && 'opacity-50',
-              )}
-            >
-              {item.label}
-            </RadixDropdown.Item>
-          ))}
+        <RadixDropdown.Content align="start" sideOffset={6} className={menuClass}>
+          <MenuItems as={RadixDropdown.Item} items={items} />
         </RadixDropdown.Content>
       </RadixDropdown.Portal>
     </RadixDropdown.Root>

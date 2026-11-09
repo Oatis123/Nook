@@ -1,6 +1,7 @@
 import { memo, useState } from 'react'
 import { clsx } from 'clsx'
-import { Flag } from '@/design/icons'
+import { Check, Flag, ListTodo, Repeat } from '@/design/icons'
+import { RowContextMenu } from '@/design/components/RowContextMenu'
 import { ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { useCompleteTask, useReopenTask } from '@/features/tasks/hooks'
@@ -45,7 +46,18 @@ export const TaskRow = memo(function TaskRow({
   }
 
   return (
-    <div className="ui-task-row group relative flex items-start gap-2.5 px-3 py-2 hover:bg-surface-raised">
+    <RowContextMenu
+      label={`Actions for ${task.title}`}
+      items={[
+        { label: 'Open', icon: ListTodo, onSelect: () => onOpen(task) },
+        {
+          label: done ? 'Reopen' : 'Mark as done',
+          icon: done ? Repeat : Check,
+          onSelect: handleToggle,
+        },
+      ]}
+      className="ui-task-row group relative flex items-start gap-2.5 px-3 py-2 hover:bg-surface-raised"
+    >
       <button
         type="button"
         onClick={handleToggle}
@@ -107,6 +119,6 @@ export const TaskRow = memo(function TaskRow({
         onOpenChange={setConfirmOpen}
         onConfirm={() => completeTask.mutate({ id: task.id, completeSubtasks: true })}
       />
-    </div>
+    </RowContextMenu>
   )
 })

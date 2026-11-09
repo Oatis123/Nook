@@ -46,8 +46,8 @@
   --priority-high: var(--danger);
   --overlay: light-dark(rgb(26 26 21 / 0.45), rgb(15 16 12 / 0.72));
   --glass-fill: light-dark(
-    color-mix(in srgb, var(--surface-raised) 58%, transparent),
-    color-mix(in srgb, var(--surface) 52%, transparent)
+    color-mix(in srgb, var(--surface-raised) 34%, transparent),
+    color-mix(in srgb, var(--surface) 28%, transparent)
   );
   --glass-edge: light-dark(rgb(255 255 255 / 0.68), rgb(255 255 255 / 0.14));
 

@@ -190,15 +190,22 @@ body {
   outline-offset: 2px;
 }
 
-/* Glass applies to floating surfaces that sit over page content. */
+/* Enable glass wherever blur is supported, even without the transparency media query. */
 /* prettier-ignore */
 @supports (backdrop-filter:none) {
-  @media (prefers-reduced-transparency: no-preference) {
+  .ui-glass {
+    background: var(--glass-fill);
+    border-color: var(--glass-edge);
+    backdrop-filter: blur(20px) saturate(170%);
+    box-shadow: inset 0 1px var(--glass-edge), var(--shadow-popover);
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
     .ui-glass {
-      background: var(--glass-fill);
-      border-color: var(--glass-edge);
-      backdrop-filter: blur(20px) saturate(170%);
-      box-shadow: inset 0 1px var(--glass-edge), var(--shadow-popover);
+      background: var(--surface-raised);
+      border-color: revert-layer;
+      backdrop-filter: none;
+      box-shadow: var(--shadow-popover);
     }
   }
 }

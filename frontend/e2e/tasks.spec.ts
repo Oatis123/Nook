@@ -23,7 +23,8 @@ test('a task created for today lands on Today', async ({ page }) => {
   // like the Today view does.
   await dialog.getByRole('button', { name: 'Due date' }).click()
   await page.getByRole('button', { name: 'Today', exact: true }).click()
-  await dialog.getByLabel('Priority').selectOption('high')
+  await dialog.getByRole('button', { name: 'Priority: No priority' }).click()
+  await page.getByRole('menuitemradio', { name: 'High', exact: true }).click()
 
   const created = page.waitForResponse(
     (res) =>

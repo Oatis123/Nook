@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { Button } from '@/design/components/Button'
 import { DateField, TimeField } from '@/design/components/DateTimeFields'
 import { Dialog } from '@/design/components/Dialog'
+import { SelectMenu } from '@/design/components/SelectMenu'
 import { useCreateTask, useTaskLists } from '@/features/tasks/hooks'
 import { PRIORITY_COLOR_VAR, PRIORITY_LABEL } from '@/features/tasks/priority'
 import { RecurrenceFields } from '@/features/tasks/RecurrenceFields'
@@ -10,8 +11,10 @@ import { TagInput } from '@/features/tasks/TagInput'
 import { DEFAULT_RECURRENCE } from '@/features/tasks/recurrenceDefaults'
 import type { RecurrenceInput, TaskPriority } from '@/lib/types'
 
-const selectClass =
-  'h-9 border border-border bg-surface-raised px-2 text-sm outline-none focus-visible:border-accent'
+const priorityOptions = (Object.keys(PRIORITY_LABEL) as TaskPriority[]).map((value) => ({
+  value,
+  label: PRIORITY_LABEL[value],
+}))
 
 type TaskMode = 'once' | 'recurring'
 
@@ -57,9 +60,7 @@ export function TaskCreateDialog({
       setPriority('none')
       setDueDate(defaultDate ?? '')
       setDueTime('')
-      setSelectedListId(
-        listId ?? taskListsQuery.data?.find((l) => l.is_inbox)?.id ?? taskListsQuery.data?.[0]?.id,
-      )
+      setSelectedListId(listId)
       setRemindersEnabled(true)
       setReminderOffsets(null)
       setTags([])
@@ -67,6 +68,10 @@ export function TaskCreateDialog({
       setRecurrence(DEFAULT_RECURRENCE)
     }
   }
+
+  const taskLists = taskListsQuery.data ?? []
+  const taskListId =
+    selectedListId ?? taskLists.find((list) => list.is_inbox)?.id ?? taskLists[0]?.id
 
   // A recurring task needs a time for its first occurrence (spec §7.4) — see QuickAdd's
   // needsTimeForRecurrence for the same rule on the old text-entry path.
@@ -87,7 +92,7 @@ export function TaskCreateDialog({
       {
         title: trimmed,
         description: description.trim() || undefined,
-        list_id: selectedListId,
+        list_id: taskListId,
         priority,
         due_date: dueDate || undefined,
         due_time: dueTime || undefined,
@@ -123,41 +128,25 @@ export function TaskCreateDialog({
         />
 
         <div className="flex flex-wrap items-center gap-3">
-          <select
-            aria-label="Priority"
+          <SelectMenu
+            label="Priority"
             value={priority}
-            onChange={(e) => setPriority(e.target.value as TaskPriority)}
-            className={selectClass}
-            style={
-              priority !== 'none'
-                ? { color: PRIORITY_COLOR_VAR[priority as 'low' | 'medium' | 'high'] }
-                : undefined
-            }
-          >
-            {(Object.keys(PRIORITY_LABEL) as TaskPriority[]).map((p) => (
-              <option key={p} value={p}>
-                {PRIORITY_LABEL[p]}
-              </option>
-            ))}
-          </select>
+            options={priorityOptions}
+            onChange={setPriority}
+            style={priority !== 'none' ? { color: PRIORITY_COLOR_VAR[priority] } : undefined}
+          />
 
           <DateField label="Due date" value={dueDate} onChange={setDueDate} className="h-9" />
 
           <TimeField label="Due time" value={dueTime} onChange={setDueTime} className="h-9" />
 
-          {taskListsQuery.data && taskListsQuery.data.length > 0 && (
-            <select
-              aria-label="List"
-              value={selectedListId ?? ''}
-              onChange={(e) => setSelectedListId(e.target.value)}
-              className={selectClass}
-            >
-              {taskListsQuery.data.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+          {taskLists.length > 0 && (
+            <SelectMenu
+              label="List"
+              value={taskListId}
+              options={taskLists.map((list) => ({ value: list.id, label: list.name }))}
+              onChange={setSelectedListId}
+            />
           )}
         </div>
 

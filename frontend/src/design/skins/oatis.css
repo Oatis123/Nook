@@ -364,12 +364,12 @@ textarea.border {
 
 .note-gutter {
   position: relative;
-  container-type: inline-size;
+  overflow: hidden;
+  container-type: size;
 }
 
 .note-gutter--left {
   grid-column: 1;
-  transform: scaleX(-1);
 }
 
 .note-gutter--right {
@@ -378,22 +378,46 @@ textarea.border {
 
 .note-scene {
   position: absolute;
-  inset: 0;
+  inset-block: 0;
+  width: 200%;
   background-position: right bottom;
   background-size: cover;
   image-rendering: pixelated;
 }
 
-.note-scene--wide {
-  display: none;
+/* Each gutter shows one half of the same render at the combined gutter width. */
+.note-gutter--left .note-scene {
+  left: 0;
 }
 
-@container (min-width: 28rem) {
+.note-gutter--right .note-scene {
+  right: 0;
+}
+
+.note-scene--wide,
+.note-scene--ultrawide {
+  display: none;
+  background-position: center bottom;
+}
+
+/* At a combined aspect ratio of 1:1 or wider, use the landscape composition. */
+@container (min-aspect-ratio: 1 / 2) {
   .note-scene--tall {
     display: none;
   }
 
   .note-scene--wide {
+    display: block;
+  }
+}
+
+/* Use the 3:1 render on super-ultrawide displays to keep the skyline and sky in frame. */
+@container (min-aspect-ratio: 11 / 10) {
+  .note-scene--wide {
+    display: none;
+  }
+
+  .note-scene--ultrawide {
     display: block;
   }
 }

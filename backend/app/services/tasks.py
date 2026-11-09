@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo
@@ -8,9 +9,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.isolation import get_owned_or_404
+from app.models.note import Note
 from app.models.task import Task, TaskStatus
 from app.models.task_completion import TaskCompletion
 from app.models.task_list import TaskList
+from app.models.task_note_link import TaskNoteLink
 from app.models.user import User
 from app.schemas.task import CalendarEntryOut, TaskCreate, TaskUpdate
 from app.services import recurrence as recurrence_service
@@ -90,9 +93,23 @@ async def _next_position(
     return (max_position or 0) + 1
 
 
-async def create_task(session: AsyncSession, user_id: uuid.UUID, data: TaskCreate) -> Task:
+async def create_task(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    data: TaskCreate,
+    *,
+    note_ids: Collection[uuid.UUID] = (),
+) -> Task:
     if data.due_time is not None and data.due_date is None:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "due_time requires due_date")
+
+    linked_ids = set(note_ids)
+    if linked_ids:
+        owned_ids = await session.scalars(
+            select(Note.id).where(Note.id.in_(linked_ids), Note.user_id == user_id)
+        )
+        if set(owned_ids) != linked_ids:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
 
     parent: Task | None = None
     if data.parent_id is not None:
@@ -126,6 +143,7 @@ async def create_task(session: AsyncSession, user_id: uuid.UUID, data: TaskCreat
         _apply_recurrence(task, data.recurrence)
     session.add(task)
     await session.flush()
+    session.add_all(TaskNoteLink(task_id=task.id, note_id=note_id) for note_id in linked_ids)
     await reminders_service.recompute_reminders_for_task(session, task)
     await session.commit()
     await session.refresh(task)

@@ -257,6 +257,56 @@ async def test_managing_task_lists_and_deleting_tasks(
     assert "Inbox can't be deleted" in inbox_delete["result"]["content"][0]["text"]
 
 
+async def test_creating_tasks_links_unambiguous_wikilinks(
+    mcp_client: TestClient, db_session: AsyncSession
+) -> None:
+    alice = await make_user(db_session, "alice")
+    bob = await make_user(db_session, "bob")
+    _, token = await create_api_token(db_session, alice.id, "agent")
+    _, bob_token = await create_api_token(db_session, bob.id, "agent")
+    sid = _initialize(mcp_client, token)
+    bob_sid = _initialize(mcp_client, bob_token)
+
+    def call(tool: str, /, **arguments: Any) -> dict:
+        response = _call_tool(mcp_client, token, sid, tool, arguments)
+        assert response["result"]["isError"] is False, response
+        return response
+
+    plan = _tool_object(call("create_note", title="Gym plan"))
+    checklist = _tool_object(call("create_note", title="Checklist"))
+    _tool_object(call("create_note", title="Code sample"))
+    private = _tool_object(
+        _call_tool(mcp_client, bob_token, bob_sid, "create_note", {"title": "Private note"})
+    )
+
+    description = "[[Gym plan#Warm-up|Plan]], [[Missing]], [[Private note]], `[[Code sample]]`"
+    task = _tool_object(
+        call(
+            "create_task",
+            title="Review [[Checklist]]",
+            description=description,
+            note_ids=[plan["id"], plan["id"]],
+        )
+    )
+    assert task["description"] == description
+    assert {note["id"] for note in task["linked_notes"]} == {plan["id"], checklist["id"]}
+    detail = _tool_object(call("get_task", task_id=task["id"]))
+    assert detail["linked_notes"] == task["linked_notes"]
+
+    results = _tool_list(
+        call(
+            "create_tasks",
+            tasks=[
+                {"title": "Reject foreign ID", "note_ids": [private["id"]]},
+                {"title": "Warm up", "description": "[[Gym plan]]"},
+            ],
+        )
+    )
+    assert [result["ok"] for result in results] == [False, True]
+    assert [note["id"] for note in results[1]["task"]["linked_notes"]] == [plan["id"]]
+    assert "Reject foreign ID" not in [task["title"] for task in _tool_list(call("list_tasks"))]
+
+
 async def test_tasks_with_recurrence_reminders_tags_subtasks_and_batches(
     mcp_client: TestClient, db_session: AsyncSession
 ) -> None:

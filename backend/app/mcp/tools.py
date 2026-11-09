@@ -25,6 +25,7 @@ from app.schemas.task import TaskCreate, TaskUpdate
 from app.schemas.task_list import TaskListCreate, TaskListUpdate
 from app.services import folders as folders_service
 from app.services import note_links as note_links_service
+from app.services import note_parsing
 from app.services import notes as notes_service
 from app.services import recurrence as recurrence_service
 from app.services import search as search_service
@@ -446,10 +447,16 @@ async def _task_out(session: AsyncSession, task: Task) -> dict[str, Any]:
 
 
 async def _create_task(session: AsyncSession, user_id: uuid.UUID, item: NewTask) -> Task:
-    note_ids = _uuids(item.note_ids, "note")
-    for note_id in note_ids:  # check them all before creating anything
-        await _run(notes_service.get_note(session, user_id, note_id))
-    task = await _run(
+    note_ids = set(_uuids(item.note_ids, "note"))
+    targets = {
+        link.target
+        for text in (item.title, item.description or "")
+        for link in note_parsing.extract_wikilinks(text)
+    }
+    if targets:
+        resolved = await note_links_service.resolve_targets(session, user_id, targets)
+        note_ids.update(resolved.values())
+    return await _run(
         tasks_service.create_task(
             session,
             user_id,
@@ -467,11 +474,9 @@ async def _create_task(session: AsyncSession, user_id: uuid.UUID, item: NewTask)
                 reminders_enabled=item.reminders_enabled,
                 tags=item.tags or [],
             ),
+            note_ids=note_ids,
         )
     )
-    for note_id in note_ids:
-        await _run(task_note_links_service.link_note_to_task(session, user_id, task.id, note_id))
-    return task
 
 
 async def _update_task(session: AsyncSession, user_id: uuid.UUID, item: TaskChanges) -> Task:
@@ -573,7 +578,9 @@ async def get_task(task_id: str) -> dict[str, Any]:
     description=f"""Create a task. `priority`: "none"|"low"|"medium"|"high". Dates are
 ISO (`due_date`: YYYY-MM-DD, `due_time`: HH:MM). Omit `list_id` for the Inbox;
 `parent_id` makes it a subtask of that (top-level) task, in the parent's list. `tags`:
-names like "work" or "home/repairs" (no `#`). `note_ids` links notes to the task.
+names like "work" or "home/repairs" (no `#`). Pass `note_ids` with note UUIDs to
+link specific notes. Wikilinks like `[[Note title]]` in the title or description
+also create links when they match exactly one active note. The text is kept as written.
 
 {_RECURRENCE_DOC}
 
@@ -651,7 +658,7 @@ async def create_tasks(tasks: list[NewTask]) -> list[dict[str, Any]]:
     async with async_session_factory() as session:
 
         async def run(item: NewTask) -> dict[str, Any]:
-            return _task_detail(await _create_task(session, user_id, item))
+            return await _task_out(session, await _create_task(session, user_id, item))
 
         return await _each(session, tasks, run)
 

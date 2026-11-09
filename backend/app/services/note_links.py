@@ -121,8 +121,21 @@ async def resolve_target(
     `folder/Title` form (matched against the note's immediate containing folder's name —
     a one-level approximation of a full path, on the agent's discretion). Returns None
     if there's no match or more than one (ambiguous), same as a dangling link."""
-    candidates, folders = await _load_candidates(session, user_id, {_split_target(target_raw)[1]})
-    return _match_target(target_raw, candidates, folders)
+    return (await resolve_targets(session, user_id, {target_raw})).get(target_raw)
+
+
+async def resolve_targets(
+    session: AsyncSession, user_id: uuid.UUID, targets: set[str]
+) -> dict[str, uuid.UUID]:
+    """Resolve only unambiguous wikilinks, with one shared set of note candidates."""
+    candidates, folders = await _load_candidates(
+        session, user_id, {_split_target(target)[1] for target in targets}
+    )
+    return {
+        target: note_id
+        for target in targets
+        if (note_id := _match_target(target, candidates, folders)) is not None
+    }
 
 
 def _dedup_links(links: list[Wikilink]) -> list[Wikilink]:

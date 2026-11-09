@@ -204,10 +204,7 @@ export function AppShell() {
                   <ChevronsUpDown size={14} strokeWidth={1.5} className="text-text-muted" />
                 </button>
               }
-              items={[
-                { label: 'Settings', onSelect: () => navigate('/settings') },
-                { label: 'Log out', onSelect: () => logout.mutate() },
-              ]}
+              items={[{ label: 'Log out', onSelect: () => logout.mutate() }]}
             />
           </div>
         )}

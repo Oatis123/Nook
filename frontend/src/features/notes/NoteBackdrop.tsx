@@ -4,19 +4,18 @@ import { type NoteScene, sceneFor, useDayPhase } from '@/features/notes/dayPhase
 function NoteGutter({ side, scene }: { side: 'left' | 'right'; scene: NoteScene }) {
   return (
     <div className={`note-gutter note-gutter--${side}`}>
-      <div
-        className="note-scene note-scene--tall"
-        style={{ backgroundImage: `url(${scene.tall})` }}
-      />
-      <div
-        className="note-scene note-scene--wide"
-        style={{ backgroundImage: `url(${scene.wide})` }}
-      />
+      {Object.entries(scene).map(([variant, src]) => (
+        <div
+          key={variant}
+          className={`note-scene note-scene--${variant}`}
+          style={{ backgroundImage: `url(${src})` }}
+        />
+      ))}
     </div>
   )
 }
 
-/** The scene is mirrored across the plain reading column. */
+/** Two adjacent halves of one scene with the reading column inserted between them. */
 export function NoteBackdrop() {
   const phase = useDayPhase()
   const theme = useResolvedTheme()

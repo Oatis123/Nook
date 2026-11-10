@@ -1,22 +1,23 @@
 import base64
 import calendar
 import contextlib
+import json
 import re
 import time as monotonic_clock
 import uuid
 from collections import defaultdict
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta
 from itertools import batched
-from typing import Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 import dateparser
 import structlog
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.enums import ChatType
-from aiogram.exceptions import TelegramBadRequest
+from aiogram.exceptions import TelegramAPIError, TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     CallbackQuery,
@@ -26,9 +27,11 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     InputRichMessage,
     Message,
+    ReplyParameters,
 )
 from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.db import async_session_factory
@@ -53,6 +56,7 @@ from app.services.telegram_format import (
     format_due,
 )
 from app.services.week_agenda import week_start
+from bot import widget_api, widget_views
 
 router = Router()
 settings = get_settings()
@@ -84,13 +88,28 @@ async def handle_start_plain(message: Message) -> None:
     async with async_session_factory() as session:
         user = await telegram_link_service.get_user_by_telegram_id(session, message.from_user.id)
     if user is None:
-        await message.answer(f"Добро пожаловать в {settings.app_name}.\n\n{NOT_LINKED_TEXT}")
+        text = f"Добро пожаловать в {settings.app_name}.\n\n{NOT_LINKED_TEXT}"
+        state = widget_views.card(
+            f"Добро пожаловать в {settings.app_name}",
+            detail="Подключите Telegram в настройках Nook.",
+            icon="home",
+        )
     else:
-        await message.answer(
+        text = (
             f"С возвращением, {user.username}.\n\n"
             "Чтобы создать задачу, просто напишите её текст. Задачи на неделю — /week, "
             "дневник — /daily, заметки — /note, справка — /help."
         )
+        state = widget_views.card(
+            f"С возвращением, {user.username}",
+            detail="Чтобы создать задачу, отправьте её название сообщением.",
+            icon="home",
+            theme=user.theme,
+            buttons=[["Справка", "h"], ["Эта неделя", "w:today:0", "primary"]],
+        )
+    caption = text if user is None else "Отправьте название задачи или воспользуйтесь /help."
+    if await widget_api.send(message, state, caption, interactive=user is not None) is None:
+        await message.answer(text)
 
 
 async def _handle_link(message: Message, telegram_user_id: int, plain_token: str) -> None:
@@ -235,25 +254,39 @@ async def handle_login_callback(callback: CallbackQuery) -> None:
     await callback.answer()
 
 
+HELP_TEXT = (
+    "Чтобы создать задачу, просто напишите её текст — бот спросит описание, дату и "
+    "время. Задачи из бота получают средний приоритет.\n\n"
+    "/new <текст> — то же самое\n"
+    "/idea <текст> — записать идею в заметку «Идеи» (или кнопка «💡 Это идея» "
+    "после текста)\n"
+    "/daily <текст> — записать в дневник: заметку за сегодня в папке «Дневник» "
+    "(или кнопка «📓 В дневник» после текста)\n"
+    "/cancel — отменить создание задачи\n"
+    "/week — задачи на эту неделю; кнопками можно листать дальше, а /week 2 "
+    "или /week 20.10 сразу откроет нужную неделю\n"
+    "/note <название> — найти заметку и прочитать её здесь; без названия — "
+    "последние изменённые\n"
+    "/lists — выбрать список и посмотреть все его задачи\n"
+    "/help — эта справка\n"
+    "/unlink — отвязать Telegram от аккаунта"
+)
+
+
+def _help_card(theme: str = "system") -> dict[str, Any]:
+    return widget_views.card("Команды Nook", icon="help", theme=theme, rows=widget_views.HELP_ROWS)
+
+
 @router.message(Command("help"))
 async def handle_help(message: Message) -> None:
-    await message.answer(
-        "Чтобы создать задачу, просто напишите её текст — бот спросит описание, дату и "
-        "время. Задачи из бота получают средний приоритет.\n\n"
-        "/new <текст> — то же самое\n"
-        "/idea <текст> — записать идею в заметку «Идеи» (или кнопка «💡 Это идея» "
-        "после текста)\n"
-        "/daily <текст> — записать в дневник: заметку за сегодня в папке «Дневник» "
-        "(или кнопка «📓 В дневник» после текста)\n"
-        "/cancel — отменить создание задачи\n"
-        "/week — задачи на эту неделю; кнопками можно листать дальше, а /week 2 "
-        "или /week 20.10 сразу откроет нужную неделю\n"
-        "/note <название> — найти заметку и прочитать её здесь; без названия — "
-        "последние изменённые\n"
-        "/lists — выбрать список и посмотреть все его задачи\n"
-        "/help — эта справка\n"
-        "/unlink — отвязать Telegram от аккаунта"
+    sent = await widget_api.send(
+        message,
+        _help_card(),
+        "Справка по командам Nook.",
+        keyboard=_text_view_keyboard("nw:h"),
     )
+    if sent is None:
+        await message.answer(HELP_TEXT)
 
 
 LISTS_PRIVATE_TEXT = "Откройте личный чат с ботом, чтобы посмотреть списки задач."
@@ -278,6 +311,18 @@ async def handle_lists(message: Message) -> None:
     if not lists:
         await message.answer("У вас пока нет списков.")
         return
+    sent = await widget_api.send(
+        message,
+        widget_views.list_card(lists, user, 0),
+        "Ваши списки задач.",
+        interactive=True,
+        keyboard=_text_view_keyboard("nw:l"),
+    )
+    if sent is None:
+        await _send_list_picker(message, lists)
+
+
+async def _send_list_picker(message: Message, lists: list[TaskList]) -> None:
     for group in batched(lists, LISTS_PER_MESSAGE):
         keyboard = InlineKeyboardMarkup(
             inline_keyboard=[
@@ -377,6 +422,11 @@ class _Draft:
     # The message whose buttons drive the current step: its keyboard is removed when the
     # step is answered by typing instead, so stale buttons don't linger in the chat.
     prompt: Message | None = None
+    widget_owner: uuid.UUID | None = None
+    due_time: time | None = None
+    list_id: uuid.UUID | None = None
+    list_page: int = 0
+    widget_revision: int = 0
     started: float = field(default_factory=lambda: monotonic_clock.monotonic())
 
 
@@ -399,6 +449,10 @@ def _local_now(user: User) -> datetime:
 
 def _button(text: str, data: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, callback_data=data)
+
+
+def _text_view_keyboard(data: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[_button("Текстовый вид", data)]])
 
 
 CANCEL_BUTTON = _button("Отмена", "nt:cancel")
@@ -512,13 +566,16 @@ def _time_prompt(draft: _Draft) -> str:
     )
 
 
-def _time_keyboard(draft: _Draft, now: datetime) -> InlineKeyboardMarkup:
-    # For today, only times still ahead are offered.
-    presets = [
+def _time_presets(draft: _Draft, now: datetime) -> list[time]:
+    return [
         preset
         for preset in TIME_PRESETS
         if draft.due_date != now.date() or datetime.combine(now.date(), preset) > now
     ]
+
+
+def _time_keyboard(draft: _Draft, now: datetime) -> InlineKeyboardMarkup:
+    presets = _time_presets(draft, now)
     rows = []
     if presets:
         rows.append([_button(f"{preset:%H:%M}", f"nt:time:{preset:%H%M}") for preset in presets])
@@ -557,9 +614,19 @@ async def _linked_user(telegram_user_id: int) -> User | None:
         return await telegram_link_service.get_user_by_telegram_id(session, telegram_user_id)
 
 
-async def _drop_prompt_buttons(draft: _Draft) -> None:
+async def _drop_prompt_buttons(draft: _Draft, status: str = "Черновик закрыт") -> None:
     """The step was answered by typing: take the buttons off the previous prompt."""
     if draft.prompt is not None:
+        if draft.widget_owner is not None and draft.prompt.bot is not None:
+            with contextlib.suppress(TelegramAPIError):
+                await widget_api.edit(
+                    draft.prompt.bot,
+                    draft.prompt.chat.id,
+                    draft.prompt.message_id,
+                    widget_views.card(
+                        status, detail=widget_views.short(draft.title, 150), icon="close"
+                    ),
+                )
         with contextlib.suppress(Exception):
             await draft.prompt.edit_reply_markup(reply_markup=None)
 
@@ -576,6 +643,50 @@ async def _prompt_by_edit(
 ) -> None:
     await callback_message.edit_text(text, reply_markup=keyboard)
     draft.prompt = callback_message
+
+
+async def _schedule_view(user: User, draft: _Draft, now: datetime) -> dict[str, Any]:
+    async with async_session_factory() as session:
+        lists = await task_lists_service.list_task_lists(session, user.id)
+    inbox = next(item for item in lists if item.is_inbox)
+    selected = next((item for item in lists if item.id == draft.list_id), inbox)
+    if selected.id != draft.list_id:
+        draft.list_id = None
+    return widget_views.schedule(
+        draft.title,
+        now.date(),
+        draft.due_date,
+        draft.due_time,
+        selected,
+        lists,
+        _time_presets(draft, now),
+        user,
+        draft.list_page,
+        draft.widget_revision,
+    )
+
+
+async def _prompt_for_schedule(
+    message: Message, user: User, draft: _Draft, *, edit: bool = False
+) -> None:
+    if widget_api.can_send(message):
+        state = await _schedule_view(user, draft, _local_now(user))
+        sent = await widget_api.send(
+            message,
+            state,
+            "Дату и время можно отправить сообщением.",
+            interactive=True,
+            keyboard=_text_view_keyboard("nt:text"),
+        )
+        if sent is not None:
+            await _drop_prompt_buttons(draft)
+            draft.prompt = sent
+            draft.widget_owner = user.id
+            return
+    if edit:
+        await _prompt_by_edit(message, draft, DATE_PROMPT, DATE_KEYBOARD)
+    else:
+        await _prompt_by_reply(message, draft, DATE_PROMPT, DATE_KEYBOARD)
 
 
 async def _start_draft(message: Message, telegram_user_id: int, text: str) -> None:
@@ -602,6 +713,7 @@ async def _create_task(user: User, draft: _Draft, due_time: time | None) -> tupl
             TaskCreate(
                 title=draft.title,
                 description=draft.description,
+                list_id=draft.list_id,
                 priority=BOT_TASK_PRIORITY,
                 due_date=draft.due_date,
                 due_time=due_time if draft.due_date is not None else None,
@@ -644,8 +756,65 @@ async def _finish(
         await reply_to.answer(summary, reply_markup=keyboard)
 
 
+def _is_widget(message: Message) -> bool:
+    return "widget" in (message.model_extra or {})
+
+
+async def _update_result_widget(
+    message: Message, state: dict[str, Any], caption: str, keyboard: InlineKeyboardMarkup | None
+) -> None:
+    assert message.bot is not None
+    try:
+        if await widget_api.edit(message.bot, message.chat.id, message.message_id, state):
+            await message.bot(
+                message.edit_caption(caption=caption[:1024], reply_markup=keyboard),
+                request_timeout=5,
+            )
+            return
+    except TelegramAPIError:
+        log.warning("bot.widget_result_fallback", message_id=message.message_id)
+    await message.answer(caption, reply_markup=keyboard)
+
+
+def _created_card(task: Task, list_name: str, theme: str = "system") -> dict[str, Any]:
+    due = format_due(task.due_date, task.due_time) if task.due_date is not None else "Без срока"
+    detail = f"{widget_views.short(list_name, 90)} · {due}"
+    return widget_views.card(
+        "Задача создана",
+        icon="check",
+        theme=theme,
+        rows=[[widget_views.short(task.title, 200), detail]],
+    )
+
+
+async def _finish_widget(
+    telegram_user_id: int, user: User, draft: _Draft, due_time: time | None
+) -> str | None:
+    assert draft.prompt is not None
+    # Invalidate the draft before the write so a retry after an ambiguous commit
+    # cannot create another task. Validation errors occur before the task is written.
+    _drafts.pop(telegram_user_id, None)
+    try:
+        task, list_name = await _create_task(user, draft, due_time)
+    except (ValidationError, HTTPException):
+        _drafts[telegram_user_id] = draft
+        return "Не получилось создать задачу. Проверьте выбранный список и срок."
+    await _update_result_widget(
+        draft.prompt,
+        _created_card(task, list_name, user.theme),
+        _summary_text(task, list_name),
+        _result_keyboard(task.id),
+    )
+    return None
+
+
 async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: str) -> None:
     assert message.from_user is not None
+    if draft.widget_owner is not None and draft.widget_owner != user.id:
+        _drafts.pop(message.from_user.id, None)
+        await _drop_prompt_buttons(draft)
+        await _start_draft(message, message.from_user.id, text)
+        return
     if draft.step == "idea":
         _drafts.pop(message.from_user.id, None)
         await _drop_prompt_buttons(draft)
@@ -657,7 +826,7 @@ async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: 
     elif draft.step == "description":
         draft.description = text.strip() or None
         draft.step = "date"
-        await _prompt_by_reply(message, draft, DATE_PROMPT, DATE_KEYBOARD)
+        await _prompt_for_schedule(message, user, draft)
     elif draft.step == "date":
         now = _local_now(user)
         day = parse_day(text, now.date())
@@ -669,6 +838,18 @@ async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: 
             return
         draft.due_date = day
         draft.step = "time"
+        if draft.widget_owner is not None:
+            assert draft.prompt is not None and draft.prompt.bot is not None
+            draft.widget_revision += 1
+            if await widget_api.edit(
+                draft.prompt.bot,
+                draft.prompt.chat.id,
+                draft.prompt.message_id,
+                await _schedule_view(user, draft, now),
+            ):
+                return
+            await _drop_prompt_buttons(draft)
+            draft.widget_owner = None
         await _prompt_by_reply(message, draft, _time_prompt(draft), _time_keyboard(draft, now))
     else:
         parsed = parse_time(text)
@@ -677,7 +858,12 @@ async def _answer_typed_step(message: Message, user: User, draft: _Draft, text: 
                 "Не понял время. Выберите его кнопкой или напишите, например, «19:30»."
             )
             return
-        await _finish(message.from_user.id, user, draft, parsed, reply_to=message)
+        if draft.widget_owner is not None:
+            error = await _finish_widget(message.from_user.id, user, draft, parsed)
+            if error is not None:
+                await message.answer(error)
+        else:
+            await _finish(message.from_user.id, user, draft, parsed, reply_to=message)
 
 
 @router.message(Command("new"))
@@ -703,10 +889,18 @@ async def handle_cancel_command(message: Message) -> None:
         return
     draft = _drafts.pop(message.from_user.id, None)
     if draft is None:
-        await message.answer("Сейчас нечего отменять.")
+        text = "Сейчас нечего отменять."
+        if await widget_api.send(message, widget_views.card(text, icon="close"), text) is None:
+            await message.answer(text)
         return
-    await _drop_prompt_buttons(draft)
-    await message.answer("Создание задачи отменено.")
+    text = "Создание задачи отменено."
+    await _drop_prompt_buttons(draft, text)
+    detail = widget_views.short(draft.title, 150) if draft.step not in ("idea", "daily") else ""
+    if (
+        await widget_api.send(message, widget_views.card(text, detail=detail, icon="close"), text)
+        is None
+    ):
+        await message.answer(text)
 
 
 @router.callback_query(F.data.startswith("nt:"))
@@ -728,6 +922,7 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
         draft is None
         or draft.prompt is None
         or draft.prompt.message_id != callback.message.message_id
+        or (draft.widget_owner is not None and draft.prompt.chat.id != callback.message.chat.id)
     ):
         await callback.answer("Эта задача уже создана или отменена.", show_alert=True)
         with contextlib.suppress(Exception):
@@ -749,6 +944,18 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
         return
     now = _local_now(user)
 
+    if draft.widget_owner is not None:
+        if action == "text" and draft.widget_owner == user.id:
+            if draft.step == "time":
+                text, keyboard = _time_prompt(draft), _time_keyboard(draft, now)
+            else:
+                text, keyboard = DATE_PROMPT, DATE_KEYBOARD
+            sent = await callback.message.answer(text, reply_markup=keyboard)
+            await _drop_prompt_buttons(draft)
+            draft.widget_owner = None
+            draft.prompt = sent
+        await callback.answer()
+        return
     if draft.step == "description" and action == "idea":
         _drafts.pop(telegram_user_id, None)
         block = await _save_idea(user, draft.title)
@@ -765,7 +972,7 @@ async def handle_new_task_callback(callback: CallbackQuery) -> None:
         _remember_daily(telegram_user_id, callback.message.message_id, day, block)
     elif draft.step == "description" and action == "skip":
         draft.step = "date"
-        await _prompt_by_edit(callback.message, draft, DATE_PROMPT, DATE_KEYBOARD)
+        await _prompt_for_schedule(callback.message, user, draft, edit=True)
     elif draft.step == "date" and action in ("today", "tomorrow", "day"):
         if action == "day":
             try:
@@ -1063,10 +1270,14 @@ async def handle_set_list(callback: CallbackQuery) -> None:
             return
         task_list = await session.get(TaskList, task.list_id)
 
-    await callback.message.edit_text(
-        _summary_text(task, task_list.name if task_list is not None else "Inbox"),
-        reply_markup=_result_keyboard(task.id),
-    )
+    list_name = task_list.name if task_list is not None else "Inbox"
+    summary, keyboard = _summary_text(task, list_name), _result_keyboard(task.id)
+    if _is_widget(callback.message):
+        await _update_result_widget(
+            callback.message, _created_card(task, list_name, user.theme), summary, keyboard
+        )
+    else:
+        await callback.message.edit_text(summary, reply_markup=keyboard)
     await callback.answer("Список изменён.")
 
 
@@ -1092,7 +1303,13 @@ async def handle_undo(callback: CallbackQuery) -> None:
             await callback.answer("Задача не найдена.", show_alert=True)
             return
 
-    await callback.message.edit_text("Задача удалена.")
+    text = "Задача удалена."
+    if _is_widget(callback.message):
+        await _update_result_widget(
+            callback.message, widget_views.card(text, theme=user.theme, icon="close"), text, None
+        )
+    else:
+        await callback.message.edit_text(text)
     await callback.answer()
 
 
@@ -1126,6 +1343,14 @@ async def _week_view(user: User, monday: date) -> tuple[str, InlineKeyboardMarku
         return await week_agenda.week_view(session, user, monday, _local_now(user).date())
 
 
+async def _week_widget(user: User, monday: date, page: int) -> dict[str, Any]:
+    today = _local_now(user).date()
+    async with async_session_factory() as session:
+        monday, occurrences, overdue = await week_agenda.week_items(session, user, monday, today)
+        lists = await task_lists_service.list_task_lists(session, user.id)
+    return widget_views.week_card(monday, today, occurrences, overdue, lists, user, page)
+
+
 @router.message(Command("week"))
 async def handle_week_command(message: Message, command: CommandObject) -> None:
     if message.from_user is None:
@@ -1148,6 +1373,16 @@ async def handle_week_command(message: Message, command: CommandObject) -> None:
             await message.answer("Так далеко не заглядываю: не больше чем на 10 лет вперёд.")
             return
         monday = parsed
+    if widget_api.can_send(message):
+        sent = await widget_api.send(
+            message,
+            await _week_widget(user, monday, 0),
+            "Задачи на неделю.",
+            interactive=True,
+            keyboard=_text_view_keyboard(f"nw:w:{monday}"),
+        )
+        if sent is not None:
+            return
     text, keyboard = await _week_view(user, monday)
     await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
 
@@ -1254,6 +1489,32 @@ async def _send_note(chat: Message | InaccessibleMessage, note: Note) -> None:
         await chat.answer(chunk, reply_markup=keyboard if last else None, parse_mode=None)
 
 
+UNLINK_PROMPT = "Отвязать Telegram от вашего аккаунта?"
+_pending_unlinks: dict[int, tuple[int, uuid.UUID, float]] = {}
+
+
+def _is_current_unlink(telegram_id: int, message_id: int, user_id: uuid.UUID) -> bool:
+    pending = _pending_unlinks.get(telegram_id)
+    if pending is None:
+        return False
+    pending_message, pending_user, expires = pending
+    if monotonic_clock.monotonic() >= expires:
+        _pending_unlinks.pop(telegram_id)
+        return False
+    return (pending_message, pending_user) == (message_id, user_id)
+
+
+def _unlink_keyboard(user_id: uuid.UUID) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                _button("Да, отвязать", f"unlink:confirm:{user_id}"),
+                _button("Отмена", "unlink:cancel"),
+            ]
+        ]
+    )
+
+
 @router.message(Command("unlink"))
 async def handle_unlink(message: Message) -> None:
     if message.from_user is None:
@@ -1264,17 +1525,22 @@ async def handle_unlink(message: Message) -> None:
         await message.answer(NOT_LINKED_TEXT)
         return
 
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text="Да, отвязать", callback_data=f"unlink:confirm:{user.id}"
-                ),
-                InlineKeyboardButton(text="Отмена", callback_data="unlink:cancel"),
-            ]
-        ]
+    state = widget_views.card(
+        "Отвязать Telegram?",
+        detail="Напоминания и команды бота будут недоступны до новой привязки.",
+        icon="unlink",
+        theme=user.theme,
+        buttons=[["Оставить", "u:cancel"], ["Отвязать", "u:confirm", "danger"]],
     )
-    await message.answer("Отвязать Telegram от вашего аккаунта?", reply_markup=keyboard)
+    sent = await widget_api.send(
+        message, state, UNLINK_PROMPT, interactive=True, keyboard=_text_view_keyboard("nw:u")
+    )
+    _pending_unlinks.pop(message.from_user.id, None)
+    if sent is not None:
+        expires = monotonic_clock.monotonic() + DRAFT_TTL_SECONDS
+        _pending_unlinks[message.from_user.id] = (sent.message_id, user.id, expires)
+        return
+    await message.answer(UNLINK_PROMPT, reply_markup=_unlink_keyboard(user.id))
 
 
 @router.callback_query(F.data.startswith("unlink:"))
@@ -1302,6 +1568,222 @@ async def handle_unlink_callback(callback: CallbackQuery) -> None:
 
     await callback.message.edit_text("Telegram отвязан.")
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("nw:"))
+async def handle_widget_text_view(callback: CallbackQuery) -> None:
+    if callback.data is None or not isinstance(callback.message, Message):
+        return
+    message = callback.message
+    action = callback.data.removeprefix("nw:")
+    if action == "h":
+        await message.answer(HELP_TEXT)
+        await callback.answer()
+        return
+
+    user = await _linked_user(callback.from_user.id)
+    if user is None:
+        await callback.answer(NOT_LINKED_TEXT, show_alert=True)
+        return
+
+    if action.startswith("w:"):
+        selected = action[2:]
+        raw_widget = (message.model_extra or {}).get("widget")
+        if isinstance(raw_widget, dict):
+            with contextlib.suppress(KeyError, ValueError, TypeError):
+                visible = json.loads(raw_widget.get("chat_data") or "{}")["monday"]
+                if isinstance(visible, str):
+                    selected = visible
+        try:
+            monday = date.fromisoformat(selected)
+        except ValueError:
+            await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+            return
+        text, keyboard = await _week_view(user, monday)
+        await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+    elif action == "l":
+        async with async_session_factory() as session:
+            lists = await task_lists_service.list_task_lists(session, user.id)
+        await _send_list_picker(message, lists)
+    elif action == "u":
+        telegram_id = callback.from_user.id
+        if not _is_current_unlink(telegram_id, message.message_id, user.id):
+            await callback.answer(
+                "Подтверждение устарело. Введите /unlink ещё раз.", show_alert=True
+            )
+            return
+        await message.answer(UNLINK_PROMPT, reply_markup=_unlink_keyboard(user.id))
+        _pending_unlinks.pop(telegram_id, None)
+        await _update_result_widget(
+            message,
+            widget_views.card("Подтвердите отвязку в чате", theme=user.theme, icon="link"),
+            "Подтвердите отвязку в чате.",
+            None,
+        )
+    await callback.answer()
+
+
+_WIDGET_STALE = "Эта карточка устарела. Откройте команду ещё раз."
+
+
+async def _edit_widget_query(
+    bot: Bot, chat_id: int, message_id: int, state: dict[str, Any]
+) -> str | None:
+    if not await widget_api.edit(bot, chat_id, message_id, state):
+        return "Не удалось обновить карточку. Попробуйте ещё раз."
+    return None
+
+
+async def _task_widget_query(
+    bot: Bot, telegram_id: int, chat_id: int, message_id: int, user: User, action: str
+) -> str | None:
+    draft = _get_draft(telegram_id)
+    if (
+        draft is None
+        or draft.widget_owner != user.id
+        or draft.prompt is None
+        or (draft.prompt.chat.id, draft.prompt.message_id) != (chat_id, message_id)
+    ):
+        return _WIDGET_STALE
+
+    kind, _, value = action.partition(":")
+    now = _local_now(user)
+    if kind == "s":
+        if value != str(draft.widget_revision):
+            return "Данные изменились. Проверьте карточку перед сохранением."
+        if draft.due_date is not None and draft.due_date < now.date():
+            return "Срок уже прошёл. Выберите новую дату или снимите срок."
+        return await _finish_widget(telegram_id, user, draft, draft.due_time)
+
+    draft = replace(draft, widget_revision=draft.widget_revision + 1)
+    if kind == "d":
+        day = date.fromisoformat(value) if value else None
+        if day is not None and day < now.date():
+            return "Эта дата уже прошла."
+        if day != draft.due_date:
+            draft.due_time = None
+        draft.due_date = day
+        draft.step = "time" if day is not None else "date"
+    elif kind == "t" and draft.due_date is not None:
+        chosen = time.fromisoformat(value) if value else None
+        if chosen is not None and chosen not in _time_presets(draft, now):
+            return "Выберите доступное время."
+        draft.due_time = chosen
+    elif kind == "l":
+        draft.list_id = uuid.UUID(hex=value)
+    elif kind == "p":
+        draft.list_page = int(value)
+    else:
+        return _WIDGET_STALE
+
+    state = await _schedule_view(user, draft, now)
+    error = await _edit_widget_query(bot, chat_id, message_id, state)
+    if error is not None:
+        return error
+    _drafts[telegram_id] = draft
+    if kind == "l" and draft.list_id is None:
+        return "Список уже недоступен. Выберите другой."
+    return None
+
+
+async def _unlink_widget_query(
+    bot: Bot, telegram_id: int, chat_id: int, message_id: int, user: User, action: str
+) -> str | None:
+    if action not in ("confirm", "cancel") or not _is_current_unlink(
+        telegram_id, message_id, user.id
+    ):
+        return _WIDGET_STALE
+    _pending_unlinks.pop(telegram_id)
+    if action == "confirm":
+        async with async_session_factory() as session:
+            linked = await session.scalar(
+                select(User)
+                .where(User.id == user.id, User.telegram_user_id == telegram_id, User.is_active)
+                .with_for_update()
+            )
+            if linked is None:
+                return _WIDGET_STALE
+            await admin_service.unlink_telegram(session, linked.id)
+        log.info("bot.telegram_unlinked", user_id=str(user.id))
+    text = "Telegram отвязан." if action == "confirm" else "Telegram остаётся привязан."
+    state = widget_views.card(text, theme=user.theme, icon="check")
+    error = await _edit_widget_query(bot, chat_id, message_id, state)
+    try:
+        await bot.edit_message_caption(
+            chat_id=chat_id, message_id=message_id, caption=text, request_timeout=5
+        )
+    except TelegramAPIError:
+        log.warning("bot.widget_caption_failed", message_id=message_id)
+    if error is not None:
+        return text
+    return None
+
+
+async def _widget_action(bot: Bot, query: widget_api.WidgetQuery) -> str | Iterator[str] | None:
+    chat = query.chat
+    message_id = query.message_id
+    telegram_id = query.sender.id
+    if chat is None or chat.type != "private" or chat.id != telegram_id or message_id is None:
+        return _WIDGET_STALE
+    if not 1 <= len(query.data.encode()) <= 64:
+        return _WIDGET_STALE
+    user = await _linked_user(telegram_id)
+    if user is None:
+        return NOT_LINKED_TEXT
+    kind, _, action = query.data.partition(":")
+    if kind == "n":
+        return await _task_widget_query(bot, telegram_id, chat.id, message_id, user, action)
+    if kind == "u":
+        return await _unlink_widget_query(bot, telegram_id, chat.id, message_id, user, action)
+    if kind == "tl":
+        list_id = uuid.UUID(hex=action)
+        async with async_session_factory() as session:
+            try:
+                task_list, tasks = await task_lists_service.get_task_list_with_tasks(
+                    session, user.id, list_id
+                )
+            except HTTPException:
+                return "Список не найден."
+        return _task_list_messages(task_list.name, tasks)
+    if kind == "w":
+        day, _, page = action.partition(":")
+        monday = _local_now(user).date() if day == "today" else date.fromisoformat(day)
+        state = await _week_widget(user, monday, int(page))
+    elif kind == "l":
+        async with async_session_factory() as session:
+            lists = await task_lists_service.list_task_lists(session, user.id)
+        state = widget_views.list_card(lists, user, int(action))
+    elif kind == "h":
+        state = _help_card(user.theme)
+    else:
+        return _WIDGET_STALE
+    return await _edit_widget_query(bot, chat.id, message_id, state)
+
+
+async def handle_widget_query(bot: Bot, query: widget_api.WidgetQuery) -> None:
+    try:
+        result = await _widget_action(bot, query)
+    except (ValueError, OverflowError):
+        result = _WIDGET_STALE
+    except Exception:
+        log.exception("bot.widget_query_failed", message_id=query.message_id)
+        result = "Не удалось выполнить действие. Попробуйте ещё раз."
+    error = result if isinstance(result, str) else None
+    data = widget_api.encode({"error": widget_views.short(error, 750)}) if error else None
+    try:
+        await bot(
+            widget_api.AnswerWidgetQuery(widget_query_id=query.id, data=data),
+            request_timeout=5,
+        )
+    except TelegramAPIError:
+        log.warning("bot.widget_answer_failed", message_id=query.message_id)
+    if result is not None and not isinstance(result, str):
+        assert query.message_id is not None
+        reply = ReplyParameters(message_id=query.message_id, allow_sending_without_reply=True)
+        for text in result:
+            await bot.send_message(
+                query.sender.id, text, parse_mode=None, reply_parameters=reply, request_timeout=5
+            )
 
 
 @router.errors()

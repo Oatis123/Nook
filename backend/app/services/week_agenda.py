@@ -151,11 +151,10 @@ def week_keyboard(monday: date, today: date) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-async def week_view(
+async def week_items(
     session: AsyncSession, user: User, monday: date, today: date
-) -> tuple[str, InlineKeyboardMarkup]:
-    """The message and buttons for the week starting `monday` — a week that has since
-    passed (an old message's button) shows the current one."""
+) -> tuple[date, list[tasks_service.Occurrence], list[Task]]:
+    """Get the visible week, clamping old navigation to the current week."""
     current = week_start(today)
     monday = min(max(week_start(monday), current), current + timedelta(weeks=MAX_WEEKS_AHEAD))
     occurrences = await tasks_service.task_occurrences(
@@ -164,6 +163,13 @@ async def week_view(
     overdue = []
     if monday == current:
         overdue = await tasks_service.overdue_tasks(session, user.id, today)
+    return monday, occurrences, overdue
+
+
+async def week_view(
+    session: AsyncSession, user: User, monday: date, today: date
+) -> tuple[str, InlineKeyboardMarkup]:
+    monday, occurrences, overdue = await week_items(session, user, monday, today)
     return week_text(monday, today, occurrences, overdue), week_keyboard(monday, today)
 
 

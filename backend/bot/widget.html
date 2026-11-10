@@ -1,0 +1,219 @@
+<style>
+  body {
+    --bg: #fbf9f3; --raised: #fff; --text: #1a1a15; --muted: #6a6757;
+    --accent: #566f1f; --on: #f7f5ec; --wash: #dedfcc; --line: #dedacb;
+    --warn: #a85a0e; --warn-wash: #ebdfce;
+    --ink-1: #006660; --ink-2: #26578b; --ink-3: #695200;
+    --ink-4: #843b40; --ink-5: #6f4176;
+    background: var(--bg); color: var(--text); margin: 0;
+    font-size: 14px; line-height: 1.3;
+  }
+  body.dark {
+    --bg: #161711; --raised: #1f2118; --text: #eeece0; --muted: #8e8d80;
+    --accent: #a6b96a; --on: #11120c; --wash: #272b1b; --line: #2b2d23;
+    --warn: #e5a04b; --warn-wash: #312716;
+    --ink-1: #67cbc3; --ink-2: #8bbcf3; --ink-3: #cdb66e;
+    --ink-4: #ee9fa0; --ink-5: #d4a3dc;
+  }
+  main { padding: 14px 16px 18px; display: grid; gap: 10px; }
+  h2, p { margin: 0; }
+  h2 { font-size: 20px; font-weight: 800; line-height: 1.2; color: var(--text); }
+  header, .row, .bar { display: flex; align-items: center; gap: 8px; }
+  header div, .row div { min-width: 0; overflow-wrap: anywhere; }
+  .badge {
+    width: 34px; height: 34px; flex: 0 0 34px; border-radius: 10px;
+    display: grid; place-items: center; background: var(--wash); color: var(--accent);
+  }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .rows { display: grid; gap: 5px; }
+  .row { background: var(--raised); padding: 7px 9px; border-radius: 10px; }
+  .row b { font-weight: 650; }
+  button.row { text-align: left; font-size: 14px; }
+  button.row span { min-width: 0; overflow-wrap: anywhere; }
+  .day {
+    min-width: 32px; text-align: center; border-right: 1px solid var(--line);
+    padding-right: 6px; font-size: 12px; color: var(--muted);
+  }
+  .dot {
+    display: inline-block; width: 7px; height: 7px; flex: 0 0 7px;
+    border-radius: 50%; margin-right: 4px;
+  }
+  .ink1 { background: var(--ink-1); } .ink2 { background: var(--ink-2); }
+  .ink3 { background: var(--ink-3); } .ink4 { background: var(--ink-4); }
+  .ink5 { background: var(--ink-5); }
+  .warn { color: var(--warn); }
+  .badge.warn, button.danger { color: var(--warn); background: var(--warn-wash); }
+  .bar { flex-wrap: wrap; gap: 5px; }
+  .nav { justify-content: space-between; flex-wrap: nowrap; }
+  .label { font-size: 12px; font-weight: 700; }
+  button {
+    border: 0; border-radius: 999px; padding: 5px 10px; min-height: 32px;
+    background: var(--raised); color: var(--text); font-size: 12px; font-weight: 650;
+  }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .38; }
+  button.selected { background: var(--wash); color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--on); }
+  .calendar {
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center;
+  }
+  .calendar span { font-size: 11px; color: var(--muted); padding: 1px 0; }
+  .calendar button { min-height: 27px; padding: 0; background: transparent; }
+  .calendar .today { color: var(--warn); background: var(--warn-wash); }
+  .calendar .selected { background: var(--accent); color: var(--on); }
+  #notice:empty { display: none; }
+</style>
+<main id="card"></main>
+<script>
+  const W = TelegramWidget;
+  const root = document.getElementById('card');
+  const paths = {
+    calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+    list: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+    check: '<path d="m5 12 4 4L19 6"/>',
+    close: '<path d="m6 6 12 12M18 6 6 18"/>',
+    link: '<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 11a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
+    help: '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 4 3c-1 .5-1 1-1 2m0 3h.01"/>',
+    home: '<path d="m3 10 9-7 9 7M5 9v11h14V9m-9 11v-6h4v6"/>'
+  };
+  const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август',
+    'Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  let month, busy = false;
+
+  function element(tag, parent, text, css) {
+    const node = document.createElement(tag);
+    if (text) node.textContent = text;
+    if (css) node.className = css;
+    parent.appendChild(node);
+    return node;
+  }
+
+  function button(parent, label, action, css, disabled, selected) {
+    const node = element('button', parent, label, css);
+    if (disabled) node.disabled = true;
+    if (selected != null) node.setAttribute('aria-pressed', String(selected));
+    node.addEventListener('click', typeof action === 'function' ? action : () => ask(action));
+    return node;
+  }
+
+  function notice(text) {
+    document.getElementById('notice').textContent = text;
+  }
+
+  function ask(data) {
+    if (busy) return;
+    busy = true;
+    notice('Загрузка…');
+    W.request(data).then(answer => {
+      busy = false;
+      const result = JSON.parse(answer.result || '{}');
+      notice(result.error || '');
+    }, () => {
+      busy = false;
+      notice('Не удалось связаться с ботом. Попробуйте ещё раз.');
+    });
+  }
+
+  function calendar(state) {
+    const floor = state.today.slice(0, 7);
+    if (!month || month < floor) month = (state.date || state.today).slice(0, 7);
+    const year = Number(month.slice(0, 4));
+    const index = Number(month.slice(5)) - 1;
+    const nav = element('div', root, '', 'bar nav');
+    const move = direction => {
+      month = new Date(Date.UTC(year, index + direction, 1)).toISOString().slice(0, 7);
+      render();
+    };
+    button(nav, '‹', () => move(-1), '', month <= floor);
+    element('b', nav, months[index] + ' ' + year);
+    button(nav, '›', () => move(1), '', year === 9999 && index === 11);
+    const grid = element('div', root, '', 'calendar');
+    weekdays.forEach(day => element('span', grid, day));
+    const blanks = (new Date(Date.UTC(year, index, 1)).getUTCDay() + 6) % 7;
+    for (let i = 0; i < blanks; i++) element('span', grid);
+    const days = new Date(Date.UTC(year, index + 1, 0)).getUTCDate();
+    for (let day = 1; day <= days; day++) {
+      const key = month + '-' + String(day).padStart(2, '0');
+      const selected = state.date === key;
+      button(grid, String(day), 'n:d:' + key,
+        selected ? 'selected' : key === state.today ? 'today' : '', key < state.today, selected);
+    }
+    const options = element('div', root, '', 'bar');
+    button(options, 'Без срока', 'n:d:', state.date ? '' : 'selected', false, !state.date);
+    if (state.date) {
+      element('p', root, 'Время · ' + state.date.split('-').slice(1).reverse().join('.'), 'label');
+      const times = element('div', root, '', 'bar');
+      const presets = state.times.slice();
+      if (state.time && !presets.includes(state.time)) presets.push(state.time);
+      presets.push('');
+      presets.forEach(value => {
+        const label = value ? value.slice(0, 2) + ':' + value.slice(2) : 'Без времени';
+        button(times, label, 'n:t:' + value, state.time === value ? 'selected' : '',
+          false, state.time === value);
+      });
+    }
+  }
+
+  function listPicker(state) {
+    element('p', root, 'Список · ' + state.selected[1], 'label');
+    const lists = element('div', root, '', 'bar');
+    state.lists.forEach(([id, name, ink]) => {
+      const selected = id === state.selected[0];
+      const choice = button(lists, '', 'n:l:' + id, selected ? 'selected' : '', false, selected);
+      element('i', choice, '', 'dot ink' + ink);
+      element('span', choice, name);
+    });
+    if (state.last) {
+      const nav = element('div', root, '', 'bar');
+      button(nav, '‹ Списки', 'n:p:' + (state.page - 1), '', state.page === 0);
+      button(nav, 'Списки ›', 'n:p:' + (state.page + 1), '', state.page === state.last);
+    }
+    button(element('div', root, '', 'bar'), 'Создать задачу', 'n:s:' + state.revision, 'primary');
+  }
+
+  function render() {
+    const state = JSON.parse(W.chatData || '{}');
+    root.textContent = '';
+    if (!state.title) return;
+    document.body.className = state.theme === 'system' ? W.colorScheme : state.theme;
+    const header = element('header', root);
+    const badge = element('span', header, '', state.icon === 'unlink' ? 'badge warn' : 'badge');
+    badge.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" ' +
+      'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+      (paths[state.icon === 'unlink' ? 'link' : state.icon] || paths.list) + '</svg>';
+    const title = element('div', header);
+    element('h2', title, state.title);
+    if (state.detail) element('p', title, state.detail, 'hint');
+    if (state.schedule) {
+      calendar(state);
+      listPicker(state);
+    } else {
+      const rows = element('div', root, '', 'rows');
+      state.rows.forEach(([name, detail, ink, day, warn, action]) => {
+        if (action) {
+          const row = button(rows, '', action, 'row');
+          if (ink) element('i', row, '', 'dot ink' + ink);
+          element('span', row, name);
+          return;
+        }
+        const row = element('div', rows, '', 'row');
+        if (day) element('span', row, day, warn ? 'day warn' : 'day');
+        const item = element('div', row);
+        if (ink) element('i', item, '', 'dot ink' + ink);
+        element('b', item, name);
+        if (detail) element('p', item, detail, 'hint');
+      });
+      if (state.buttons.length) {
+        const nav = element('div', root, '', 'bar');
+        state.buttons.forEach(([label, action, css]) => button(nav, label, action, css));
+      }
+    }
+    element('p', root, '', 'hint warn').id = 'notice';
+  }
+
+  W.onEvent('chatDataChanged', render);
+  W.onEvent('themeChanged', render);
+  render();
+  W.ready();
+</script>

@@ -7,7 +7,7 @@ import pytest
 from aiogram import Bot
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.exceptions import TelegramNotFound
-from aiogram.methods import SendMessage
+from aiogram.methods import EditMessageCaption, SendMessage
 from aiogram.types import Message, Update
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -132,11 +132,18 @@ async def test_widget_task_creates_once_with_typed_description(db_session, teleg
     )
 
     await message(bot, sender, "/new Review calendar")
-    await message(bot, sender, "Check the month boundary")
     sent = session.last(widget_api.SendWidget)
+    first_state = json.loads(sent.chat_data)
     assert sent.allow_queries
     assert len(sent.chat_data.encode()) <= 1024
+    assert "caption" not in sent.model_dump(exclude_none=True)
+    assert first_state["entry"] == "description"
     prompt = max(session.messages)
+
+    await message(bot, sender, "Check the month boundary")
+    assert max(session.messages) == prompt
+    updated = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
+    assert updated["description"] == "Check the month boundary"
 
     await tap(bot, sender, prompt, "n:d:2026-11-12")
     await tap(bot, sender, prompt, "n:t:1800")
@@ -155,7 +162,43 @@ async def test_widget_task_creates_once_with_typed_description(db_session, teleg
         time(18),
         target.id,
     )
-    assert json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)["icon"] == "check"
+    result = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
+    assert result["icon"] == "check"
+    assert result["rows"][-1] == ["Описание", "Check the month boundary"]
+    assert not any(isinstance(call, (SendMessage, EditMessageCaption)) for call in session.calls)
+
+
+async def test_bare_new_and_typed_schedule_stay_in_widgets(db_session, telegram):
+    bot, session = telegram
+    user = await make_user(db_session)
+    sender = user.telegram_user_id
+
+    await message(bot, sender, "/new")
+    assert "Напишите текст задачи" in session.last(widget_api.SendWidget).chat_data
+    await message(bot, sender, "Review calendar")
+    prompt = max(session.messages)
+    await tap(bot, sender, prompt, "n:skip:")
+    await message(bot, sender, "это не дата")
+    error = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
+    assert "например" in error["error"]
+    await message(bot, sender, "12.11")
+    state = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
+    assert state["date"] == "2026-11-12"
+    assert "error" not in state
+    await message(bot, sender, "19:30")
+    (task,) = (await db_session.scalars(select(Task))).all()
+    assert task.due_time == time(19, 30)
+    assert not any(isinstance(call, SendMessage) for call in session.calls)
+
+
+async def test_new_keeps_description_prompt_when_widget_api_is_unavailable(db_session, telegram):
+    bot, session = telegram
+    user = await make_user(db_session)
+    session.reject_widgets = True
+    await message(bot, user.telegram_user_id, "/new Review calendar")
+    assert session.last(SendMessage).text == handlers.DESCRIPTION_PROMPT
+    await message(bot, user.telegram_user_id, "Check the month boundary")
+    assert session.last(SendMessage).text == handlers.DATE_PROMPT
 
 
 async def test_week_widget_navigation_and_api_fallback(db_session, telegram):
@@ -231,7 +274,9 @@ async def test_command_cards_and_help_text_view(db_session, telegram):
         ("/help", "help"),
     ]:
         await message(bot, sender, command)
-        assert json.loads(session.last(widget_api.SendWidget).chat_data)["icon"] == icon
+        sent = session.last(widget_api.SendWidget)
+        assert json.loads(sent.chat_data)["icon"] == icon
+        assert "caption" not in sent.model_dump(exclude_none=True)
 
     prompt = session.messages[max(session.messages)]
     await tap_text_view(bot, sender, prompt, "nw:h")
@@ -260,10 +305,13 @@ def test_widget_payloads_fit_bot_api_limits():
             time(18),
             lists[0],
             lists,
-            [time(9), time(18)],
+            [time(9), time(12), time(18)],
             user,
             1,
-            10,
+            999_999,
+            entry="description",
+            description=long_name,
+            error=long_name,
         ),
     ]
     assert all(len(widget_api.encode(state).encode()) <= 1024 for state in states)

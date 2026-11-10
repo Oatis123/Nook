@@ -167,24 +167,34 @@ def schedule(
     user: User,
     requested: int,
     revision: int,
+    *,
+    entry: str = "description",
+    description: str | None = None,
+    error: str = "",
 ) -> dict[str, Any]:
     page, last, start = page_window(len(lists), requested)
-    return {
+    state = {
         "title": "Новая задача",
-        "detail": short(title, 135),
+        "detail": short(title, 104),
         "icon": "calendar",
         "theme": user.theme,
         "schedule": True,
         "revision": revision,
+        "entry": entry,
         "today": today.isoformat(),
         "date": due_date.isoformat() if due_date is not None else "",
         "time": due_time.strftime("%H%M") if due_time is not None else "",
-        "selected": [selected.id.hex, short(selected.name, 62), ink(selected)],
+        "selected": [selected.id.hex, short(selected.name, 48), ink(selected)],
         "lists": [
-            [item.id.hex, short(item.name, 62), ink(item)]
+            [item.id.hex, short(item.name, 48), ink(item)]
             for item in lists[start : start + PAGE_SIZE]
         ],
         "page": page,
         "last": last,
         "times": [item.strftime("%H%M") for item in presets],
     }
+    if description:
+        state["description"] = short(description, 100)
+    if error:
+        state["error"] = short(error, 76)
+    return state

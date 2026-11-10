@@ -25,7 +25,6 @@ class SendWidget(TelegramMethod[Message]):
     html: str
     width: int = 398
     chat_data: str
-    caption: str
     allow_queries: bool
     reply_markup: InlineKeyboardMarkup | None = None
 
@@ -79,7 +78,6 @@ def can_send(message: Message) -> bool:
 async def send(
     message: Message,
     state: dict[str, Any],
-    caption: str,
     *,
     interactive: bool = False,
     keyboard: InlineKeyboardMarkup | None = None,
@@ -95,7 +93,6 @@ async def send(
                 message_thread_id=message.message_thread_id if message.is_topic_message else None,
                 html=widget_html(),
                 chat_data=encode(state),
-                caption=caption if len(caption) <= 1024 else caption[:1023] + "…",
                 allow_queries=interactive,
                 reply_markup=keyboard,
             )

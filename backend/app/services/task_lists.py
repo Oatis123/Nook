@@ -66,6 +66,18 @@ async def list_task_lists(session: AsyncSession, user_id: uuid.UUID) -> list[Tas
     return list(result)
 
 
+async def get_task_list_with_tasks(
+    session: AsyncSession, user_id: uuid.UUID, list_id: uuid.UUID
+) -> tuple[TaskList, list[Task]]:
+    task_list = await get_owned_or_404(session, TaskList, list_id, user_id)
+    result = await session.scalars(
+        select(Task)
+        .where(Task.user_id == user_id, Task.list_id == list_id, Task.deleted_at.is_(None))
+        .order_by(Task.due_date.nulls_last(), Task.position, Task.id)
+    )
+    return task_list, list(result)
+
+
 async def update_task_list(
     session: AsyncSession, user_id: uuid.UUID, list_id: uuid.UUID, data: TaskListUpdate
 ) -> TaskList:

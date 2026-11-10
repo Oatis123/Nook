@@ -4,14 +4,18 @@ import contextlib
 import re
 import time as monotonic_clock
 import uuid
+from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from itertools import batched
 from typing import Literal
 from zoneinfo import ZoneInfo
 
 import dateparser
 import structlog
 from aiogram import F, Router
+from aiogram.enums import ChatType
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
@@ -29,7 +33,7 @@ from pydantic import ValidationError
 from app.core.config import get_settings
 from app.core.db import async_session_factory
 from app.models.note import Note
-from app.models.task import Task, TaskPriority
+from app.models.task import Task, TaskPriority, TaskStatus
 from app.models.task_list import TaskList
 from app.models.user import User
 from app.schemas.task import TaskCreate, TaskUpdate
@@ -246,15 +250,23 @@ async def handle_help(message: Message) -> None:
         "или /week 20.10 сразу откроет нужную неделю\n"
         "/note <название> — найти заметку и прочитать её здесь; без названия — "
         "последние изменённые\n"
-        "/lists — ваши списки\n"
+        "/lists — выбрать список и посмотреть все его задачи\n"
         "/help — эта справка\n"
         "/unlink — отвязать Telegram от аккаунта"
     )
 
 
+LISTS_PRIVATE_TEXT = "Откройте личный чат с ботом, чтобы посмотреть списки задач."
+LISTS_PER_MESSAGE = 20
+MAX_TASK_LIST_TEXT = 4000
+
+
 @router.message(Command("lists"))
 async def handle_lists(message: Message) -> None:
     if message.from_user is None:
+        return
+    if message.chat.type != ChatType.PRIVATE:
+        await message.answer(LISTS_PRIVATE_TEXT)
         return
     async with async_session_factory() as session:
         user = await telegram_link_service.get_user_by_telegram_id(session, message.from_user.id)
@@ -266,7 +278,79 @@ async def handle_lists(message: Message) -> None:
     if not lists:
         await message.answer("У вас пока нет списков.")
         return
-    await message.answer("Ваши списки:\n" + "\n".join(f"• {task_list.name}" for task_list in lists))
+    for group in batched(lists, LISTS_PER_MESSAGE):
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [_button(note_telegram.button_title(task_list.name), f"tl:{task_list.id}")]
+                for task_list in group
+            ]
+        )
+        await message.answer("Выберите список задач", reply_markup=keyboard)
+
+
+def _task_list_messages(list_name: str, tasks: list[Task]) -> Iterator[str]:
+    header = f"📋 {list_name}"
+    if not tasks:
+        yield f"{header}\n\nВ этом списке пока нет задач."
+        return
+
+    task_ids = {task.id for task in tasks}
+    children: dict[uuid.UUID | None, list[Task]] = defaultdict(list)
+    for task in tasks:
+        parent_id = task.parent_id if task.parent_id in task_ids else None
+        children[parent_id].append(task)
+
+    lines = [header]
+    header_units = len(header.encode("utf-16-le")) // 2
+    units = header_units
+    for parent in children[None]:
+        for task in (parent, *children[parent.id]):
+            indent = "    " if task is not parent else ""
+            status = "✓" if task.status == TaskStatus.done else "☐"
+            title = " ".join(task.title.split())
+            line = f"{indent}{status} {title}"
+            if task.due_date is not None:
+                line += f" — {format_due(task.due_date, task.due_time)}"
+            line_units = 1 + len(line.encode("utf-16-le")) // 2
+            if units + line_units > MAX_TASK_LIST_TEXT:
+                yield "\n".join(lines)
+                lines = [header]
+                units = header_units
+            lines.append(line)
+            units += line_units
+    yield "\n".join(lines)
+
+
+@router.callback_query(F.data.startswith("tl:"))
+async def handle_task_list_view(callback: CallbackQuery) -> None:
+    if callback.data is None or not isinstance(callback.message, Message):
+        await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+        return
+    if callback.message.chat.type != ChatType.PRIVATE:
+        await callback.answer(LISTS_PRIVATE_TEXT, show_alert=True)
+        return
+    try:
+        list_id = uuid.UUID(callback.data.removeprefix("tl:"))
+    except ValueError:
+        await callback.answer("Эта кнопка больше не работает.", show_alert=True)
+        return
+
+    async with async_session_factory() as session:
+        user = await telegram_link_service.get_user_by_telegram_id(session, callback.from_user.id)
+        if user is None:
+            await callback.answer(NOT_LINKED_TEXT, show_alert=True)
+            return
+        try:
+            task_list, tasks = await task_lists_service.get_task_list_with_tasks(
+                session, user.id, list_id
+            )
+        except HTTPException:
+            await callback.answer("Список не найден.", show_alert=True)
+            return
+
+    await callback.answer()
+    for text in _task_list_messages(task_list.name, tasks):
+        await callback.message.answer(text, parse_mode=None)
 
 
 # --- New task: text → description → date → time -------------------------------------

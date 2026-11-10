@@ -2,8 +2,10 @@ import itertools
 from datetime import date, time
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
+from aiogram.enums import ChatType
 from aiogram.filters import CommandObject
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from freezegun import freeze_time
@@ -69,6 +71,7 @@ _CALLBACK_ROUTES = [
     ("idea:undo", handlers.handle_idea_undo),
     ("daily:undo", handlers.handle_daily_undo),
     ("wk:", handlers.handle_week_callback),
+    ("tl:", handlers.handle_task_list_view),
 ]
 
 
@@ -90,9 +93,12 @@ class FakeChat:
         self.telegram_id = telegram_id
         self.sent: list[Any] = []
 
-    def _bot_message(self, text: str, reply_markup: InlineKeyboardMarkup | None) -> Any:
+    def _bot_message(
+        self, text: str, reply_markup: InlineKeyboardMarkup | None = None, **_: Any
+    ) -> Any:
         msg = _mock(Message)
         msg.message_id = next(_message_ids)
+        msg.chat = MagicMock(type=ChatType.PRIVATE)
         msg.text = text
         msg.reply_markup = _checked(reply_markup)
 
@@ -104,18 +110,17 @@ class FakeChat:
 
         msg.edit_text = AsyncMock(side_effect=edit_text)
         msg.edit_reply_markup = AsyncMock(side_effect=edit_reply_markup)
+        msg.answer = AsyncMock(side_effect=self._bot_message)
         self.sent.append(msg)
         return msg
 
     def _user_message(self, text: str) -> Any:
         msg = _mock(Message)
         msg.text = text
+        msg.chat = MagicMock(type=ChatType.PRIVATE)
         msg.from_user = MagicMock(id=self.telegram_id)
 
-        async def answer(text: str, reply_markup: Any = None, **_: Any) -> Any:
-            return self._bot_message(text, reply_markup)
-
-        msg.answer = AsyncMock(side_effect=answer)
+        msg.answer = AsyncMock(side_effect=self._bot_message)
         return msg
 
     async def type(self, text: str) -> None:
@@ -603,6 +608,55 @@ async def test_a_long_week_is_cut_to_fit_one_message(db_session: AsyncSession) -
     left_out = int(text.rsplit("…и ещё ", 1)[1].split()[0])
     assert shown + left_out == 120
     assert text.endswith(f"…и ещё {left_out} {plural(left_out, 'задача', 'задачи', 'задач')}")
+
+
+async def test_lists_shows_only_tasks_from_the_selected_list(db_session: AsyncSession) -> None:
+    alice = await make_user(db_session, "alice")
+    bob = await make_user(db_session, "bob")
+    assert alice.telegram_user_id is not None
+    chat = FakeChat(alice.telegram_user_id)
+    work = await task_lists_service.create_task_list(
+        db_session, alice.id, "Работа", TaskListColor.palette_1, TaskListIcon.briefcase
+    )
+    private = await task_lists_service.get_or_create_inbox(db_session, bob.id)
+    parent = await tasks_service.create_task(
+        db_session, alice.id, TaskCreate(title="Отчёт <Q4>", list_id=work.id)
+    )
+    child = await tasks_service.create_task(
+        db_session, alice.id, TaskCreate(title="Собрать цифры", parent_id=parent.id)
+    )
+    await tasks_service.complete_task(db_session, alice.id, child.id, complete_subtasks=False)
+    removed = await tasks_service.create_task(
+        db_session, alice.id, TaskCreate(title="Удалена", list_id=work.id)
+    )
+    await tasks_service.delete_task(db_session, alice.id, removed.id)
+    await tasks_service.create_task(db_session, bob.id, TaskCreate(title="Секрет"))
+
+    await handlers.handle_lists(chat._user_message("/lists"))
+    assert chat.buttons() == ["Inbox", "Работа"]
+    picker = chat.last
+    await chat.tap("Работа")
+    assert chat.last.text == "📋 Работа\n☐ Отчёт <Q4>\n    ✓ Собрать цифры"
+    await chat.tap("Inbox")
+    assert chat.last.text == "📋 Inbox\n\nВ этом списке пока нет задач."
+
+    callback = _mock(CallbackQuery)
+    callback.from_user = MagicMock(id=alice.telegram_user_id)
+    callback.message = picker
+    callback.data = f"tl:{private.id}"
+    picker.answer.reset_mock()
+    await _route_callback(callback)
+    callback.answer.assert_awaited_once_with("Список не найден.", show_alert=True)
+    picker.answer.assert_not_awaited()
+
+
+def test_long_task_list_fits_telegram_messages_without_dropping_tasks() -> None:
+    tasks = [Task(id=uuid4(), title=f"{i} " + "🙂" * 490) for i in range(15)]
+    messages = list(handlers._task_list_messages("Работа", tasks))
+    assert len(messages) > 1
+    assert all(len(message.encode("utf-16-le")) // 2 <= 4096 for message in messages)
+    lines = [line for message in messages for line in message.splitlines()[1:]]
+    assert lines == [f"☐ {task.title}" for task in tasks]
 
 
 @pytest.mark.parametrize(

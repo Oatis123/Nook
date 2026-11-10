@@ -24,7 +24,7 @@ COMMANDS_MENU = [
     BotCommand(command="daily", description="Запись в дневник"),
     BotCommand(command="note", description="Найти и прочитать заметку"),
     BotCommand(command="cancel", description="Отменить создание задачи"),
-    BotCommand(command="lists", description="Мои списки"),
+    BotCommand(command="lists", description="Посмотреть задачи по спискам"),
     BotCommand(command="help", description="Справка"),
     BotCommand(command="unlink", description="Отвязать Telegram"),
 ]

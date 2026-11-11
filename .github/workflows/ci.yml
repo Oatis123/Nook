@@ -136,7 +136,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
         working-directory: frontend
-        run: pnpm exec playwright install --with-deps chromium
+        # GitHub's hosted Ubuntu image already has the Chromium system libraries.
+        run: pnpm exec playwright install chromium
       - name: Run e2e tests
         working-directory: frontend
         run: pnpm exec playwright test

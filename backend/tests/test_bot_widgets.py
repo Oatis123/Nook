@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.models.task import Task, TaskPriority
-from app.models.task_list import TaskList, TaskListColor, TaskListIcon
+from app.models.task_list import TaskList, TaskListColor
 from app.models.user import Theme, User
 from app.schemas.task import TaskCreate
 from app.services import task_lists, tasks
@@ -123,82 +123,59 @@ async def tap_text_view(bot, sender_id, prompt, data):
     )
 
 
-async def test_widget_task_creates_once_with_typed_description(db_session, telegram):
-    bot, session = telegram
-    user = await make_user(db_session)
-    sender = user.telegram_user_id
-    target = await task_lists.create_task_list(
-        db_session, user.id, "Nook", TaskListColor.palette_2, TaskListIcon.folder
-    )
-
-    await message(bot, sender, "/new Review calendar")
-    sent = session.last(widget_api.SendWidget)
-    first_state = json.loads(sent.chat_data)
-    assert sent.allow_queries
-    assert len(sent.chat_data.encode()) <= 1024
-    assert "caption" not in sent.model_dump(exclude_none=True)
-    assert first_state["entry"] == "description"
-    prompt = max(session.messages)
-
-    await message(bot, sender, "Check the month boundary")
-    assert max(session.messages) == prompt
-    updated = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
-    assert updated["description"] == "Check the month boundary"
-
-    await tap(bot, sender, prompt, "n:d:2026-11-12")
-    await tap(bot, sender, prompt, "n:t:1800")
-    await tap(bot, sender, prompt, f"n:l:{target.id.hex}")
-    state = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
-    await tap(bot, sender, prompt, "n:s:0")
-    assert "Данные изменились" in session.last(widget_api.AnswerWidgetQuery).data
-    assert not (await db_session.scalars(select(Task))).all()
-
-    save = f"n:s:{state['revision']}"
-    await asyncio.gather(tap(bot, sender, prompt, save), tap(bot, sender, prompt, save))
-    (task,) = (await db_session.scalars(select(Task))).all()
-    assert (task.description, task.due_date, task.due_time, task.list_id) == (
-        "Check the month boundary",
-        date(2026, 11, 12),
-        time(18),
-        target.id,
-    )
-    result = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
-    assert result["icon"] == "check"
-    assert result["rows"][-1] == ["Описание", "Check the month boundary"]
-    assert not any(isinstance(call, (SendMessage, EditMessageCaption)) for call in session.calls)
-
-
-async def test_bare_new_and_typed_schedule_stay_in_widgets(db_session, telegram):
+async def test_widget_saves_typed_task_only_after_confirmation(db_session, telegram):
     bot, session = telegram
     user = await make_user(db_session)
     sender = user.telegram_user_id
 
     await message(bot, sender, "/new")
-    assert "Напишите текст задачи" in session.last(widget_api.SendWidget).chat_data
+    assert session.last(SendMessage).text == "Напишите текст задачи одним сообщением."
     await message(bot, sender, "Review calendar")
-    prompt = max(session.messages)
-    await tap(bot, sender, prompt, "n:skip:")
-    await message(bot, sender, "это не дата")
-    error = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
-    assert "например" in error["error"]
+    await message(bot, sender, "Check the month boundary")
     await message(bot, sender, "12.11")
-    state = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
-    assert state["date"] == "2026-11-12"
-    assert "error" not in state
+    assert not any(isinstance(call, widget_api.SendWidget) for call in session.calls)
+
     await message(bot, sender, "19:30")
+    sent = session.last(widget_api.SendWidget)
+    state = json.loads(sent.chat_data)
+    assert sent.allow_queries
+    assert "caption" not in sent.model_dump(exclude_none=True)
+    assert state["rows"][0][0] == "Review calendar"
+    assert state["rows"][1] == ["Описание", "Check the month boundary"]
+    assert ["Создать задачу", "n:confirm", "primary"] in state["buttons"]
+    assert not (await db_session.scalars(select(Task))).all()
+
+    prompt = max(session.messages)
+    await message(bot, sender, "Ещё текст")
+    assert not (await db_session.scalars(select(Task))).all()
+    await asyncio.gather(
+        tap(bot, sender, prompt, "n:confirm"), tap(bot, sender, prompt, "n:confirm")
+    )
     (task,) = (await db_session.scalars(select(Task))).all()
-    assert task.due_time == time(19, 30)
-    assert not any(isinstance(call, SendMessage) for call in session.calls)
+    assert (task.description, task.due_date, task.due_time) == (
+        "Check the month boundary",
+        date(2026, 11, 12),
+        time(19, 30),
+    )
+    result = json.loads(session.last(widget_api.EditMessageWidgetData).chat_data)
+    assert result["icon"] == "check"
+    assert not any(isinstance(call, EditMessageCaption) for call in session.calls)
 
 
-async def test_new_keeps_description_prompt_when_widget_api_is_unavailable(db_session, telegram):
+async def test_confirmation_can_be_cancelled_in_widget(db_session, telegram):
     bot, session = telegram
     user = await make_user(db_session)
-    session.reject_widgets = True
-    await message(bot, user.telegram_user_id, "/new Review calendar")
-    assert session.last(SendMessage).text == handlers.DESCRIPTION_PROMPT
-    await message(bot, user.telegram_user_id, "Check the month boundary")
-    assert session.last(SendMessage).text == handlers.DATE_PROMPT
+    sender = user.telegram_user_id
+    await message(bot, sender, "/new Review calendar")
+    await message(bot, sender, "Check the month boundary")
+    prompt = max(session.messages)
+    await tap_text_view(bot, sender, session.messages[prompt], "nt:nodate")
+    assert json.loads(session.last(widget_api.SendWidget).chat_data)["buttons"]
+    prompt = max(session.messages)
+    await tap(bot, sender, prompt, "n:cancel")
+    await tap(bot, sender, prompt, "n:confirm")
+    assert not (await db_session.scalars(select(Task))).all()
+    assert "отменено" in session.last(widget_api.EditMessageWidgetData).chat_data
 
 
 async def test_week_widget_navigation_and_api_fallback(db_session, telegram):
@@ -263,24 +240,21 @@ async def test_list_widget_opens_only_owned_lists(db_session, telegram):
     assert session.last(SendMessage).text == "📋 Inbox\n☐ Review calendar"
 
 
-async def test_command_cards_and_help_text_view(db_session, telegram):
+async def test_commands_without_actions_use_text(db_session, telegram):
     bot, session = telegram
     user = await make_user(db_session)
     sender = user.telegram_user_id
-    for command, icon in [
-        ("/start", "home"),
-        ("/lists", "list"),
-        ("/cancel", "close"),
-        ("/help", "help"),
-    ]:
+    for command, icon in [("/start", "home"), ("/lists", "list")]:
         await message(bot, sender, command)
         sent = session.last(widget_api.SendWidget)
         assert json.loads(sent.chat_data)["icon"] == icon
         assert "caption" not in sent.model_dump(exclude_none=True)
 
-    prompt = session.messages[max(session.messages)]
-    await tap_text_view(bot, sender, prompt, "nw:h")
-    assert session.last(SendMessage).text == handlers.HELP_TEXT
+    await message(bot, sender, "/cancel")
+    assert isinstance(session.calls[-1], SendMessage)
+    await message(bot, sender, "/help")
+    assert isinstance(session.calls[-1], SendMessage)
+    assert session.calls[-1].text == handlers.HELP_TEXT
 
 
 def test_widget_payloads_fit_bot_api_limits():
@@ -295,23 +269,17 @@ def test_widget_payloads_fit_bot_api_limits():
         for _ in range(12)
     ]
     states = [
-        handlers._help_card(),
         widget_views.list_card(lists, user, 1),
         widget_views.week_card(date(2026, 11, 9), TODAY, [], overdue, lists, user, 1),
-        widget_views.schedule(
-            long_name,
-            TODAY,
-            TODAY,
-            time(18),
-            lists[0],
-            lists,
-            [time(9), time(12), time(18)],
-            user,
-            1,
-            999_999,
-            entry="description",
-            description=long_name,
-            error=long_name,
+        widget_views.card(
+            "Подтвердите создание задачи",
+            icon="calendar",
+            rows=handlers._task_rows(
+                Task(title=long_name, description=long_name, due_date=TODAY, due_time=time(18)),
+                long_name,
+                TaskPriority.medium,
+            ),
+            buttons=[["Создать задачу", "n:confirm", "primary"], ["Отмена", "n:cancel"]],
         ),
     ]
     assert all(len(widget_api.encode(state).encode()) <= 1024 for state in states)

@@ -258,6 +258,7 @@ async def test_text_description_date_button_and_time_preset(db_session: AsyncSes
     assert chat.buttons()[:2] == ["Сегодня", "Завтра"]
     await chat.tap("Завтра")
     await chat.tap("18:00")
+    await chat.tap("Создать задачу")
 
     [task] = await _tasks(db_session)
     assert task.title == "Купить подарок Лене"
@@ -280,6 +281,7 @@ async def test_skipped_description_typed_date_and_time(db_session: AsyncSession)
     await chat.tap("Пропустить")
     await chat.type("12.10")
     await chat.type("19.30")
+    await chat.tap("Создать задачу")
 
     [task] = await _tasks(db_session)
     assert task.description is None
@@ -301,18 +303,21 @@ async def test_calendar_pick_next_month_without_time(db_session: AsyncSession) -
     assert "Ноябрь 2026" in chat.buttons()
     await chat.tap("15")
     await chat.tap("Без времени")
+    await chat.tap("Создать задачу")
 
     [task] = await _tasks(db_session)
     assert (task.due_date, task.due_time) == (date(2026, 11, 15), None)
 
 
 @freeze_time(NOW)
-async def test_no_date_creates_task_right_away(db_session: AsyncSession) -> None:
+async def test_no_date_requires_confirmation(db_session: AsyncSession) -> None:
     chat = await _chat(db_session)
 
     await chat.type("Когда-нибудь почитать")
     await chat.tap("Пропустить")
     await chat.tap("Без срока")
+    assert await _tasks(db_session) == []
+    await chat.tap("Создать задачу")
 
     [task] = await _tasks(db_session)
     assert (task.due_date, task.due_time) == (None, None)
@@ -399,6 +404,7 @@ async def test_undo_deletes_the_created_task(db_session: AsyncSession) -> None:
     await chat.type("Ошибочная")
     await chat.tap("Пропустить")
     await chat.tap("Без срока")
+    await chat.tap("Создать задачу")
     await chat.tap("Удалить")
 
     assert chat.last.text == "Задача удалена."
@@ -416,6 +422,7 @@ async def test_change_list_moves_the_task_or_goes_back(db_session: AsyncSession)
     await chat.type("Отчёт")
     await chat.tap("Пропустить")
     await chat.tap("Без срока")
+    await chat.tap("Создать задачу")
     summary = chat.last
 
     await chat.tap("Сменить список")

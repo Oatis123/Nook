@@ -44,23 +44,12 @@
   .warn { color: var(--warn); }
   .badge.warn, button.danger { color: var(--warn); background: var(--warn-wash); }
   .bar { flex-wrap: wrap; gap: 5px; }
-  .nav { justify-content: space-between; flex-wrap: nowrap; }
-  .label { font-size: 12px; font-weight: 700; }
   button {
     border: 0; border-radius: 999px; padding: 5px 10px; min-height: 32px;
     background: var(--raised); color: var(--text); font-size: 12px; font-weight: 650;
   }
   button:active { transform: scale(.96); }
-  button:disabled { opacity: .38; }
-  button.selected { background: var(--wash); color: var(--accent); }
   button.primary { background: var(--accent); color: var(--on); }
-  .calendar {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center;
-  }
-  .calendar span { font-size: 11px; color: var(--muted); padding: 1px 0; }
-  .calendar button { min-height: 27px; padding: 0; background: transparent; }
-  .calendar .today { color: var(--warn); background: var(--warn-wash); }
-  .calendar .selected { background: var(--accent); color: var(--on); }
   #notice:empty { display: none; }
 </style>
 <main id="card"></main>
@@ -73,13 +62,9 @@
     check: '<path d="m5 12 4 4L19 6"/>',
     close: '<path d="m6 6 12 12M18 6 6 18"/>',
     link: '<path d="M10 13a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 11a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
-    help: '<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 4 3c-1 .5-1 1-1 2m0 3h.01"/>',
     home: '<path d="m3 10 9-7 9 7M5 9v11h14V9m-9 11v-6h4v6"/>'
   };
-  const months = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август',
-    'Сентябрь','Октябрь','Ноябрь','Декабрь'];
-  const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-  let month, renderedDate, busy = false;
+  let busy = false;
 
   function element(tag, parent, text, css) {
     const node = document.createElement(tag);
@@ -89,11 +74,9 @@
     return node;
   }
 
-  function button(parent, label, action, css, disabled, selected) {
+  function button(parent, label, action, css) {
     const node = element('button', parent, label, css);
-    if (disabled) node.disabled = true;
-    if (selected != null) node.setAttribute('aria-pressed', String(selected));
-    node.addEventListener('click', typeof action === 'function' ? action : () => ask(action));
+    node.addEventListener('click', () => ask(action));
     return node;
   }
 
@@ -115,89 +98,6 @@
     });
   }
 
-  function calendar(state) {
-    const floor = state.today.slice(0, 7);
-    if (!month || month < floor || (state.date && state.date !== renderedDate)) {
-      month = (state.date || state.today).slice(0, 7);
-    }
-    renderedDate = state.date;
-    const year = Number(month.slice(0, 4));
-    const index = Number(month.slice(5)) - 1;
-    const nav = element('div', root, '', 'bar nav');
-    const move = direction => {
-      month = new Date(Date.UTC(year, index + direction, 1)).toISOString().slice(0, 7);
-      render();
-    };
-    button(nav, '‹', () => move(-1), '', month <= floor);
-    element('b', nav, months[index] + ' ' + year);
-    button(nav, '›', () => move(1), '', year === 9999 && index === 11);
-    const grid = element('div', root, '', 'calendar');
-    weekdays.forEach(day => element('span', grid, day));
-    const blanks = (new Date(Date.UTC(year, index, 1)).getUTCDay() + 6) % 7;
-    for (let i = 0; i < blanks; i++) element('span', grid);
-    const days = new Date(Date.UTC(year, index + 1, 0)).getUTCDate();
-    for (let day = 1; day <= days; day++) {
-      const key = month + '-' + String(day).padStart(2, '0');
-      const selected = state.date === key;
-      button(grid, String(day), 'n:d:' + key,
-        selected ? 'selected' : key === state.today ? 'today' : '', key < state.today, selected);
-    }
-    const options = element('div', root, '', 'bar');
-    button(options, 'Без срока', 'n:d:', state.date ? '' : 'selected', false, !state.date);
-    if (state.date) {
-      element('p', root, 'Время · ' + state.date.split('-').slice(1).reverse().join('.'), 'label');
-      const times = element('div', root, '', 'bar');
-      const presets = state.times.slice();
-      if (state.time && !presets.includes(state.time)) presets.push(state.time);
-      presets.push('');
-      presets.forEach(value => {
-        const label = value ? value.slice(0, 2) + ':' + value.slice(2) : 'Без времени';
-        button(times, label, 'n:t:' + value, state.time === value ? 'selected' : '',
-          false, state.time === value);
-      });
-    }
-  }
-
-  function listPicker(state) {
-    element('p', root, 'Список · ' + state.selected[1], 'label');
-    const lists = element('div', root, '', 'bar');
-    state.lists.forEach(([id, name, ink]) => {
-      const selected = id === state.selected[0];
-      const choice = button(lists, '', 'n:l:' + id, selected ? 'selected' : '', false, selected);
-      element('i', choice, '', 'dot ink' + ink);
-      element('span', choice, name);
-    });
-    if (state.last) {
-      const nav = element('div', root, '', 'bar');
-      button(nav, '‹ Списки', 'n:p:' + (state.page - 1), '', state.page === 0);
-      button(nav, 'Списки ›', 'n:p:' + (state.page + 1), '', state.page === state.last);
-    }
-    const actions = element('div', root, '', 'bar');
-    button(actions, 'Создать задачу', 'n:s:' + state.revision, 'primary');
-    button(actions, 'Отмена', 'n:cancel:');
-  }
-
-  function typedDetails(state) {
-    const hints = {
-      description: 'Описание можно отправить сообщением.',
-      date: 'Дату можно написать в чате.',
-      time: 'Время из чата сразу сохранит задачу.'
-    };
-    element('p', root, hints[state.entry] || hints.date, 'hint');
-    if (state.description) element('p', root, state.description, 'hint');
-    if (state.error) element('p', root, state.error, 'hint warn');
-    const actions = element('div', root, '', 'bar');
-    if (state.entry === 'description') {
-      button(actions, 'Пропустить', 'n:skip:');
-      if (!state.description) {
-        button(actions, 'Это идея', 'n:idea:');
-        button(actions, 'В дневник', 'n:daily:');
-      }
-    } else {
-      button(actions, state.description ? 'Изменить описание' : 'Добавить описание', 'n:desc:');
-    }
-  }
-
   function render() {
     const state = JSON.parse(W.chatData || '{}');
     root.textContent = '';
@@ -211,30 +111,24 @@
     const title = element('div', header);
     element('h2', title, state.title);
     if (state.detail) element('p', title, state.detail, 'hint');
-    if (state.schedule) {
-      typedDetails(state);
-      calendar(state);
-      listPicker(state);
-    } else {
-      const rows = element('div', root, '', 'rows');
-      state.rows.forEach(([name, detail, ink, day, warn, action]) => {
-        if (action) {
-          const row = button(rows, '', action, 'row');
-          if (ink) element('i', row, '', 'dot ink' + ink);
-          element('span', row, name);
-          return;
-        }
-        const row = element('div', rows, '', 'row');
-        if (day) element('span', row, day, warn ? 'day warn' : 'day');
-        const item = element('div', row);
-        if (ink) element('i', item, '', 'dot ink' + ink);
-        element('b', item, name);
-        if (detail) element('p', item, detail, 'hint');
-      });
-      if (state.buttons.length) {
-        const nav = element('div', root, '', 'bar');
-        state.buttons.forEach(([label, action, css]) => button(nav, label, action, css));
+    const rows = element('div', root, '', 'rows');
+    state.rows.forEach(([name, detail, ink, day, warn, action]) => {
+      if (action) {
+        const row = button(rows, '', action, 'row');
+        if (ink) element('i', row, '', 'dot ink' + ink);
+        element('span', row, name);
+        return;
       }
+      const row = element('div', rows, '', 'row');
+      if (day) element('span', row, day, warn ? 'day warn' : 'day');
+      const item = element('div', row);
+      if (ink) element('i', item, '', 'dot ink' + ink);
+      element('b', item, name);
+      if (detail) element('p', item, detail, 'hint');
+    });
+    if (state.buttons.length) {
+      const nav = element('div', root, '', 'bar');
+      state.buttons.forEach(([label, action, css]) => button(nav, label, action, css));
     }
     element('p', root, '', 'hint warn').id = 'notice';
   }

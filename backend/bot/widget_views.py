@@ -12,17 +12,6 @@ from app.services.telegram_format import MONTHS_SHORT, WEEKDAYS_SHORT
 
 PAGE_SIZE = 4
 
-HELP_ROWS = [
-    ("/new", "Создать задачу"),
-    ("/week", "Посмотреть задачи на неделю"),
-    ("/lists", "Посмотреть задачи выбранного списка"),
-    ("/cancel", "Отменить черновик"),
-    ("/idea", "Записать идею"),
-    ("/daily", "Сделать запись в дневнике"),
-    ("/note", "Найти заметку"),
-    ("/unlink", "Отвязать аккаунт"),
-]
-
 
 def short(text: str, budget: int) -> str:
     """Keep JSON-encoded text within a UTF-8 byte budget."""
@@ -153,48 +142,4 @@ def week_card(
         buttons=buttons,
     )
     state["monday"] = monday.isoformat()
-    return state
-
-
-def schedule(
-    title: str,
-    today: date,
-    due_date: date | None,
-    due_time: time | None,
-    selected: TaskList,
-    lists: list[TaskList],
-    presets: list[time],
-    user: User,
-    requested: int,
-    revision: int,
-    *,
-    entry: str = "description",
-    description: str | None = None,
-    error: str = "",
-) -> dict[str, Any]:
-    page, last, start = page_window(len(lists), requested)
-    state = {
-        "title": "Новая задача",
-        "detail": short(title, 104),
-        "icon": "calendar",
-        "theme": user.theme,
-        "schedule": True,
-        "revision": revision,
-        "entry": entry,
-        "today": today.isoformat(),
-        "date": due_date.isoformat() if due_date is not None else "",
-        "time": due_time.strftime("%H%M") if due_time is not None else "",
-        "selected": [selected.id.hex, short(selected.name, 48), ink(selected)],
-        "lists": [
-            [item.id.hex, short(item.name, 48), ink(item)]
-            for item in lists[start : start + PAGE_SIZE]
-        ],
-        "page": page,
-        "last": last,
-        "times": [item.strftime("%H%M") for item in presets],
-    }
-    if description:
-        state["description"] = short(description, 100)
-    if error:
-        state["error"] = short(error, 76)
     return state

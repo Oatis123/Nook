@@ -9,12 +9,11 @@ test.beforeAll(() => {
 
 test.beforeEach(async ({ page }) => {
   await login(page, ADMIN_USERNAME, ADMIN_PASSWORD)
-  await expect(page.getByLabel('New note')).toBeVisible()
 })
 
 test('a task created for today lands on Today', async ({ page }) => {
   const title = `E2E Task ${Date.now()}`
-  await page.goto('/tasks/today')
+  await expect(page.getByRole('heading', { name: 'Today', exact: true })).toBeVisible()
   await page.getByRole('button', { name: /Add a task/ }).click()
 
   const dialog = page.getByRole('dialog')

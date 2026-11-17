@@ -40,7 +40,9 @@ test('an admin invite lets a new user register, then gates them until Telegram i
 
   // TelegramGate polls the current-user endpoint every 2s and routes into the app as soon
   // as telegram_linked flips server-side.
-  await expect(guestPage.getByLabel('New note')).toBeVisible({ timeout: 10_000 })
+  await expect(guestPage.getByRole('heading', { name: 'Today', exact: true })).toBeVisible({
+    timeout: 10_000,
+  })
 
   await guestContext.close()
 })

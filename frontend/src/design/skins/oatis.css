@@ -180,6 +180,10 @@ body {
   text-wrap: balance;
 }
 
+.ui-dialog[data-placement='right'] {
+  border-radius: var(--oatis-radius-md);
+}
+
 .ui-search-field {
   border-radius: var(--radius-button);
   box-shadow: var(--shadow-popover);

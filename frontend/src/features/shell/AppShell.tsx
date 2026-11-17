@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
-import { Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo } from 'react'
+import { Link, Outlet, NavLink, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  FileText,
+  Folder,
+  Inbox,
   ListTodo,
   Network,
   Paperclip,
@@ -9,6 +10,7 @@ import {
   Trash2,
   Settings,
   Shield,
+  Sun,
   PanelLeft,
   PanelRight,
   Menu,
@@ -26,11 +28,19 @@ import { CommandPalette } from '@/features/shell/CommandPalette'
 import { useCurrentUser, useLogout } from '@/features/auth/hooks'
 import { ConnectionBanner } from '@/features/shell/ConnectionBanner'
 import { useMediaQuery } from '@/lib/useMediaQuery'
-import { FolderTree } from '@/features/notes/FolderTree'
-import { TagList } from '@/features/notes/TagList'
+import { useFolders, useNote, useNotes } from '@/features/notes/hooks'
 import { NoteContextPanel } from '@/features/notes/NoteContextPanel'
 import { TaskListSidebar } from '@/features/tasks/TaskListSidebar'
 import { prefetchCommonPages } from '@/app/prefetch'
+import { useTaskLists } from '@/features/tasks/hooks'
+import { FilesDrawer } from '@/features/workspaces/FilesDrawer'
+import {
+  lastNote,
+  rememberNote,
+  workspaceByFolder,
+  workspacePath,
+} from '@/features/workspaces/workspaces'
+import type { Folder as WorkspaceFolder } from '@/lib/types'
 
 const navItems = [
   { to: '/graph', label: 'Graph', icon: Network },
@@ -39,6 +49,9 @@ const navItems = [
   { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
+
+const workspaceNav =
+  'ui-nav-item flex min-w-0 items-center gap-2.5 px-2.5 py-2 text-sm text-text-muted'
 
 export function AppShell() {
   const sidebarOpen = useUIStore((s) => s.sidebarOpen)
@@ -49,15 +62,63 @@ export function AppShell() {
   const focusSearch = useUIStore((s) => s.focusSearch)
   const location = useLocation()
   const navigate = useNavigate()
-  const { noteId } = useParams<{ noteId: string }>()
-  const section = location.pathname.startsWith('/tasks') ? 'tasks' : 'notes'
+  const { noteId, workspaceId, listId } = useParams()
+  const tasksSection = location.pathname.startsWith('/tasks')
+  const inbox =
+    location.pathname === '/notes' && new URLSearchParams(location.search).get('view') === 'inbox'
   const { data: user } = useCurrentUser()
+  const { data: folders } = useFolders()
+  const { data: notes } = useNotes()
+  const { data: openNote } = useNote(noteId)
+  const { data: taskLists } = useTaskLists()
+  const workspaces = folders?.filter((folder) => folder.parent_id === null) ?? []
+  const note = openNote ?? notes?.find((entry) => entry.id === noteId)
+  const taskList = taskLists?.find((entry) => entry.id === listId)
+  const workspaceMap = useMemo(() => workspaceByFolder(folders), [folders])
+  const activeWorkspace = workspaceMap.get(
+    workspaceId ?? note?.folder_id ?? taskList?.workspace_id ?? '',
+  )
+  const activeWorkspaceId = activeWorkspace?.id
   const logout = useLogout()
   const isDesktop = useMediaQuery('(min-width: 768px)')
   // On phones the sidebar is a drawer over the page: while it's open the page behind it
   // is inert (no focus, no screen reader), and Esc closes it.
   const drawerOpen = sidebarOpen && !isDesktop
-  const sheetOpen = rightPanelOpen && !isDesktop
+  const showContext = rightPanelOpen && Boolean(noteId)
+  const sheetOpen = showContext && !isDesktop
+
+  useEffect(() => {
+    // Wait for the folder index to resolve the note's owning workspace, including subfolders.
+    if (user && note && !note.deleted_at && folders)
+      rememberNote(user.id, note.id, activeWorkspaceId)
+  }, [user, note, folders, activeWorkspaceId])
+
+  function workspaceDestination(folder: WorkspaceFolder) {
+    const id = lastNote(user?.id, folder.id)
+    const last = id && notes?.find((entry) => entry.id === id)
+    return last && workspaceMap.get(last.folder_id ?? '')?.id === folder.id
+      ? '/notes/' + last.id
+      : workspacePath(folder.id)
+  }
+
+  const workspaceItems = [
+    { label: 'Browse workspaces', icon: Folder, onSelect: () => navigate('/notes') },
+    { label: 'Inbox', icon: Inbox, onSelect: () => navigate('/notes?view=inbox') },
+    ...(activeWorkspace
+      ? [
+          {
+            label: 'Workspace overview',
+            onSelect: () => navigate(workspacePath(activeWorkspace.id)),
+          },
+        ]
+      : []),
+    ...workspaces.map((folder) => ({
+      key: folder.id,
+      label: folder.name,
+      icon: Folder,
+      onSelect: () => navigate(workspaceDestination(folder)),
+    })),
+  ]
 
   useEffect(() => {
     if (!drawerOpen && !sheetOpen) return
@@ -90,7 +151,7 @@ export function AppShell() {
   useEffect(() => {
     if (window.innerWidth < 768 && useUIStore.getState().sidebarOpen) toggleSidebar()
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on navigation, not on every sidebarOpen/toggleSidebar identity change
-  }, [location.pathname])
+  }, [location.pathname, location.search])
 
   const items =
     user?.role === 'admin'
@@ -125,47 +186,50 @@ export function AppShell() {
           </IconButton>
         </div>
 
-        <div className="px-3">
-          <div className="ui-segmented inline-flex w-full border border-border bg-bg p-0.5">
-            <NavLink
+        <div className="min-h-0 flex-1 overflow-y-auto px-2">
+          <nav aria-label="Workspace navigation" className="grid gap-0.5">
+            <NavLink to="/tasks/today" className={workspaceNav}>
+              <Sun size={16} /> Today
+            </NavLink>
+            <NavLink to="/tasks/all" className={workspaceNav}>
+              <ListTodo size={16} /> All tasks
+            </NavLink>
+            <Link
               to="/notes"
-              data-active={section === 'notes'}
-              className={({ isActive }) =>
-                clsx(
-                  'ui-segment flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-sm transition-colors duration-150',
-                  isActive || section === 'notes'
-                    ? 'bg-surface-raised text-text'
-                    : 'text-text-muted hover:text-text',
-                )
-              }
+              aria-current={location.pathname === '/notes' && !inbox ? 'page' : undefined}
+              className={clsx(workspaceNav, 'mt-3')}
             >
-              <FileText size={15} strokeWidth={1.5} />
-              Notes
-            </NavLink>
-            <NavLink
-              to="/tasks"
-              data-active={section === 'tasks'}
-              className={({ isActive }) =>
-                clsx(
-                  'ui-segment flex flex-1 items-center justify-center gap-1.5 px-2 py-1.5 text-sm transition-colors duration-150',
-                  isActive ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text',
-                )
-              }
+              <Folder size={16} /> Workspaces
+            </Link>
+            {workspaces.map((folder) => (
+              <Link
+                key={folder.id}
+                to={workspaceDestination(folder)}
+                data-active={folder.id === activeWorkspaceId}
+                className={clsx(workspaceNav, 'pl-4')}
+              >
+                <span className="h-2 w-2 shrink-0 rounded-full bg-accent/65" />
+                <span className="truncate">{folder.name}</span>
+              </Link>
+            ))}
+            <Link
+              to="/notes?view=inbox"
+              aria-current={inbox ? 'page' : undefined}
+              className={workspaceNav}
             >
-              <ListTodo size={15} strokeWidth={1.5} />
-              Tasks
-            </NavLink>
-          </div>
-        </div>
-
-        <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
-          {section === 'notes' ? (
-            <>
-              <FolderTree />
-              <TagList />
-            </>
-          ) : (
-            <TaskListSidebar />
+              <Inbox size={16} /> Inbox
+            </Link>
+          </nav>
+          {tasksSection && (
+            <details
+              className="mt-3 border-t border-border py-2"
+              open={Boolean(listId) || undefined}
+            >
+              <summary className="cursor-pointer px-2 py-2 text-sm text-text-muted hover:text-text">
+                Task lists & calendar
+              </summary>
+              <TaskListSidebar />
+            </details>
           )}
         </div>
 
@@ -211,16 +275,11 @@ export function AppShell() {
 
         <div className="flex items-center justify-between border-t border-border px-3 py-3">
           <ThemeToggle />
-          <Tooltip label="Command palette (Ctrl/Cmd+K)">
-            <IconButton label="Open command palette" onClick={() => setCommandPaletteOpen(true)}>
-              <Search size={16} strokeWidth={1.5} />
-            </IconButton>
-          </Tooltip>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col" inert={drawerOpen || sheetOpen}>
-        <header className="ui-topbar flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
+        <header className="ui-topbar flex min-h-14 shrink-0 items-center gap-1 border-b border-border px-2 sm:gap-2 sm:px-3">
           <IconButton
             label="Open menu"
             onClick={toggleSidebar}
@@ -228,15 +287,45 @@ export function AppShell() {
           >
             <Menu size={18} strokeWidth={1.5} />
           </IconButton>
-          <span className="ui-wordmark font-serif text-sm md:hidden">{APP_NAME}</span>
-          <span className="hidden flex-1 md:block" />
-          <IconButton
-            label="Toggle context panel"
-            onClick={toggleRightPanel}
-            active={rightPanelOpen}
-          >
-            <PanelRight size={16} strokeWidth={1.5} />
-          </IconButton>
+          <DropdownMenu
+            trigger={
+              <button
+                type="button"
+                aria-label="Switch workspace"
+                className="ui-nav-item flex min-h-10 min-w-0 items-center gap-2 bg-surface px-3 text-sm font-semibold"
+              >
+                <span className="truncate">
+                  {activeWorkspace?.name ?? (inbox ? 'Inbox' : 'All workspaces')}
+                </span>
+                <ChevronsUpDown size={14} />
+              </button>
+            }
+            items={workspaceItems}
+          />
+          {activeWorkspace && (noteId || listId) && (
+            <Link
+              to={workspacePath(activeWorkspace.id)}
+              className="ui-nav-item hidden px-3 py-2 text-sm text-text-muted sm:inline-flex"
+            >
+              Overview
+            </Link>
+          )}
+          <span className="flex-1" />
+          <Tooltip label="Command palette (Ctrl/Cmd+K)">
+            <IconButton label="Open command palette" onClick={() => setCommandPaletteOpen(true)}>
+              <Search size={16} strokeWidth={1.5} />
+            </IconButton>
+          </Tooltip>
+          <FilesDrawer key={location.pathname} workspaceId={activeWorkspaceId} />
+          {noteId && (
+            <IconButton
+              label="Toggle context panel"
+              onClick={toggleRightPanel}
+              active={showContext}
+            >
+              <PanelRight size={16} strokeWidth={1.5} />
+            </IconButton>
+          )}
         </header>
 
         <ConnectionBanner />
@@ -265,15 +354,15 @@ export function AppShell() {
           <aside
             className={clsx(
               'hidden shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-150 md:flex',
-              rightPanelOpen ? 'w-72' : 'w-0 overflow-hidden',
+              showContext ? 'w-72' : 'w-0 overflow-hidden',
             )}
           >
-            {rightPanelOpen && isDesktop && <ContextPanelContent noteId={noteId} />}
+            {showContext && isDesktop && <ContextPanelContent noteId={noteId} />}
           </aside>
         </div>
       </div>
 
-      {rightPanelOpen && (
+      {showContext && (
         <div
           className="fixed inset-0 z-30 bg-(--overlay) md:hidden"
           onClick={toggleRightPanel}
@@ -284,7 +373,7 @@ export function AppShell() {
         className={clsx(
           'fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col border-t border-border bg-surface',
           'transition-transform duration-150 md:hidden',
-          rightPanelOpen ? 'translate-y-0' : 'translate-y-full',
+          showContext ? 'translate-y-0' : 'translate-y-full',
         )}
       >
         <div className="flex justify-center pt-2">
@@ -292,10 +381,10 @@ export function AppShell() {
         </div>
         {/* Only one copy of the panel is ever mounted (its graph/backlink queries aren't
             free), and only while it's actually open. */}
-        {rightPanelOpen && !isDesktop && <ContextPanelContent noteId={noteId} />}
+        {showContext && !isDesktop && <ContextPanelContent noteId={noteId} />}
       </div>
 
-      <CommandPalette />
+      <CommandPalette workspace={activeWorkspace} workspaceAssignments={workspaceMap} />
     </div>
   )
 }

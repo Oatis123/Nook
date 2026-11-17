@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as authApi from '@/features/auth/api'
 import { ApiError } from '@/lib/api'
 import { clearStoredDrafts } from '@/features/notes/draftStorage'
+import { clearRememberedNotes } from '@/features/workspaces/workspaces'
+import type { User } from '@/lib/types'
 
 export const meQueryKey = ['me'] as const
 
@@ -46,6 +48,8 @@ export function useLogout() {
       // Nothing of this account may stay behind on a shared computer: cached API data
       // and unsaved-draft backups.
       clearStoredDrafts()
+      const user = queryClient.getQueryData<User>(meQueryKey)
+      if (user) clearRememberedNotes(user.id)
       queryClient.clear()
       queryClient.setQueryData(meQueryKey, null)
     },

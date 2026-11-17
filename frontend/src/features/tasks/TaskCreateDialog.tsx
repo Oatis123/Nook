@@ -23,6 +23,7 @@ export function TaskCreateDialog({
   onOpenChange,
   title: dialogTitle = 'New task',
   listId,
+  allowedListIds,
   defaultDate,
 }: {
   open: boolean
@@ -30,6 +31,7 @@ export function TaskCreateDialog({
   title?: string
   /** Preselects (but doesn't lock) the list — e.g. opened from a specific list's page. */
   listId?: string
+  allowedListIds?: string[]
   /** Preselects the due date — e.g. opened by clicking a day on the calendar. */
   defaultDate?: string | null
 }) {
@@ -69,9 +71,15 @@ export function TaskCreateDialog({
     }
   }
 
-  const taskLists = taskListsQuery.data ?? []
+  const taskLists = (taskListsQuery.data ?? []).filter(
+    (list) => !allowedListIds || allowedListIds.includes(list.id),
+  )
   const taskListId =
-    selectedListId ?? taskLists.find((list) => list.is_inbox)?.id ?? taskLists[0]?.id
+    (allowedListIds && !taskLists.some((list) => list.id === selectedListId)
+      ? undefined
+      : selectedListId) ??
+    taskLists.find((list) => list.is_inbox)?.id ??
+    taskLists[0]?.id
 
   // A recurring task needs a time for its first occurrence (spec §7.4) — see QuickAdd's
   // needsTimeForRecurrence for the same rule on the old text-entry path.
@@ -87,7 +95,7 @@ export function TaskCreateDialog({
     e.preventDefault()
     const trimmed = title.trim()
     // A double click (or Enter + click) used to create the task twice.
-    if (!trimmed || createTask.isPending) return
+    if (!trimmed || createTask.isPending || (allowedListIds && !taskListId)) return
     createTask.mutate(
       {
         title: trimmed,

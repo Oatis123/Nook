@@ -10,6 +10,7 @@ class TaskListCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     color: TaskListColor = TaskListColor.palette_1
     icon: TaskListIcon = TaskListIcon.folder
+    workspace_id: uuid.UUID | None = None
 
 
 class TaskListUpdate(BaseModel):
@@ -18,6 +19,7 @@ class TaskListUpdate(BaseModel):
     icon: TaskListIcon | None = None
     position: int | None = None
     archived: bool | None = None
+    workspace_id: uuid.UUID | None = None
 
 
 class TaskListOut(BaseModel):
@@ -30,3 +32,4 @@ class TaskListOut(BaseModel):
     position: int
     is_inbox: bool
     archived_at: datetime | None
+    workspace_id: uuid.UUID | None = None

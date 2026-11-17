@@ -2,6 +2,7 @@ import { PRIORITY_LABEL, PRIORITY_ORDER } from '@/features/tasks/priority'
 import type { Task } from '@/lib/types'
 
 export interface TaskGroup {
+  key?: string
   label: string
   tasks: Task[]
 }

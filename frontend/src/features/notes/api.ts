@@ -5,12 +5,22 @@ export const listFolders = () => apiFetch<Folder[]>('/folders')
 
 export const listTags = () => apiFetch<Tag[]>('/tags')
 
-export const createFolder = (input: { name: string; parent_id?: string | null }) =>
-  apiFetch<Folder>('/folders', { method: 'POST', body: input })
+export const createFolder = (input: {
+  name: string
+  parent_id?: string | null
+  description?: string | null
+}) => apiFetch<Folder>('/folders', { method: 'POST', body: input })
 
 export const updateFolder = (
   id: string,
-  input: { name?: string; parent_id?: string | null; position?: number; move_to_root?: boolean },
+  input: {
+    name?: string
+    parent_id?: string | null
+    position?: number
+    move_to_root?: boolean
+    description?: string | null
+    pinned_note_id?: string | null
+  },
 ) => apiFetch<Folder>(`/folders/${id}`, { method: 'PATCH', body: input })
 
 export const deleteFolder = (id: string) => apiFetch<void>(`/folders/${id}`, { method: 'DELETE' })

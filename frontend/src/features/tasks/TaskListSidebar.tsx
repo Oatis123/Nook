@@ -1,15 +1,7 @@
 import { type DragEvent, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { clsx } from 'clsx'
-import {
-  Calendar,
-  CalendarClock,
-  CalendarRange,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Trash2,
-} from '@/design/icons'
+import { Calendar, CalendarRange, MoreHorizontal, Pencil, Plus, Trash2 } from '@/design/icons'
 import { DropdownMenu, type DropdownMenuItem } from '@/design/components/DropdownMenu'
 import { IconButton } from '@/design/components/IconButton'
 import { RowContextMenu } from '@/design/components/RowContextMenu'
@@ -69,10 +61,6 @@ export function TaskListSidebar() {
   return (
     <div className="flex flex-col gap-0.5 px-2">
       <nav className="mb-2 flex flex-col gap-0.5">
-        <NavLink to="/tasks/today" className={fixedNavClass}>
-          <CalendarClock size={15} strokeWidth={1.5} />
-          Today
-        </NavLink>
         <NavLink to="/tasks/upcoming" className={fixedNavClass}>
           <CalendarRange size={15} strokeWidth={1.5} />
           Upcoming

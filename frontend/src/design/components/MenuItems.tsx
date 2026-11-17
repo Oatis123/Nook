@@ -9,10 +9,11 @@ export interface MenuAction {
   onSelect?: () => void
   danger?: boolean
   disabled?: boolean
+  key?: string
 }
 
 export const menuClass =
-  'ui-menu ui-glass z-50 min-w-40 border border-border bg-surface-raised p-1 animate-fade-in'
+  'ui-menu ui-glass z-50 max-h-[var(--radix-dropdown-menu-content-available-height,var(--radix-context-menu-content-available-height,75dvh))] min-w-40 overflow-y-auto border border-border bg-surface-raised p-1 animate-fade-in'
 
 export function MenuItems({
   as: Item,
@@ -21,9 +22,9 @@ export function MenuItems({
   as: ComponentType<MenuItemProps>
   items: MenuAction[]
 }) {
-  return items.map(({ label, icon: Icon, onSelect, danger, disabled }) => (
+  return items.map(({ key, label, icon: Icon, onSelect, danger, disabled }) => (
     <Item
-      key={label}
+      key={key ?? label}
       disabled={disabled}
       data-danger={danger || undefined}
       onSelect={onSelect}

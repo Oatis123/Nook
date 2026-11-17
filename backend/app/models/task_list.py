@@ -75,6 +75,9 @@ class TaskList(UUIDPKMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("folders.id", ondelete="SET NULL"), index=True
+    )
     color: Mapped[TaskListColor] = mapped_column(
         Enum(TaskListColor, name="task_list_color"),
         nullable=False,

@@ -37,6 +37,7 @@ export function useDeleteFolder() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: foldersKey })
       queryClient.invalidateQueries({ queryKey: ['notes'] })
+      queryClient.invalidateQueries({ queryKey: ['task-lists'] })
     },
   })
 }
@@ -115,8 +116,15 @@ function useInvalidateNotesAndTags() {
 }
 
 export function useCreateNote() {
+  const queryClient = useQueryClient()
   const invalidate = useInvalidateNotesAndTags()
-  return useMutation({ mutationFn: notesApi.createNote, onSuccess: invalidate })
+  return useMutation({
+    mutationFn: notesApi.createNote,
+    onSuccess: (note) => {
+      queryClient.setQueryData(noteKey(note.id), note)
+      invalidate()
+    },
+  })
 }
 
 export function useOpenDailyNote() {

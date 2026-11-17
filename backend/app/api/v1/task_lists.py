@@ -21,7 +21,7 @@ async def create_task_list(
     body: TaskListCreate, user: CurrentUser, session: DbSession
 ) -> TaskListOut:
     task_list = await task_lists_service.create_task_list(
-        session, user.id, body.name, body.color, body.icon
+        session, user.id, body.name, body.color, body.icon, body.workspace_id
     )
     return TaskListOut.model_validate(task_list)
 

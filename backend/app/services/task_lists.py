@@ -7,9 +7,29 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.isolation import get_owned_or_404
+from app.models.folder import Folder
 from app.models.task import Task
 from app.models.task_list import TaskList, TaskListColor, TaskListIcon
 from app.schemas.task_list import TaskListUpdate
+
+
+async def _validate_workspace(
+    session: AsyncSession, user_id: uuid.UUID, workspace_id: uuid.UUID | None
+) -> None:
+    if workspace_id is None:
+        return
+    folder = await session.scalar(
+        select(Folder)
+        .where(
+            Folder.id == workspace_id,
+            Folder.user_id == user_id,
+            Folder.parent_id.is_(None),
+            Folder.deleted_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if folder is None:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Workspace not found")
 
 
 async def get_or_create_inbox(session: AsyncSession, user_id: uuid.UUID) -> TaskList:
@@ -45,12 +65,19 @@ async def create_task_list(
     name: str,
     color: TaskListColor,
     icon: TaskListIcon,
+    workspace_id: uuid.UUID | None = None,
 ) -> TaskList:
+    await _validate_workspace(session, user_id, workspace_id)
     max_position = await session.scalar(
         select(func.max(TaskList.position)).where(TaskList.user_id == user_id)
     )
     task_list = TaskList(
-        user_id=user_id, name=name, color=color, icon=icon, position=(max_position or 0) + 1
+        user_id=user_id,
+        name=name,
+        color=color,
+        icon=icon,
+        position=(max_position or 0) + 1,
+        workspace_id=workspace_id,
     )
     session.add(task_list)
     await session.commit()
@@ -82,6 +109,12 @@ async def update_task_list(
     session: AsyncSession, user_id: uuid.UUID, list_id: uuid.UUID, data: TaskListUpdate
 ) -> TaskList:
     task_list = await get_owned_or_404(session, TaskList, list_id, user_id)
+
+    if "workspace_id" in data.model_fields_set:
+        if task_list.is_inbox and data.workspace_id is not None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Inbox belongs to all workspaces")
+        await _validate_workspace(session, user_id, data.workspace_id)
+        task_list.workspace_id = data.workspace_id
 
     if data.name is not None:
         task_list.name = data.name

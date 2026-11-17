@@ -20,9 +20,11 @@ function isOverdue(task: Task, today: string): boolean {
 export const TaskRow = memo(function TaskRow({
   task,
   onOpen,
+  listName,
 }: {
   task: Task
   onOpen: (task: Task) => void
+  listName?: string
 }) {
   const completeTask = useCompleteTask()
   const reopenTask = useReopenTask()
@@ -97,7 +99,7 @@ export const TaskRow = memo(function TaskRow({
             </span>
           )}
         </div>
-        {(task.due_date || task.tags.length > 0) && (
+        {(task.due_date || task.tags.length > 0 || listName) && (
           <div className="flex flex-wrap items-center gap-x-2 text-xs">
             {task.due_date && (
               <span className={isOverdue(task, today) ? 'text-danger' : 'text-text-muted'}>
@@ -110,6 +112,7 @@ export const TaskRow = memo(function TaskRow({
                 #{tag}
               </span>
             ))}
+            {listName && <span className="truncate text-text-muted">{listName}</span>}
           </div>
         )}
       </button>

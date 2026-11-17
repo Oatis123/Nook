@@ -14,6 +14,7 @@ interface DialogProps {
   onOpenChange?: (open: boolean) => void
   /** false: a choice is required — no close button, Esc and outside clicks do nothing. */
   dismissible?: boolean
+  placement?: 'center' | 'right'
 }
 
 export function Dialog({
@@ -24,6 +25,7 @@ export function Dialog({
   open,
   onOpenChange,
   dismissible = true,
+  placement = 'center',
 }: DialogProps) {
   // Dialogs opened programmatically (no trigger) put focus back where it was when they
   // opened — Radix can only do that for its own trigger — so keyboard users aren't
@@ -36,6 +38,7 @@ export function Dialog({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in" />
         <RadixDialog.Content
+          data-placement={placement}
           onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
           onInteractOutside={(e) => {
             // Dismissing a toast (e.g. the error from this very dialog's submit) must
@@ -66,12 +69,16 @@ export function Dialog({
             }
           }}
           className={[
-            'ui-dialog fixed z-50 overflow-y-auto overscroll-contain border border-border bg-surface-raised p-5 animate-fade-in',
-            // Phones: a bottom sheet that never runs off-screen — a tall form (e.g. a
-            // recurring task) scrolls inside it instead of losing its header and buttons.
-            'inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] pb-[max(1.25rem,env(safe-area-inset-bottom))]',
-            'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[90vw] sm:max-w-md sm:max-h-[calc(100dvh-2rem)]',
-            'sm:-translate-x-1/2 sm:-translate-y-1/2 sm:pb-5',
+            'ui-dialog fixed z-50 overscroll-contain border border-border bg-surface-raised p-5 animate-fade-in',
+            placement === 'right'
+              ? 'inset-y-2 right-2 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden sm:inset-y-4 sm:right-4'
+              : [
+                  // Phones: a bottom sheet that never runs off-screen — a tall form (e.g. a
+                  // recurring task) scrolls inside it instead of losing its header and buttons.
+                  'inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] overflow-y-auto pb-[max(1.25rem,env(safe-area-inset-bottom))]',
+                  'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[90vw] sm:max-w-md sm:max-h-[calc(100dvh-2rem)]',
+                  'sm:-translate-x-1/2 sm:-translate-y-1/2 sm:pb-5',
+                ].join(' '),
           ].join(' ')}
         >
           <div className="ui-dialog-header mb-3 flex items-start justify-between gap-4">

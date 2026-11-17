@@ -18,7 +18,9 @@ async def list_folders(user: CurrentUser, session: DbSession) -> list[FolderOut]
 
 @router.post("", response_model=FolderOut, dependencies=[Csrf])
 async def create_folder(body: FolderCreate, user: CurrentUser, session: DbSession) -> FolderOut:
-    folder = await folders_service.create_folder(session, user.id, body.name, body.parent_id)
+    folder = await folders_service.create_folder(
+        session, user.id, body.name, body.parent_id, body.description
+    )
     return FolderOut.model_validate(folder)
 
 

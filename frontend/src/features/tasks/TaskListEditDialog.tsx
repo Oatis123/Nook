@@ -2,6 +2,7 @@ import { type FormEvent, useState } from 'react'
 import { clsx } from 'clsx'
 import { Button } from '@/design/components/Button'
 import { Dialog } from '@/design/components/Dialog'
+import { useFolders } from '@/features/notes/hooks'
 import { useCreateTaskList, useUpdateTaskList } from '@/features/tasks/hooks'
 import {
   LIST_COLOR_OPTIONS,
@@ -16,17 +17,22 @@ export function TaskListEditDialog({
   list,
   open,
   onOpenChange,
+  workspaceId,
 }: {
   /** null while creating a new list; an existing list while editing one. */
   list: TaskList | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  workspaceId?: string
 }) {
   const createList = useCreateTaskList()
   const updateList = useUpdateTaskList()
+  const folders = useFolders()
+  const roots = folders.data?.filter((folder) => folder.parent_id === null) ?? []
   const [name, setName] = useState('')
   const [color, setColor] = useState<TaskListColor>('palette-1')
   const [icon, setIcon] = useState<TaskListIcon>('folder')
+  const [workspace, setWorkspace] = useState(list?.workspace_id ?? workspaceId ?? '')
   const [wasOpen, setWasOpen] = useState(open)
 
   // Reset the form fields whenever the dialog transitions to open — adjusted during
@@ -39,20 +45,23 @@ export function TaskListEditDialog({
       setName(list?.name ?? '')
       setColor(list?.color ?? 'palette-1')
       setIcon(list?.icon ?? 'folder')
+      setWorkspace(list?.workspace_id ?? workspaceId ?? '')
     }
   }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim() || createList.isPending || updateList.isPending) return
+    const assignment =
+      workspace === (list?.workspace_id ?? '') ? {} : { workspace_id: workspace || null }
     if (list) {
       updateList.mutate(
-        { id: list.id, name: name.trim(), color, icon },
+        { id: list.id, name: name.trim(), color, icon, ...assignment },
         { onSuccess: () => onOpenChange(false) },
       )
     } else {
       createList.mutate(
-        { name: name.trim(), color, icon },
+        { name: name.trim(), color, icon, ...assignment },
         { onSuccess: () => onOpenChange(false) },
       )
     }
@@ -64,10 +73,36 @@ export function TaskListEditDialog({
         <input
           autoFocus
           value={name}
+          aria-label="List name"
+          maxLength={255}
           onChange={(e) => setName(e.target.value)}
           placeholder="List name"
           className="h-9 border border-border bg-surface-raised px-3 text-sm text-text outline-none focus-visible:border-accent"
         />
+
+        {!list?.is_inbox && (roots.length > 0 || workspace) && (
+          <label className="flex flex-col gap-1.5 text-sm text-text-muted">
+            Workspace
+            <select
+              value={workspace}
+              onChange={(e) => setWorkspace(e.target.value)}
+              className="ui-field h-9 border border-border bg-surface px-3 text-text"
+            >
+              <option value="">No workspace</option>
+              {workspace && !roots.some((folder) => folder.id === workspace) && (
+                <option value={workspace}>
+                  {folders.data?.find((folder) => folder.id === workspace)?.name ??
+                    'Current folder'}
+                </option>
+              )}
+              {roots.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div>
           <p className="mb-1.5 text-xs font-medium lowercase text-text-muted">Color</p>
@@ -118,7 +153,11 @@ export function TaskListEditDialog({
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button type="submit" variant="primary">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={createList.isPending || updateList.isPending}
+          >
             {list ? 'Save' : 'Create list'}
           </Button>
         </div>

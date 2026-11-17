@@ -65,24 +65,47 @@ type DragPayload = { type: 'note' | 'folder'; id: string }
 const MoveContext = createContext<(payload: DragPayload) => void>(() => {})
 const DRAG_MIME = 'application/x-nook-item'
 
-export function FolderTree() {
+export function FolderTree({
+  workspaceId,
+  onNoteSelected,
+}: {
+  workspaceId?: string
+  onNoteSelected?: () => void
+}) {
   const foldersQuery = useFolders()
   const notesQuery = useNotes()
 
   if (!foldersQuery.data) return <QueryState query={foldersQuery} compact />
   if (!notesQuery.data) return <QueryState query={notesQuery} compact />
-  return <LoadedFolderTree folders={foldersQuery.data} notes={notesQuery.data} />
+  return (
+    <LoadedFolderTree
+      folders={foldersQuery.data}
+      notes={notesQuery.data}
+      workspaceId={workspaceId}
+      onNoteSelected={onNoteSelected}
+    />
+  )
 }
 
 /** The rows are memoized and get only stable callbacks: an autosave refetches the note
  * list and switching notes changes the active one, and with a few hundred rows (each with
  * its own menu) re-rendering them all made both visibly slow. Unchanged notes keep their
  * object identity across refetches, so their rows are skipped. */
-function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSummary[] }) {
+function LoadedFolderTree({
+  folders,
+  notes,
+  workspaceId,
+  onNoteSelected,
+}: {
+  folders: Folder[]
+  notes: NoteSummary[]
+  workspaceId?: string
+  onNoteSelected?: () => void
+}) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { noteId: activeNoteId } = useParams<{ noteId: string }>()
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState(() => new Set(workspaceId ? [workspaceId] : []))
   const [renaming, setRenaming] = useState<string | null>(null)
   const [moving, setMoving] = useState<DragPayload | null>(null)
 
@@ -135,7 +158,13 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
   }, [])
   // Rows don't call useNavigate themselves: it reads the route context, which changes on
   // every navigation and would re-render every (memoized) row each time a note is opened.
-  const openNote = useCallback((id: string) => navigate(`/notes/${id}`), [navigate])
+  const openNote = useCallback(
+    (id: string) => {
+      onNoteSelected?.()
+      navigate(`/notes/${id}`)
+    },
+    [navigate, onNoteSelected],
+  )
   const startRenameNote = useCallback((id: string) => setRenaming(`note:${id}`), [])
   const finishRename = useCallback(() => setRenaming(null), [])
 
@@ -204,7 +233,9 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
           <div className="flex gap-0.5">
             <IconButton
               label="New folder"
-              onClick={() => createFolder.mutate({ name: 'New folder', parent_id: null })}
+              onClick={() =>
+                createFolder.mutate({ name: 'New folder', parent_id: workspaceId ?? null })
+              }
             >
               <FolderPlus size={14} strokeWidth={1.5} />
             </IconButton>
@@ -213,8 +244,8 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
               onClick={() =>
                 createNote.mutate(
                   {
-                    title: uniqueNoteTitle('Untitled', notes, null),
-                    folder_id: null,
+                    title: uniqueNoteTitle('Untitled', notes, workspaceId ?? null),
+                    folder_id: workspaceId ?? null,
                   },
                   { onSuccess: (note) => navigate(`/notes/${note.id}`) },
                 )

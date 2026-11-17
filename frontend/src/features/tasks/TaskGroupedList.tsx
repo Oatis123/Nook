@@ -6,10 +6,12 @@ export function TaskGroupedList({
   groups,
   onOpenTask,
   emptyMessage,
+  listNames,
 }: {
   groups: TaskGroup[]
   onOpenTask: (task: Task) => void
   emptyMessage: string
+  listNames?: Map<string, string>
 }) {
   if (groups.length === 0) {
     return <p className="px-2 py-6 text-center text-sm text-text-muted">{emptyMessage}</p>
@@ -18,13 +20,18 @@ export function TaskGroupedList({
   return (
     <div className="flex flex-col gap-4">
       {groups.map((group) => (
-        <div key={group.label || 'ungrouped'}>
+        <div key={group.key ?? (group.label || 'ungrouped')}>
           {group.label && (
             <h3 className="mb-2 px-2 text-xs font-medium text-text-muted">{group.label}</h3>
           )}
           <div className="flex flex-col gap-0.5 rounded-md bg-surface p-1">
             {group.tasks.map((task) => (
-              <TaskRow key={task.id} task={task} onOpen={onOpenTask} />
+              <TaskRow
+                key={task.id}
+                task={task}
+                onOpen={onOpenTask}
+                listName={listNames?.get(task.list_id)}
+              />
             ))}
           </div>
         </div>

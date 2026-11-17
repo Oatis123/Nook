@@ -3,11 +3,13 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
+from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.isolation import get_owned_or_404
 from app.models.folder import Folder
 from app.models.note import Note
+from app.models.task_list import TaskList
 from app.schemas.folder import FolderUpdate
 from app.services.ideas import free_root_title
 
@@ -23,7 +25,11 @@ async def _validate_parent(
 
 
 async def create_folder(
-    session: AsyncSession, user_id: uuid.UUID, name: str, parent_id: uuid.UUID | None
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    name: str,
+    parent_id: uuid.UUID | None,
+    description: str | None = None,
 ) -> Folder:
     await _validate_parent(session, user_id, parent_id)
 
@@ -35,7 +41,11 @@ async def create_folder(
         )
     )
     folder = Folder(
-        user_id=user_id, parent_id=parent_id, name=name, position=(max_position or 0) + 1
+        user_id=user_id,
+        parent_id=parent_id,
+        name=name,
+        position=(max_position or 0) + 1,
+        description=(description or "").strip() or None,
     )
     session.add(folder)
     await session.commit()
@@ -75,6 +85,8 @@ async def update_folder(
     session: AsyncSession, user_id: uuid.UUID, folder_id: uuid.UUID, data: FolderUpdate
 ) -> Folder:
     folder = await get_owned_or_404(session, Folder, folder_id, user_id)
+    if folder.deleted_at is not None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
 
     if data.name is not None:
         folder.name = data.name
@@ -96,6 +108,16 @@ async def update_folder(
 
     if data.position is not None:
         folder.position = data.position
+    if "description" in data.model_fields_set:
+        folder.description = (data.description or "").strip() or None
+    if "pinned_note_id" in data.model_fields_set:
+        if data.pinned_note_id is not None:
+            note = await get_owned_or_404(session, Note, data.pinned_note_id, user_id)
+            if note.deleted_at is not None or note.folder_id not in await _descendant_ids(
+                session, user_id, folder.id
+            ):
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Note is outside this workspace")
+        folder.pinned_note_id = data.pinned_note_id
 
     await session.commit()
     await session.refresh(folder)
@@ -115,6 +137,12 @@ async def delete_folder(session: AsyncSession, user_id: uuid.UUID, folder_id: uu
     )
     for f in folders_result:
         f.deleted_at = now
+
+    await session.execute(
+        sql_update(TaskList)
+        .where(TaskList.user_id == user_id, TaskList.workspace_id.in_(ids))
+        .values(workspace_id=None)
+    )
 
     notes_result = await session.scalars(
         select(Note).where(

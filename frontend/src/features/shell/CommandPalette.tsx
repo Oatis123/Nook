@@ -1,4 +1,4 @@
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as RadixDialog from '@radix-ui/react-dialog'
 import {
@@ -20,7 +20,9 @@ import { fuzzyFilter } from '@/lib/fuzzy'
 import { useCurrentUser } from '@/features/auth/hooks'
 import { useCreateNote, useNotes, useOpenDailyNote } from '@/features/notes/hooks'
 import { uniqueNoteTitle } from '@/features/notes/tree'
-import { useTasks } from '@/features/tasks/hooks'
+import { useTaskLists, useTasks } from '@/features/tasks/hooks'
+import { workspacePath } from '@/features/workspaces/workspaces'
+import type { Folder } from '@/lib/types'
 
 interface Entry {
   key: string
@@ -30,18 +32,26 @@ interface Entry {
   onSelect: () => void
 }
 
-export function CommandPalette() {
+export function CommandPalette({
+  workspace,
+  workspaceAssignments,
+}: {
+  workspace?: Folder
+  workspaceAssignments: Map<string, Folder>
+}) {
   const open = useUIStore((s) => s.commandPaletteOpen)
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen)
   const navigate = useNavigate()
   const notesQuery = useNotes()
   const tasksQuery = useTasks({})
+  const { data: taskLists } = useTaskLists()
   const createNote = useCreateNote()
   const openDaily = useOpenDailyNote()
   const { data: user } = useCurrentUser()
   const [query, setQuery] = useState('')
   const [lastQuery, setLastQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
+  const [includeAll, setIncludeAll] = useState(false)
   const [wasOpen, setWasOpen] = useState(open)
 
   useEffect(() => {
@@ -66,6 +76,7 @@ export function CommandPalette() {
       setQuery('')
       setLastQuery('')
       setActiveIndex(0)
+      setIncludeAll(false)
     }
   }
 
@@ -76,8 +87,12 @@ export function CommandPalette() {
 
   function createAndOpenNote() {
     const notes = notesQuery.data ?? []
-    const title = uniqueNoteTitle('Untitled', notes, null)
-    createNote.mutate({ title, folder_id: null }, { onSuccess: (note) => go(`/notes/${note.id}`) })
+    const folderId = workspace?.id ?? null
+    const title = uniqueNoteTitle('Untitled', notes, folderId)
+    createNote.mutate(
+      { title, folder_id: folderId },
+      { onSuccess: (note) => go(`/notes/${note.id}`) },
+    )
   }
 
   const commands: Entry[] = [
@@ -88,8 +103,18 @@ export function CommandPalette() {
       icon: Calendar,
       onSelect: () => openDaily.mutate(undefined, { onSuccess: (note) => go(`/notes/${note.id}`) }),
     },
-    { key: 'cmd-notes', label: 'Go to Notes', icon: FileText, onSelect: () => go('/notes') },
-    { key: 'cmd-tasks', label: 'Go to Tasks', icon: ListTodo, onSelect: () => go('/tasks') },
+    {
+      key: 'cmd-notes',
+      label: workspace ? 'Go to workspace notes' : 'Browse workspaces',
+      icon: FileText,
+      onSelect: () => go(workspace ? workspacePath(workspace.id, 'notes') : '/notes'),
+    },
+    {
+      key: 'cmd-tasks',
+      label: 'Go to All tasks',
+      icon: ListTodo,
+      onSelect: () => go('/tasks/all'),
+    },
     {
       key: 'cmd-today',
       label: 'Go to Today',
@@ -128,27 +153,38 @@ export function CommandPalette() {
       : []),
   ]
 
-  const noteEntries: Entry[] = (notesQuery.data ?? []).map((note) => ({
-    key: note.id,
-    label: note.title,
-    hint: 'Note',
-    icon: FileText,
-    onSelect: () => go(`/notes/${note.id}`),
-  }))
+  const scope = includeAll ? undefined : workspace
+  const listWorkspace = new Map(
+    taskLists?.map((list) => [list.id, workspaceAssignments.get(list.workspace_id ?? '')]),
+  )
+  const noteWorkspace = (id: string | null) => workspaceAssignments.get(id ?? '')
+  const noteEntries: Entry[] = (notesQuery.data ?? [])
+    .filter((note) => !scope || noteWorkspace(note.folder_id)?.id === scope.id)
+    .map((note) => ({
+      key: note.id,
+      label: note.title,
+      hint: noteWorkspace(note.folder_id)?.name ?? 'Note',
+      icon: FileText,
+      onSelect: () => go(`/notes/${note.id}`),
+    }))
 
-  const taskEntries: Entry[] = (tasksQuery.data ?? []).map((task) => ({
-    key: task.id,
-    label: task.title,
-    hint: 'Task',
-    icon: ListTodo,
-    onSelect: () => go(`/tasks/list/${task.list_id}`),
-  }))
+  const taskEntries: Entry[] = (tasksQuery.data ?? [])
+    .filter((task) => !scope || listWorkspace.get(task.list_id)?.id === scope.id)
+    .map((task) => ({
+      key: task.id,
+      label: task.title,
+      hint: listWorkspace.get(task.list_id)?.name ?? 'Task',
+      icon: ListTodo,
+      onSelect: () => go(`/tasks/list/${task.list_id}`),
+    }))
 
-  const results = useMemo(() => {
-    const all = [...noteEntries, ...taskEntries, ...commands]
-    return fuzzyFilter(query, all, (entry) => entry.label).slice(0, 20)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- commands/noteEntries/taskEntries are rebuilt fresh every render from stable inputs; including them would just re-run this every render regardless
-  }, [query, notesQuery.data, tasksQuery.data])
+  const results = open
+    ? fuzzyFilter(
+        query,
+        [...noteEntries, ...taskEntries, ...commands],
+        (entry) => entry.label,
+      ).slice(0, 20)
+    : []
 
   if (query !== lastQuery && open === wasOpen) {
     setLastQuery(query)
@@ -162,9 +198,10 @@ export function CommandPalette() {
   }, [activeIndex, open])
 
   function handleKeyDown(e: ReactKeyboardEvent) {
+    if (!(e.target instanceof HTMLInputElement)) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex((i) => Math.min(i + 1, results.length - 1))
+      setActiveIndex((i) => Math.max(0, Math.min(i + 1, results.length - 1)))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setActiveIndex((i) => Math.max(i - 1, 0))
@@ -204,6 +241,24 @@ export function CommandPalette() {
               className="w-full bg-transparent text-sm text-text outline-none placeholder:text-text-muted"
             />
           </div>
+          {workspace && (
+            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2 text-xs text-text-muted">
+              <span className="truncate">
+                {includeAll ? 'Searching all workspaces' : workspace.name}
+              </span>
+              <button
+                type="button"
+                aria-pressed={includeAll}
+                className="ui-nav-item shrink-0 px-2 py-1 text-accent"
+                onClick={() => {
+                  setIncludeAll((value) => !value)
+                  setActiveIndex(0)
+                }}
+              >
+                All workspaces
+              </button>
+            </div>
+          )}
           <ul
             id="palette-results"
             role="listbox"

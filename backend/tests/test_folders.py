@@ -44,6 +44,39 @@ async def test_rename_and_move_folder(client: AsyncClient, db_session: AsyncSess
     assert move.json()["parent_id"] == parent["id"]
 
 
+async def test_workspace_metadata_round_trip(client: AsyncClient, db_session: AsyncSession) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+    headers = {"x-csrf-token": await csrf_token(client)}
+    workspace = await client.post(
+        "/api/v1/folders", json={"name": "Studio", "description": " First draft "}, headers=headers
+    )
+    assert workspace.status_code == 200
+    assert workspace.json()["description"] == "First draft"
+    workspace_id = workspace.json()["id"]
+    child = await _create_folder(client, "Research", parent_id=workspace_id)
+    note = await client.post(
+        "/api/v1/notes", json={"title": "Brief", "folder_id": child["id"]}, headers=headers
+    )
+    note_id = note.json()["id"]
+    url = f"/api/v1/folders/{workspace_id}"
+    updated = await client.patch(
+        url, json={"description": "Live project", "pinned_note_id": note_id}, headers=headers
+    )
+    assert updated.status_code == 200, updated.text
+    folders = (await client.get("/api/v1/folders")).json()
+    saved = next(folder for folder in folders if folder["id"] == workspace_id)
+    assert saved["description"] == "Live project"
+    assert saved["pinned_note_id"] == note_id
+
+    cleared = await client.patch(
+        url, json={"description": None, "pinned_note_id": None}, headers=headers
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["description"] is None
+    assert cleared.json()["pinned_note_id"] is None
+
+
 async def test_cannot_move_folder_into_itself_or_descendant(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:

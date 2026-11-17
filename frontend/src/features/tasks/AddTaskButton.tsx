@@ -12,13 +12,25 @@ function isTypingInField(target: EventTarget | null): boolean {
 /** Opens TaskCreateDialog — the row it renders stands in for the old inline QuickAdd text
  * field, keeping the same look and the same Q/Ctrl+N shortcut, but every field (due time,
  * recurrence, priority, ...) now has a real control instead of typed shorthand. */
-export function AddTaskButton({ listId }: { listId?: string }) {
+export function AddTaskButton({
+  listId,
+  variant = 'primary',
+}: {
+  listId?: string
+  variant?: 'primary' | 'secondary'
+}) {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const isShortcut = e.key.toLowerCase() === 'q' || ((e.metaKey || e.ctrlKey) && e.key === 'n')
-      if (!isShortcut || isTypingInField(e.target)) return
+      if (
+        e.defaultPrevented ||
+        !isShortcut ||
+        isTypingInField(e.target) ||
+        document.querySelector('[role="dialog"]')
+      )
+        return
       e.preventDefault()
       setOpen(true)
     }
@@ -28,7 +40,7 @@ export function AddTaskButton({ listId }: { listId?: string }) {
 
   return (
     <>
-      <Button type="button" variant="primary" onClick={() => setOpen(true)}>
+      <Button type="button" variant={variant} onClick={() => setOpen(true)}>
         <Plus size={16} strokeWidth={1.5} className="shrink-0" />
         Add a task… (Q)
       </Button>

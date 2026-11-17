@@ -50,6 +50,41 @@ async def test_create_and_list_task_lists(client: AsyncClient, db_session: Async
     assert names == {"Inbox", "Work", "Personal"}
 
 
+async def test_workspace_membership_preserves_tasks_after_folder_deletion(
+    client: AsyncClient, second_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await make_user(db_session, "bob")
+    await login(client, "alice")
+    await login(second_client, "bob")
+    headers = {"x-csrf-token": await csrf_token(client)}
+    response = await client.post("/api/v1/folders", json={"name": "Studio"}, headers=headers)
+    workspace_id = response.json()["id"]
+    task_list = await _create_list(client, "Existing list")
+    task = await _create_task(client, "Keep this", list_id=task_list["id"])
+    attached = await client.patch(
+        f"/api/v1/task-lists/{task_list['id']}",
+        json={"workspace_id": workspace_id},
+        headers=headers,
+    )
+    assert attached.status_code == 200, attached.text
+    assert attached.json()["workspace_id"] == workspace_id
+
+    denied = await second_client.post(
+        "/api/v1/task-lists",
+        json={"name": "Foreign list", "workspace_id": workspace_id},
+        headers={"x-csrf-token": await csrf_token(second_client)},
+    )
+    assert denied.status_code == 400
+
+    deleted = await client.delete(f"/api/v1/folders/{workspace_id}", headers=headers)
+    assert deleted.status_code == 204
+    lists = (await client.get("/api/v1/task-lists")).json()
+    assert next(item for item in lists if item["id"] == task_list["id"])["workspace_id"] is None
+    tasks = (await client.get("/api/v1/tasks")).json()
+    assert any(item["id"] == task["id"] for item in tasks)
+
+
 async def test_update_task_list(client: AsyncClient, db_session: AsyncSession) -> None:
     await make_user(db_session, "alice")
     await login(client, "alice")

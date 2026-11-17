@@ -100,16 +100,50 @@
 
   --oatis-shadow-pop: 0 10px 30px light-dark(rgb(52 46 24 / 0.14), rgb(0 0 0 / 0.38));
 
-  --motion-fast: 140ms;
-  --motion-base: 220ms;
-  --motion-press: 260ms;
+  --motion-fast: 170ms;
+  --motion-base: 245ms;
+  --motion-press: 245ms;
+  --motion-press-in: 90ms;
+  --motion-segment: 345ms;
+  --motion-overlay: 445ms;
   --ease-standard: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --oatis-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --oatis-ease-spring: var(--ease-standard);
+  --oatis-ease-overlay: var(--ease-standard);
 
   --btn-primary-bg: var(--accent);
   --btn-primary-text: var(--accent-text);
 
   --mask-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
+}
+
+/* The first peak is 4.5% past the target for controls and 2.25% for overlays. */
+@supports (animation-timing-function: linear(0, 1)) {
+  :root {
+    --oatis-ease-spring: linear(
+      0,
+      0.25 9%,
+      0.65 18%,
+      0.92 27%,
+      1.03 36%,
+      1.045 43%,
+      1.03 53%,
+      1.0075 65%,
+      0.99775 80%,
+      1
+    );
+    --oatis-ease-overlay: linear(
+      0,
+      0.25 9%,
+      0.65 18%,
+      0.92 27%,
+      1.015 36%,
+      1.0225 43%,
+      1.015 53%,
+      1.00375 65%,
+      0.998875 80%,
+      1
+    );
+  }
 }
 
 /* Cyber keeps the same roles with volt yellow for action, red for attention and square corners. */

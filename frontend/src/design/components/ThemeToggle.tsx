@@ -1,5 +1,4 @@
 import { Monitor, Moon, Sparkles, Sun } from '@/design/icons'
-import { clsx } from 'clsx'
 import { type ThemePreference, transitionOriginFromEvent, useThemeStore } from '@/lib/theme'
 
 const OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
@@ -14,25 +13,17 @@ export function ThemeToggle() {
   const setPreference = useThemeStore((s) => s.setPreference)
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Theme"
-      className="ui-segmented inline-flex items-center gap-0.5 border border-border bg-surface p-0.5"
-    >
+    <div role="radiogroup" aria-label="Theme" className="ui-fluid-segments [--segment-count:4]">
       {OPTIONS.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
+          type="button"
           role="radio"
           aria-checked={preference === value}
-          data-active={preference === value}
+          aria-label={label}
           title={label}
           onClick={(e) => setPreference(value, transitionOriginFromEvent(e))}
-          className={clsx(
-            'ui-segment inline-flex h-7 w-7 items-center justify-center transition-colors duration-150',
-            preference === value
-              ? 'bg-surface-raised text-text'
-              : 'text-text-muted hover:text-text',
-          )}
+          className="inline-flex h-9 w-9 items-center justify-center"
         >
           <Icon size={16} strokeWidth={1.5} />
         </button>

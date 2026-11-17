@@ -71,7 +71,7 @@ function Workspace({
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-7 sm:px-9 sm:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="ui-rise flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <Link
             to="/notes"
@@ -99,16 +99,13 @@ function Workspace({
           )}
         </div>
       </div>
-      <nav
-        aria-label="Workspace sections"
-        className="mt-6 flex flex-wrap gap-1 border-b border-border pb-2"
-      >
+      <nav aria-label="Workspace sections" className="ui-fluid-segments mt-6 [--segment-count:3]">
         {([undefined, 'notes', 'tasks'] as const).map((page) => (
           <NavLink
             end
             key={page ?? 'overview'}
             to={workspacePath(folder.id, page)}
-            className="ui-nav-item px-4 py-2 text-sm font-semibold text-text-muted"
+            className="flex min-h-10 items-center justify-center px-3 text-sm font-semibold sm:px-5"
           >
             {page === 'notes' ? 'Notes' : page === 'tasks' ? 'Tasks' : 'Overview'}
           </NavLink>
@@ -116,7 +113,7 @@ function Workspace({
       </nav>
 
       {overview ? (
-        <div className="mt-6 grid gap-7 lg:grid-cols-[1.2fr_1fr]">
+        <div key="overview" className="ui-rise mt-6 grid gap-7 lg:grid-cols-[1.2fr_1fr]">
           <section className="min-w-0">
             <SectionHeader
               title="Notes"
@@ -144,7 +141,7 @@ function Workspace({
           </section>
         </div>
       ) : tab === 'notes' ? (
-        <div className="mt-5 grid gap-1">
+        <div key="notes" className="ui-rise mt-5 grid gap-1">
           {notes.map((note) => (
             <div key={note.id} className="flex min-w-0 items-center gap-2">
               <div className="min-w-0 flex-1">
@@ -172,7 +169,7 @@ function Workspace({
           {notes.length === 0 && <EmptyState title="No notes yet" />}
         </div>
       ) : (
-        <div className="mt-5">
+        <div key="tasks" className="ui-rise mt-5">
           <WorkspaceTasks folder={folder} assignments={assignments} />
         </div>
       )}
@@ -213,7 +210,7 @@ function NoteLink({
       onFocus={() => prefetch(note.id)}
       className={
         pinned
-          ? 'mb-2 grid gap-1 rounded-md bg-surface px-4 py-3 hover:bg-surface-raised'
+          ? 'ui-tonal-link mb-2 grid gap-1 bg-surface px-4 py-3 hover:bg-surface-raised'
           : 'ui-nav-item flex min-w-0 items-center gap-2.5 px-3 py-2.5 text-sm'
       }
     >

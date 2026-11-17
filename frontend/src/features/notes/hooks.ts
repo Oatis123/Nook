@@ -128,8 +128,17 @@ export function useCreateNote() {
 }
 
 export function useOpenDailyNote() {
+  const queryClient = useQueryClient()
   const invalidate = useInvalidateNotesAndTags()
-  return useMutation({ mutationFn: notesApi.openDailyNote, onSuccess: invalidate })
+  return useMutation({
+    mutationFn: notesApi.openDailyNote,
+    onSuccess: (note) => {
+      queryClient.setQueryData(noteKey(note.id), note)
+      invalidate()
+      // The first daily note can also create the journal's root folder.
+      void queryClient.invalidateQueries({ queryKey: foldersKey })
+    },
+  })
 }
 
 export function useUpdateNote(id: string) {

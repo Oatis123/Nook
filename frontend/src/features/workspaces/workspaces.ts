@@ -13,6 +13,13 @@ export function workspacePath(id: string, tab?: 'notes' | 'tasks') {
   return '/workspaces/' + id + (tab ? '/' + tab : '')
 }
 
+const inks = ['--ink-bi', '--ink-fn', '--ink-type', '--ink-prop', '--ink-kw']
+
+export function workspaceInk(id: string) {
+  const index = Array.from(id).reduce((sum, character) => sum + character.charCodeAt(0), 0)
+  return `var(${inks[index % inks.length]})`
+}
+
 function recentKey(userId: string, workspaceId?: string) {
   return ['nook', 'recent-note', userId, workspaceId].filter(Boolean).join(':')
 }

@@ -12,7 +12,7 @@ export default function AllTasksPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-7 sm:px-9 sm:py-10">
-      <h1 className="mb-6 text-4xl font-extrabold tracking-tight sm:text-5xl">All tasks</h1>
+      <h1 className="ui-rise mb-6 text-4xl font-extrabold tracking-tight sm:text-5xl">All tasks</h1>
       {folders.data ? <WorkspaceTasks assignments={assignments} /> : <QueryState query={folders} />}
     </section>
   )

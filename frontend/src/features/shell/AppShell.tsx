@@ -14,6 +14,7 @@ import {
   PanelLeft,
   PanelRight,
   Menu,
+  ChevronDown,
   ChevronsUpDown,
   TriangleAlert,
 } from '@/design/icons'
@@ -38,6 +39,7 @@ import {
   lastNote,
   rememberNote,
   workspaceByFolder,
+  workspaceInk,
   workspacePath,
 } from '@/features/workspaces/workspaces'
 import type { Folder as WorkspaceFolder } from '@/lib/types'
@@ -173,7 +175,7 @@ export function AppShell() {
         aria-label="Sidebar"
         className={clsx(
           'ui-sidebar fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-border bg-surface',
-          'transition-transform duration-150 md:relative md:inset-auto md:transition-[width]',
+          'md:relative md:inset-auto',
           sidebarOpen
             ? 'translate-x-0 md:m-4 md:border'
             : '-translate-x-full md:w-0 md:translate-x-0 md:overflow-hidden md:border-r-0',
@@ -208,7 +210,11 @@ export function AppShell() {
                 data-active={folder.id === activeWorkspaceId}
                 className={clsx(workspaceNav, 'pl-4')}
               >
-                <span className="h-2 w-2 shrink-0 rounded-full bg-accent/65" />
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: workspaceInk(folder.id) }}
+                />
                 <span className="truncate">{folder.name}</span>
               </Link>
             ))}
@@ -292,12 +298,19 @@ export function AppShell() {
               <button
                 type="button"
                 aria-label="Switch workspace"
-                className="ui-nav-item flex min-h-10 min-w-0 items-center gap-2 bg-surface px-3 text-sm font-semibold"
+                className="ui-nav-item ui-workspace-trigger flex min-h-11 min-w-0 items-center gap-2 bg-surface px-3 text-sm font-semibold"
               >
+                {activeWorkspace && (
+                  <span
+                    aria-hidden="true"
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: workspaceInk(activeWorkspace.id) }}
+                  />
+                )}
                 <span className="truncate">
                   {activeWorkspace?.name ?? (inbox ? 'Inbox' : 'All workspaces')}
                 </span>
-                <ChevronsUpDown size={14} />
+                <ChevronDown size={14} />
               </button>
             }
             items={workspaceItems}
@@ -316,7 +329,7 @@ export function AppShell() {
               <Search size={16} strokeWidth={1.5} />
             </IconButton>
           </Tooltip>
-          <FilesDrawer key={location.pathname} workspaceId={activeWorkspaceId} />
+          <FilesDrawer workspaceId={activeWorkspaceId} />
           {noteId && (
             <IconButton
               label="Toggle context panel"
@@ -353,7 +366,7 @@ export function AppShell() {
 
           <aside
             className={clsx(
-              'hidden shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-150 md:flex',
+              'hidden shrink-0 flex-col border-l border-border bg-surface transition-[width] duration-(--motion-overlay) ease-(--ease-standard) md:flex',
               showContext ? 'w-72' : 'w-0 overflow-hidden',
             )}
           >
@@ -372,7 +385,7 @@ export function AppShell() {
       <div
         className={clsx(
           'fixed inset-x-0 bottom-0 z-40 flex max-h-[70vh] flex-col border-t border-border bg-surface',
-          'transition-transform duration-150 md:hidden',
+          'transition-transform duration-(--motion-overlay) ease-(--ease-standard) md:hidden',
           showContext ? 'translate-y-0' : 'translate-y-full',
         )}
       >

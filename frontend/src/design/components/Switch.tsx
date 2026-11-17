@@ -17,7 +17,7 @@ export function Switch({
       checked={checked}
       onCheckedChange={onCheckedChange}
       aria-label={label}
-      className="ui-toggle shrink-0"
+      className="ui-toggle ui-fluid-segments shrink-0 [--segment-count:2]"
     >
       <span data-part="on" aria-hidden>
         on

@@ -2,12 +2,12 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Button } from '@/design/components/Button'
 import { QueryState } from '@/design/components/QueryState'
-import { ChevronRight, FileText, Folder, Inbox, Plus } from '@/design/icons'
+import { ChevronRight, FileText, Inbox, Plus } from '@/design/icons'
 import { useCurrentUser } from '@/features/auth/hooks'
 import { useFolders, useNotes } from '@/features/notes/hooks'
 import { useTaskLists } from '@/features/tasks/hooks'
 import { WorkspaceEditDialog, WorkspaceNoteDialog } from '@/features/workspaces/WorkspaceDialogs'
-import { workspacePath } from '@/features/workspaces/workspaces'
+import { workspaceInk, workspacePath } from '@/features/workspaces/workspaces'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 
 export default function WorkspacesPage() {
@@ -27,7 +27,7 @@ export default function WorkspacesPage() {
 
   return (
     <section className="mx-auto max-w-5xl px-4 py-7 sm:px-9 sm:py-10">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="ui-rise flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
           {inbox ? 'Inbox' : 'Workspaces'}
         </h1>
@@ -72,9 +72,13 @@ export default function WorkspacesPage() {
               <Link
                 key={folder.id}
                 to={workspacePath(folder.id)}
-                className="flex min-w-0 items-center gap-4 rounded-md bg-surface px-4 py-3.5 hover:bg-surface-raised"
+                className="ui-tonal-link flex min-w-0 items-center gap-4 bg-surface px-4 py-3.5 hover:bg-surface-raised"
               >
-                <Folder size={20} className="text-text-muted" />
+                <span
+                  aria-hidden="true"
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: workspaceInk(folder.id) }}
+                />
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate text-lg font-bold">{folder.name}</h2>
                   {folder.description && (

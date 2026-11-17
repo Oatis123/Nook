@@ -36,7 +36,10 @@ export function Dialog({
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger && <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger>}
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in" />
+        <RadixDialog.Overlay
+          data-placement={placement}
+          className="ui-dialog-overlay fixed inset-0 z-50 bg-(--overlay) animate-fade-in"
+        />
         <RadixDialog.Content
           data-placement={placement}
           onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
@@ -71,7 +74,7 @@ export function Dialog({
           className={[
             'ui-dialog fixed z-50 overscroll-contain border border-border bg-surface-raised p-5 animate-fade-in',
             placement === 'right'
-              ? 'inset-y-2 right-2 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden sm:inset-y-4 sm:right-4'
+              ? 'ui-glass inset-y-2 right-2 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden sm:inset-y-4 sm:right-4'
               : [
                   // Phones: a bottom sheet that never runs off-screen — a tall form (e.g. a
                   // recurring task) scrolls inside it instead of losing its header and buttons.

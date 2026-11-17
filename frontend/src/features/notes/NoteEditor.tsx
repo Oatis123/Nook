@@ -358,11 +358,7 @@ const MODES: { value: NoteMode; label: string; icon: typeof Eye }[] = [
 function ModeSwitch({ mode, onChange }: { mode: NoteMode; onChange: (mode: NoteMode) => void }) {
   return (
     <Tooltip label="Edit or view (Ctrl/Cmd+E)">
-      <div
-        role="radiogroup"
-        aria-label="Mode"
-        className="ui-segmented inline-flex items-center gap-0.5 border border-border bg-surface p-0.5"
-      >
+      <div role="radiogroup" aria-label="Mode" className="ui-fluid-segments [--segment-count:2]">
         {MODES.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
@@ -370,12 +366,8 @@ function ModeSwitch({ mode, onChange }: { mode: NoteMode; onChange: (mode: NoteM
             role="radio"
             aria-checked={mode === value}
             aria-label={label}
-            data-active={mode === value}
             onClick={() => onChange(value)}
-            className={clsx(
-              'ui-segment inline-flex h-7 items-center justify-center gap-1.5 px-2 text-sm transition-colors duration-150',
-              mode === value ? 'bg-surface-raised text-text' : 'text-text-muted hover:text-text',
-            )}
+            className="inline-flex h-8 items-center justify-center gap-1.5 px-2.5 text-sm font-semibold"
           >
             <Icon size={15} strokeWidth={1.5} />
             <span className="max-sm:hidden">{label}</span>

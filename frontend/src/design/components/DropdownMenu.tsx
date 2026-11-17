@@ -22,7 +22,11 @@ export function DropdownMenu({
         {trigger}
       </RadixDropdown.Trigger>
       <RadixDropdown.Portal>
-        <RadixDropdown.Content align="start" sideOffset={6} className={menuClass}>
+        <RadixDropdown.Content
+          align="start"
+          sideOffset={6}
+          className={menuClass + ' ui-menu-anchored'}
+        >
           <MenuItems as={RadixDropdown.Item} items={items} />
         </RadixDropdown.Content>
       </RadixDropdown.Portal>

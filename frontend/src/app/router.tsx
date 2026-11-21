@@ -34,20 +34,15 @@ export const router = createBrowserRouter([
         children: [
           {
             index: true,
-            element: <Navigate to="/tasks/today" replace />,
+            element: <PlaceholderPage title="Select or create a note" />,
           },
           {
             path: 'notes',
-            lazy: page(() => import('@/features/workspaces/WorkspacesPage')),
-          },
-          {
-            path: 'workspaces/:workspaceId/:tab?',
-            lazy: page(() => import('@/features/workspaces/WorkspacePage')),
+            element: <PlaceholderPage title="Select or create a note" />,
           },
           { path: 'notes/:noteId', lazy: page(() => import('@/features/notes/NoteEditorRoute')) },
           { path: 'tags/:name', lazy: page(() => import('@/features/notes/TagNotesPage')) },
-          { path: 'tasks', element: <Navigate to="/tasks/all" replace /> },
-          { path: 'tasks/all', lazy: page(() => import('@/features/tasks/AllTasksPage')) },
+          { path: 'tasks', element: <Navigate to="/tasks/today" replace /> },
           { path: 'tasks/today', lazy: page(() => import('@/features/tasks/TodayView')) },
           { path: 'tasks/upcoming', lazy: page(() => import('@/features/tasks/UpcomingView')) },
           { path: 'tasks/list/:listId', lazy: page(() => import('@/features/tasks/ListView')) },

@@ -9,7 +9,7 @@ test.beforeAll(() => {
 
 test.beforeEach(async ({ page }) => {
   await login(page, ADMIN_USERNAME, ADMIN_PASSWORD)
-  await expect(page.getByRole('button', { name: 'Files', exact: true })).toBeVisible()
+  await expect(page.getByLabel('New note')).toBeVisible()
 })
 
 test('a wikilink from one note to another shows up as a backlink', async ({ page }) => {
@@ -22,7 +22,6 @@ test('a wikilink from one note to another shows up as a backlink', async ({ page
   // matches both). Wait for the URL to actually change, then for the title input to show
   // the fresh note's default before touching it — otherwise a fill can land on the note
   // that's on its way out rather than the one that just replaced it.
-  await page.getByRole('button', { name: 'Files', exact: true }).click()
   await page.getByLabel('New note').click()
   await page.waitForURL(/\/notes\/[^/]+$/)
   const urlA = page.url()
@@ -32,7 +31,6 @@ test('a wikilink from one note to another shows up as a backlink', async ({ page
   await Promise.all([waitForNoteSave(page), titleInputA.blur()])
   await expect(titleInputA).toHaveValue(titleA)
 
-  await page.getByRole('button', { name: 'Files', exact: true }).click()
   await page.getByLabel('New note').click()
   await page.waitForURL((url) => url.toString() !== urlA && /\/notes\/[^/]+$/.test(url.pathname))
   const titleInputB = page.getByLabel('Note title')
@@ -46,7 +44,6 @@ test('a wikilink from one note to another shows up as a backlink', async ({ page
   await page.keyboard.type(`Links to [[${titleA}]].`)
   await saved
 
-  await page.getByRole('button', { name: 'Files', exact: true }).click()
   await page.getByRole('button', { name: titleA, exact: true }).click()
   await page.waitForURL(urlA)
   await page.getByLabel('Toggle context panel').click()

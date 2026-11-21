@@ -16,7 +16,6 @@ export const createTaskList = (input: {
   name: string
   color?: TaskListColor
   icon?: TaskListIcon
-  workspace_id?: string | null
 }) => apiFetch<TaskList>('/task-lists', { method: 'POST', body: input })
 
 export const updateTaskList = (
@@ -27,7 +26,6 @@ export const updateTaskList = (
     icon?: TaskListIcon
     position?: number
     archived?: boolean
-    workspace_id?: string | null
   },
 ) => apiFetch<TaskList>(`/task-lists/${id}`, { method: 'PATCH', body: input })
 

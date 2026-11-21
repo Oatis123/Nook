@@ -81,8 +81,6 @@ export interface Folder {
   parent_id: string | null
   name: string
   position: number
-  description?: string | null
-  pinned_note_id?: string | null
 }
 
 export interface NoteSummary {
@@ -213,7 +211,6 @@ export interface TaskList {
   position: number
   is_inbox: boolean
   archived_at: string | null
-  workspace_id?: string | null
 }
 
 export type TaskPriority = 'none' | 'low' | 'medium' | 'high'

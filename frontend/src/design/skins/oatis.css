@@ -195,6 +195,14 @@ body {
   background: var(--surface);
 }
 
+.ui-fluid-segments.w-full {
+  width: 100%;
+}
+
+.ui-sidebar .ui-fluid-segments {
+  background: var(--bg);
+}
+
 .ui-fluid-segments::before {
   position: absolute;
   z-index: -1;
@@ -271,19 +279,6 @@ body {
 .ui-topbar {
   border: 0;
   background: var(--bg);
-}
-
-.ui-workspace-trigger > svg {
-  transition: transform var(--motion-press) var(--oatis-ease-spring);
-}
-
-.ui-workspace-trigger[data-state='open'] {
-  background: var(--accent-wash);
-  color: var(--accent);
-}
-
-.ui-workspace-trigger[data-state='open'] > svg {
-  transform: rotate(180deg);
 }
 
 :is(.ui-dialog, .ui-palette, .ui-menu, .ui-tooltip, .ui-toast) {

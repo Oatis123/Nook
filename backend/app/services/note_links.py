@@ -149,6 +149,159 @@ def _dedup_links(links: list[Wikilink]) -> list[Wikilink]:
     return list(seen.values())
 
 
+async def _load_folder_tree(
+    session: AsyncSession, user_id: uuid.UUID
+) -> tuple[dict[uuid.UUID | None, tuple[str, ...]], dict[tuple[str, ...], list[uuid.UUID | None]]]:
+    rows = (
+        await session.execute(
+            select(Folder.id, Folder.name, Folder.parent_id).where(
+                Folder.user_id == user_id, Folder.deleted_at.is_(None)
+            )
+        )
+    ).all()
+    by_id = {row.id: (row.name, row.parent_id) for row in rows}
+    folder_paths: dict[uuid.UUID | None, tuple[str, ...]] = {None: ()}
+    path_to_ids: dict[tuple[str, ...], list[uuid.UUID | None]] = {(): [None]}
+
+    for fid in by_id:
+        segments: list[str] = []
+        seen: set[uuid.UUID] = set()
+        curr: uuid.UUID | None = fid
+        while curr is not None and curr not in seen:
+            entry = by_id.get(curr)
+            if entry is None:
+                break
+            seen.add(curr)
+            name, parent_id = entry
+            segments.append(name)
+            curr = parent_id
+        path = tuple(reversed(segments))
+        folder_paths[fid] = path
+        path_to_ids.setdefault(path, []).append(fid)
+
+    return folder_paths, path_to_ids
+
+
+def _resolve_embed_ids(
+    target: str,
+    note_folder_id: uuid.UUID | None,
+    note_folder_path: tuple[str, ...],
+    folder_paths: dict[uuid.UUID | None, tuple[str, ...]],
+    path_to_ids: dict[tuple[str, ...], list[uuid.UUID | None]],
+    by_folder_and_name: dict[tuple[uuid.UUID | None, str], list[uuid.UUID]],
+    by_name: dict[str, list[uuid.UUID]],
+) -> list[uuid.UUID]:
+    norm = target.replace("\\", "/").strip()
+    if "/" in norm:
+        dir_raw, _, filename = norm.rpartition("/")
+        is_abs = norm.startswith("/")
+        raw_parts = [p for p in dir_raw.split("/") if p and p != "."]
+
+        # 1. Path relative to note's folder (handles ../images/file.gif and ./file.gif)
+        if not is_abs:
+            rel_parts = list(note_folder_path)
+            rel_valid = True
+            for part in raw_parts:
+                if part == "..":
+                    if not rel_parts:
+                        rel_valid = False
+                        break
+                    rel_parts.pop()
+                else:
+                    rel_parts.append(part)
+            if rel_valid:
+                matched: list[uuid.UUID] = []
+                for fid in path_to_ids.get(tuple(rel_parts), ()):
+                    matched.extend(by_folder_and_name.get((fid, filename), ()))
+                if matched:
+                    return matched
+
+        # 2. Vault-root path (e.g. images/file.gif) and 3. unambiguous suffix folder match
+        if ".." not in raw_parts:
+            vault_matched: list[uuid.UUID] = []
+            for fid in path_to_ids.get(tuple(raw_parts), ()):
+                vault_matched.extend(by_folder_and_name.get((fid, filename), ()))
+            if vault_matched:
+                return vault_matched
+
+            if raw_parts:
+                suffix = tuple(raw_parts)
+                suffix_matches: list[list[uuid.UUID]] = []
+                for (fid, name), ids in by_folder_and_name.items():
+                    if name != filename or fid is None:
+                        continue
+                    fpath = folder_paths.get(fid, ())
+                    if len(fpath) >= len(suffix) and fpath[-len(suffix) :] == suffix:
+                        suffix_matches.append(ids)
+                if len(suffix_matches) == 1:
+                    return suffix_matches[0]
+    else:
+        filename = norm
+        same_folder = by_folder_and_name.get((note_folder_id, filename), [])
+        if same_folder:
+            return same_folder
+
+    all_matches = by_name.get(filename, [])
+    if len(all_matches) == 1:
+        return all_matches
+    return []
+
+
+async def _sync_note_attachments(
+    session: AsyncSession, user_id: uuid.UUID, note: Note, body: str
+) -> None:
+    embed_targets = _capped(extract_embeds(body))
+    await session.execute(delete(NoteAttachment).where(NoteAttachment.note_id == note.id))
+    if not embed_targets:
+        return
+
+    filenames = {t.replace("\\", "/").strip().rsplit("/", 1)[-1] for t in embed_targets}
+    attachments = (
+        await session.execute(
+            select(Attachment.id, Attachment.filename, Attachment.folder_id).where(
+                Attachment.user_id == user_id, Attachment.filename.in_(filenames)
+            )
+        )
+    ).all()
+    if not attachments:
+        return
+
+    by_folder_and_name: dict[tuple[uuid.UUID | None, str], list[uuid.UUID]] = {}
+    by_name: dict[str, list[uuid.UUID]] = {}
+    for attachment_id, filename, folder_id in attachments:
+        by_folder_and_name.setdefault((folder_id, filename), []).append(attachment_id)
+        by_name.setdefault(filename, []).append(attachment_id)
+
+    needs_tree = any("/" in t for t in embed_targets) or any(
+        row.folder_id is not None for row in attachments
+    )
+    if needs_tree:
+        folder_paths, path_to_ids = await _load_folder_tree(session, user_id)
+    else:
+        folder_paths = {None: ()}
+        path_to_ids = {(): [None]}
+
+    note_folder_path = folder_paths.get(note.folder_id, ())
+    resolved_ids: set[uuid.UUID] = set()
+    for target in embed_targets:
+        resolved_ids.update(
+            _resolve_embed_ids(
+                target,
+                note.folder_id,
+                note_folder_path,
+                folder_paths,
+                path_to_ids,
+                by_folder_and_name,
+                by_name,
+            )
+        )
+
+    for attachment_id in resolved_ids:
+        await session.execute(
+            insert(NoteAttachment).values(note_id=note.id, attachment_id=attachment_id)
+        )
+
+
 async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note: Note) -> None:
     """Re-derives frontmatter/tags/aliases/outgoing-links from `note.content`. Call after
     setting the note's content (and before commit) on every create/update."""
@@ -201,25 +354,7 @@ async def sync_note_from_content(session: AsyncSession, user_id: uuid.UUID, note
             )
         )
 
-    embed_filenames = _capped(extract_embeds(body))
-    await session.execute(delete(NoteAttachment).where(NoteAttachment.note_id == note.id))
-    if embed_filenames:
-        attachments = await session.execute(
-            select(Attachment.id, Attachment.filename).where(
-                Attachment.user_id == user_id, Attachment.filename.in_(embed_filenames)
-            )
-        )
-        by_filename: dict[str, list[uuid.UUID]] = {}
-        for attachment_id, filename in attachments.all():
-            by_filename.setdefault(filename, []).append(attachment_id)
-        for filename in embed_filenames:
-            # Every same-named attachment counts as used — the embed can't pick between
-            # them (duplicates predating unique names), but "delete unused" must not
-            # delete any of them either.
-            for attachment_id in by_filename.get(filename, []):
-                await session.execute(
-                    insert(NoteAttachment).values(note_id=note.id, attachment_id=attachment_id)
-                )
+    await _sync_note_attachments(session, user_id, note, body)
 
 
 async def resolve_dangling_links_to(session: AsyncSession, user_id: uuid.UUID, note: Note) -> None:

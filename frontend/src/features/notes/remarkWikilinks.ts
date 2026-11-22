@@ -29,7 +29,11 @@ function voidNode(hName: string, hProperties: Record<string, unknown>): Text {
  * `![[embed]]` (spec §6.3/§6.5). Resolution/click-navigation is done via plain <a>
  * elements the preview container handles through event delegation (see
  * MarkdownPreview's onClick), since hast/rehype-react props can't carry a JS handler. */
-export function remarkWikilinks(index: WikilinkIndex, attachmentIndex: AttachmentIndex) {
+export function remarkWikilinks(
+  index: WikilinkIndex,
+  attachmentIndex: AttachmentIndex,
+  noteFolderId?: string | null,
+) {
   return (tree: Root) => {
     findAndReplace(tree, [
       [
@@ -41,7 +45,7 @@ export function remarkWikilinks(index: WikilinkIndex, attachmentIndex: Attachmen
           const label = (alias ?? targetPart).trim() || trimmedTarget
 
           if (bang) {
-            const attachment = attachmentIndex.resolve(trimmedTarget)
+            const attachment = attachmentIndex.resolve(trimmedTarget, noteFolderId)
             if (attachment?.mime.startsWith('image/')) {
               return voidNode('img', {
                 src: attachmentDownloadUrl(attachment.id),

@@ -142,7 +142,10 @@ export function NoteEditor({ noteId }: { noteId: string }) {
   const uploadAndInsert = useCallback(
     async (files: File[], pos: number | 'cursor', view: EditorView) => {
       // A failed upload is already reported by the global mutation error toast.
-      const uploaded = await Promise.all(files.map((f) => uploadAttachment(f))).catch(() => null)
+      const folderId = noteQuery.data?.folder_id ?? null
+      const uploaded = await Promise.all(
+        files.map((f) => uploadAttachment({ file: f, folderId })),
+      ).catch(() => null)
       if (!uploaded) return
       const insertPos = pos === 'cursor' ? view.state.selection.main.from : pos
       const embedText = uploaded.map((a) => `![[${a.filename}]]`).join(' ')
@@ -152,7 +155,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
       })
       view.focus()
     },
-    [uploadAttachment],
+    [uploadAttachment, noteQuery.data?.folder_id],
   )
 
   const editorExtensions = useMemo(
@@ -276,6 +279,7 @@ export function NoteEditor({ noteId }: { noteId: string }) {
               {draft.content.trim() ? (
                 <MarkdownPreview
                   content={draft.content}
+                  noteFolderId={noteQuery.data?.folder_id ?? null}
                   onToggleTask={toggleTask}
                   onEditAt={editAt}
                 />

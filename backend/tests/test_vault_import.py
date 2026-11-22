@@ -111,7 +111,66 @@ async def test_import_uploads_attachments_and_links_embeds(
     attachments = (await client.get("/api/v1/attachments")).json()
     assert len(attachments) == 1
     assert attachments[0]["filename"] == "photo.png"
+    assert attachments[0]["folder_id"] is not None
     assert attachments[0]["used_by"] == ["Note"]
+
+
+async def test_import_attachment_folders_markdown_embeds_and_dedup_rewrite(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+
+    # First import creates folders and places attachments into their zip directories
+    job1 = await _upload_and_process(
+        client,
+        db_session,
+        {
+            "Course/images/8943ee10.gif": b"GIF89a-course",
+            "Other/images/8943ee10.gif": b"GIF89a-other",
+            "Course/notes/Lecture.md": b"| ![](../images/8943ee10.gif) | Graph |\n",
+        },
+    )
+    assert job1["status"] == ImportJobStatus.done
+    assert job1["report"]["attachments_imported"] == 2
+    assert job1["report"]["notes_imported"] == 1
+
+    folders = (await client.get("/api/v1/folders")).json()
+    by_name_parent = {(f["name"], f["parent_id"]): f["id"] for f in folders}
+    course_id = by_name_parent[("Course", None)]
+    other_id = by_name_parent[("Other", None)]
+    course_images_id = by_name_parent[("images", course_id)]
+    other_images_id = by_name_parent[("images", other_id)]
+
+    attachments = (await client.get("/api/v1/attachments")).json()
+    by_folder = {a["folder_id"]: a for a in attachments}
+    assert by_folder[course_images_id]["filename"] == "8943ee10.gif"
+    assert by_folder[course_images_id]["used_by"] == ["Lecture"]
+    assert by_folder[other_images_id]["filename"] == "8943ee10.gif"
+    assert by_folder[other_images_id]["used_by"] == []
+
+    # Second import with different bytes in Course/images/8943ee10.gif numbers it and rewrites
+    job2 = await _upload_and_process(
+        client,
+        db_session,
+        {
+            "Course/images/8943ee10.gif": b"GIF89a-course-v2",
+            "Course/notes/Lecture 2.md": b"See ![graph](../images/8943ee10.gif)\n",
+        },
+    )
+    assert job2["status"] == ImportJobStatus.done
+    notes = (await client.get("/api/v1/notes")).json()
+    lec2 = next(n for n in notes if n["title"] == "Lecture 2")
+    lec2_detail = (await client.get(f"/api/v1/notes/{lec2['id']}")).json()
+    assert "<../images/8943ee10 (2).gif>" in lec2_detail["content"]
+
+    attachments2 = (await client.get("/api/v1/attachments")).json()
+    renamed = next(
+        a
+        for a in attachments2
+        if a["folder_id"] == course_images_id and a["filename"] == "8943ee10 (2).gif"
+    )
+    assert renamed["used_by"] == ["Lecture 2"]
 
 
 async def test_import_handles_title_conflict(client: AsyncClient, db_session: AsyncSession) -> None:

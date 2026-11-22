@@ -1,8 +1,10 @@
 import math
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import date, datetime, time
 from typing import Any
+from urllib.parse import unquote
 
 import yaml
 
@@ -18,6 +20,7 @@ _BARE_URL_RE = re.compile(r"https?://\S+")
 _TAG_RE = re.compile(r"(?<![\w#/])#([^\W\d_][\w-]*(?:/[^\W\d_][\w-]*)*)")
 _WIKILINK_RE = re.compile(r"(?<!!)\[\[([^\[\]]+)\]\]")
 _EMBED_RE = re.compile(r"!\[\[([^\[\]]+)\]\]")
+_EXTERNAL_SCHEME_RE = re.compile(r"^(?:https?:|data:|mailto:)", re.IGNORECASE)
 
 
 def _json_safe(value: Any) -> Any:
@@ -100,6 +103,16 @@ class Wikilink:
     alias: str | None
 
 
+@dataclass(frozen=True)
+class MarkdownImageSpan:
+    start: int
+    end: int
+    alt: str
+    dest: str
+    title_part: str
+    angle_bracketed: bool
+
+
 def extract_wikilinks(body: str) -> list[Wikilink]:
     prose = _FENCED_CODE_RE.sub(" ", body)
     prose = _INLINE_CODE_RE.sub(" ", prose)
@@ -121,9 +134,190 @@ def extract_wikilinks(body: str) -> list[Wikilink]:
     return links
 
 
+def _is_escaped(text: str, pos: int) -> bool:
+    backslashes = 0
+    i = pos - 1
+    while i >= 0 and text[i] == "\\":
+        backslashes += 1
+        i -= 1
+    return backslashes % 2 == 1
+
+
+def iter_markdown_images(text: str) -> Iterator[MarkdownImageSpan]:
+    """Yields standard Markdown image spans `![alt](dest "title")` in `text`, handling
+    `<angle bracketed>` destinations, balanced parentheses in filenames, and optional titles."""
+    n = len(text)
+    idx = 0
+    while idx < n:
+        pos = text.find("![", idx)
+        if pos == -1:
+            break
+        if _is_escaped(text, pos):
+            idx = pos + 2
+            continue
+
+        # Scan alt text up to matching `]`
+        i = pos + 2
+        bracket_depth = 0
+        alt_end = -1
+        while i < n:
+            ch = text[i]
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == "[":
+                bracket_depth += 1
+            elif ch == "]":
+                if bracket_depth == 0:
+                    alt_end = i
+                    break
+                bracket_depth -= 1
+            elif ch == "\n" and i + 1 < n and text[i + 1] == "\n":
+                break
+            i += 1
+
+        if alt_end == -1 or alt_end + 1 >= n or text[alt_end + 1] != "(":
+            idx = pos + 2
+            continue
+
+        j = alt_end + 2
+        while j < n and text[j] in (" ", "\t", "\n", "\r"):
+            j += 1
+        if j >= n:
+            idx = pos + 2
+            continue
+
+        angle_bracketed = False
+        if text[j] == "<":
+            angle_bracketed = True
+            j += 1
+            dest_start = j
+            found_close = False
+            while j < n:
+                ch = text[j]
+                if ch == "\\":
+                    j += 2
+                    continue
+                if ch in ("\n", "\r"):
+                    break
+                if ch == ">":
+                    found_close = True
+                    break
+                j += 1
+            if not found_close:
+                idx = pos + 2
+                continue
+            dest = text[dest_start:j]
+            j += 1  # consume '>'
+        else:
+            dest_start = j
+            paren_depth = 0
+            while j < n:
+                ch = text[j]
+                if ch == "\\":
+                    j += 2
+                    continue
+                if ch == "(":
+                    paren_depth += 1
+                elif ch == ")":
+                    if paren_depth == 0:
+                        break
+                    paren_depth -= 1
+                elif ch in (" ", "\t", "\n", "\r"):
+                    break
+                j += 1
+            dest = text[dest_start:j]
+
+        dest_end = j
+        k = dest_end
+        while k < n and text[k] in (" ", "\t", "\n", "\r"):
+            k += 1
+
+        if k < n and text[k] != ")":
+            opener = text[k]
+            if opener in ('"', "'"):
+                k += 1
+                closed = False
+                while k < n:
+                    if text[k] == "\\":
+                        k += 2
+                        continue
+                    if text[k] == opener:
+                        closed = True
+                        k += 1
+                        break
+                    k += 1
+                if not closed:
+                    idx = pos + 2
+                    continue
+            elif opener == "(":
+                k += 1
+                closed = False
+                while k < n:
+                    if text[k] == "\\":
+                        k += 2
+                        continue
+                    if text[k] == "(":
+                        break
+                    if text[k] == ")":
+                        closed = True
+                        k += 1
+                        break
+                    k += 1
+                if not closed:
+                    idx = pos + 2
+                    continue
+            else:
+                idx = pos + 2
+                continue
+            while k < n and text[k] in (" ", "\t", "\n", "\r"):
+                k += 1
+
+        if k >= n or text[k] != ")":
+            idx = pos + 2
+            continue
+
+        yield MarkdownImageSpan(
+            start=pos,
+            end=k + 1,
+            alt=text[pos + 2 : alt_end],
+            dest=dest,
+            title_part=text[dest_end:k],
+            angle_bracketed=angle_bracketed,
+        )
+        idx = k + 1
+
+
+def clean_markdown_image_target(raw_dest: str) -> str | None:
+    """Normalizes a Markdown image destination, returning None for external/data/empty targets."""
+    target = raw_dest.strip()
+    if not target or _EXTERNAL_SCHEME_RE.match(target):
+        return None
+    for sep in ("#", "?"):
+        if sep in target:
+            target = target.split(sep, 1)[0]
+    target = unquote(target).strip().replace("\\", "/")
+    if not target or _EXTERNAL_SCHEME_RE.match(target):
+        return None
+    return target
+
+
 def extract_embeds(body: str) -> set[str]:
-    """`![[filename]]` — image/file embeds (spec §6.3), tracked separately from regular
-    wikilinks so an embedded attachment doesn't also show up as a dangling note link."""
+    """Extracts both `![[...]]` Obsidian embeds and standard Markdown image embeds
+    `![alt](target)` (ignoring external/data/mailto links and code blocks)."""
     prose = _FENCED_CODE_RE.sub(" ", body)
     prose = _INLINE_CODE_RE.sub(" ", prose)
-    return {match.group(1).strip() for match in _EMBED_RE.finditer(prose) if match.group(1).strip()}
+
+    embeds: set[str] = set()
+    for match in _EMBED_RE.finditer(prose):
+        inner = match.group(1)
+        target = inner.partition("|")[0].partition("#")[0].strip().replace("\\", "/")
+        if target:
+            embeds.add(target)
+
+    for span in iter_markdown_images(prose):
+        target = clean_markdown_image_target(span.dest)
+        if target:
+            embeds.add(target)
+
+    return embeds

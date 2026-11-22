@@ -3,6 +3,7 @@ this is the layer with the fiddly wiring (auth middleware, mounting, the session
 manager's own lifespan), so it's worth proving the whole stack works together once,
 on top of the plainer service-level tests in test_api_tokens.py."""
 
+import base64
 import json
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
@@ -14,6 +15,7 @@ from starlette.testclient import TestClient
 
 import app.mcp.tools as mcp_tools
 import app.mcp.verifier as mcp_verifier
+import app.services.attachments as attachments_service
 from app.core.config import get_settings
 from app.main import app
 from app.services.api_tokens import create_api_token
@@ -390,3 +392,302 @@ async def test_tasks_with_recurrence_reminders_tags_subtasks_and_batches(
         _tool_object(call("complete_task", task_id=gym["id"], complete_subtasks=True))["status"]
         == "done"
     )
+
+
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+
+async def test_mcp_attachments_upload_list_get_move_delete(
+    mcp_client: TestClient, db_session: AsyncSession
+) -> None:
+    alice = await make_user(db_session, "alice")
+    _, token = await create_api_token(db_session, alice.id, "agent")
+    sid = _initialize(mcp_client, token)
+
+    def call(tool: str, /, **arguments: Any) -> dict:
+        response = _call_tool(mcp_client, token, sid, tool, arguments)
+        assert response["result"]["isError"] is False, response
+        return response
+
+    png_b64 = base64.b64encode(_PNG_MAGIC).decode("ascii")
+    txt_bytes = b"lecture notes bytes"
+    txt_b64 = base64.b64encode(txt_bytes).decode("ascii")
+
+    # Upload to root
+    root_att = _tool_object(
+        call("upload_attachment", filename="diagram.png", content_base64=png_b64)
+    )
+    assert root_att["filename"] == "diagram.png"
+    assert root_att["mime"] == "image/png"
+    assert root_att["size"] == len(_PNG_MAGIC)
+    assert root_att["folder_id"] is None
+    assert root_att["download_url"] == f"/api/v1/attachments/{root_att['id']}/download"
+    assert root_att["created_at"]
+
+    # Upload into nested folder_path (auto-creates parent + child folders)
+    folder_att = _tool_object(
+        call(
+            "upload_attachment",
+            filename="diagram.png",
+            content_base64=png_b64,
+            folder_path="Математический анализ 1/images",
+        )
+    )
+    assert folder_att["filename"] == "diagram.png"
+    assert folder_att["folder_id"] is not None
+    images_folder_id = folder_att["folder_id"]
+
+    folders = _tool_list(call("list_folders"))
+    by_name = {f["name"]: f for f in folders}
+    assert "Математический анализ 1" in by_name
+    assert by_name["images"]["parent_id"] == by_name["Математический анализ 1"]["id"]
+    assert by_name["images"]["id"] == images_folder_id
+
+    # Duplicate upload in the same folder is numbered, while a different folder keeps its name
+    dup_att = _tool_object(
+        call(
+            "upload_attachment",
+            filename="diagram.png",
+            content_base64=png_b64,
+            folder_id=images_folder_id,
+        )
+    )
+    assert dup_att["filename"] == "diagram (2).png"
+    assert dup_att["folder_id"] == images_folder_id
+
+    other_folder_att = _tool_object(
+        call(
+            "upload_attachment",
+            filename="notes.txt",
+            content_base64=txt_b64,
+            folder_path="Physics/handouts",
+        )
+    )
+    assert other_folder_att["filename"] == "notes.txt"
+    assert other_folder_att["mime"] == "text/plain"
+
+    # Link the image in a sibling note via relative Markdown embed -> used_by tracks it
+    notes_folder = _tool_object(
+        call(
+            "create_folder",
+            name="notes",
+            parent_id=by_name["Математический анализ 1"]["id"],
+        )
+    )
+    call(
+        "create_note",
+        title="Lecture 1",
+        folder_id=notes_folder["id"],
+        content="See ![graph](../images/diagram.png) here.",
+    )
+
+    # List all / root_only / by folder_id
+    all_atts = _tool_list(call("list_attachments"))
+    assert len(all_atts) == 4
+    root_only = _tool_list(call("list_attachments", root_only=True))
+    assert [a["id"] for a in root_only] == [root_att["id"]]
+    in_images = _tool_list(call("list_attachments", folder_id=images_folder_id))
+    assert {a["id"] for a in in_images} == {folder_att["id"], dup_att["id"]}
+    by_id = {a["id"]: a for a in in_images}
+    assert by_id[folder_att["id"]]["used_by"] == ["Lecture 1"]
+    assert by_id[dup_att["id"]]["used_by"] == []
+
+    # Get metadata (without and with base64 content)
+    meta = _tool_object(call("get_attachment", attachment_id=folder_att["id"]))
+    assert meta["used_by"] == ["Lecture 1"]
+    assert "content_base64" not in meta
+
+    with_content = _tool_object(
+        call("get_attachment", attachment_id=other_folder_att["id"], include_content_base64=True)
+    )
+    assert base64.b64decode(with_content["content_base64"]) == txt_bytes
+
+    # Rename in place keeps folder_id unchanged
+    renamed = _tool_object(
+        call("move_attachment", attachment_id=other_folder_att["id"], filename="renamed.txt")
+    )
+    assert renamed["filename"] == "renamed.txt"
+    assert renamed["folder_id"] == other_folder_att["folder_id"]
+
+    # Move into another folder via folder_path
+    moved = _tool_object(
+        call(
+            "move_attachment",
+            attachment_id=other_folder_att["id"],
+            folder_path="Archive/Files",
+        )
+    )
+    assert moved["folder_id"] is not None
+    assert moved["folder_id"] != other_folder_att["folder_id"]
+    assert moved["filename"] == "renamed.txt"
+
+    # Move back to root explicitly
+    at_root = _tool_object(
+        call("move_attachment", attachment_id=other_folder_att["id"], move_to_root=True)
+    )
+    assert at_root["folder_id"] is None
+
+    # Move into folder, then omit folder_id/folder_path/filename to move to root
+    _tool_object(
+        call("move_attachment", attachment_id=other_folder_att["id"], folder_id=images_folder_id)
+    )
+    back_root = _tool_object(call("move_attachment", attachment_id=other_folder_att["id"]))
+    assert back_root["folder_id"] is None
+
+    # Delete attachment
+    deleted = _tool_object(call("delete_attachment", attachment_id=other_folder_att["id"]))
+    assert deleted == {"status": "deleted"}
+    missing = _call_tool(
+        mcp_client, token, sid, "get_attachment", {"attachment_id": other_folder_att["id"]}
+    )
+    assert missing["result"]["isError"] is True
+    assert "Not found" in missing["result"]["content"][0]["text"]
+    assert other_folder_att["id"] not in {a["id"] for a in _tool_list(call("list_attachments"))}
+
+
+async def test_mcp_attachments_validation_limits_and_isolation(
+    mcp_client: TestClient, db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alice = await make_user(db_session, "alice")
+    bob = await make_user(db_session, "bob")
+    _, alice_token = await create_api_token(db_session, alice.id, "alice")
+    _, bob_token = await create_api_token(db_session, bob.id, "bob")
+    alice_sid = _initialize(mcp_client, alice_token)
+    bob_sid = _initialize(mcp_client, bob_token)
+
+    png_b64 = base64.b64encode(_PNG_MAGIC).decode("ascii")
+
+    # Invalid base64 / empty content / empty filename / conflicting folder params / traversal
+    bad_b64 = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "upload_attachment",
+        {"filename": "bad.png", "content_base64": "not-valid-base64!!!"},
+    )
+    assert bad_b64["result"]["isError"] is True
+    assert "Invalid base64" in bad_b64["result"]["content"][0]["text"]
+
+    empty_b64 = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "upload_attachment",
+        {"filename": "empty.txt", "content_base64": "   "},
+    )
+    assert empty_b64["result"]["isError"] is True
+
+    empty_name = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "upload_attachment",
+        {"filename": "   ", "content_base64": png_b64},
+    )
+    assert empty_name["result"]["isError"] is True
+
+    alice_folder = _tool_object(
+        _call_tool(mcp_client, alice_token, alice_sid, "create_folder", {"name": "AliceFolder"})
+    )
+    both_folders = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "upload_attachment",
+        {
+            "filename": "a.png",
+            "content_base64": png_b64,
+            "folder_id": alice_folder["id"],
+            "folder_path": "Other",
+        },
+    )
+    assert both_folders["result"]["isError"] is True
+
+    traversal = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "upload_attachment",
+        {"filename": "a.png", "content_base64": png_b64, "folder_path": "../secret"},
+    )
+    assert traversal["result"]["isError"] is True
+
+    bad_list_filter = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "list_attachments",
+        {"folder_id": alice_folder["id"], "root_only": True},
+    )
+    assert bad_list_filter["result"]["isError"] is True
+
+    # Oversized upload rejected via service limit
+    small_limit = get_settings().model_copy(update={"max_upload_mb": 1})
+    monkeypatch.setattr(attachments_service, "get_settings", lambda: small_limit)
+    oversized_b64 = base64.b64encode(b"x" * (1024 * 1024 + 10)).decode("ascii")
+    oversized = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "upload_attachment",
+        {"filename": "big.bin", "content_base64": oversized_b64},
+    )
+    assert oversized["result"]["isError"] is True
+    assert "exceeds" in oversized["result"]["content"][0]["text"]
+
+    # Inline base64 limit check on get_attachment
+    alice_att = _tool_object(
+        _call_tool(
+            mcp_client,
+            alice_token,
+            alice_sid,
+            "upload_attachment",
+            {"filename": "pic.png", "content_base64": png_b64, "folder_id": alice_folder["id"]},
+        )
+    )
+    monkeypatch.setattr(mcp_tools, "_MAX_INLINE_ATTACHMENT_BYTES", 8)
+    too_big_inline = _call_tool(
+        mcp_client,
+        alice_token,
+        alice_sid,
+        "get_attachment",
+        {"attachment_id": alice_att["id"], "include_content_base64": True},
+    )
+    assert too_big_inline["result"]["isError"] is True
+    assert "too large" in too_big_inline["result"]["content"][0]["text"]
+
+    # Ownership isolation between Alice and Bob
+    bob_list = _call_tool(mcp_client, bob_token, bob_sid, "list_attachments", {})
+    assert _tool_list(bob_list) == []
+
+    for tool, args in (
+        ("get_attachment", {"attachment_id": alice_att["id"]}),
+        ("move_attachment", {"attachment_id": alice_att["id"], "filename": "hacked.png"}),
+        ("delete_attachment", {"attachment_id": alice_att["id"]}),
+        (
+            "upload_attachment",
+            {"filename": "intrude.png", "content_base64": png_b64, "folder_id": alice_folder["id"]},
+        ),
+    ):
+        resp = _call_tool(mcp_client, bob_token, bob_sid, tool, args)
+        assert resp["result"]["isError"] is True, (tool, resp)
+        assert "Not found" in resp["result"]["content"][0]["text"]
+
+    bob_att = _tool_object(
+        _call_tool(
+            mcp_client,
+            bob_token,
+            bob_sid,
+            "upload_attachment",
+            {"filename": "bob.png", "content_base64": png_b64},
+        )
+    )
+    bob_move_foreign_folder = _call_tool(
+        mcp_client,
+        bob_token,
+        bob_sid,
+        "move_attachment",
+        {"attachment_id": bob_att["id"], "folder_id": alice_folder["id"]},
+    )
+    assert bob_move_foreign_folder["result"]["isError"] is True
+    assert "Not found" in bob_move_foreign_folder["result"]["content"][0]["text"]

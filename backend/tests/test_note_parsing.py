@@ -1,4 +1,5 @@
 from app.services.note_parsing import (
+    extract_embeds,
     extract_frontmatter,
     extract_inline_tags,
     extract_wikilinks,
@@ -70,3 +71,34 @@ def test_extract_wikilinks_ignores_code() -> None:
     body = "Inline `[[NotALink]]` and:\n\n```\n[[AlsoNotALink]]\n```\n\n[[RealLink]]"
     links = extract_wikilinks(body)
     assert [link.target for link in links] == ["RealLink"]
+
+
+def test_extract_embeds_obsidian_and_markdown() -> None:
+    body = (
+        "![[diagram.png]] and ![[images/pic.png|300]]\n"
+        "![](../images/8943ee10.gif)\n"
+        "![alt](<./my%20photo.png> \"caption\")\n"
+        "![plot](charts/plot(1).png?w=200#center 'title')\n"
+        "| ![](../images/table%20img.png) | cell |\n"
+    )
+    assert extract_embeds(body) == {
+        "diagram.png",
+        "images/pic.png",
+        "../images/8943ee10.gif",
+        "./my photo.png",
+        "charts/plot(1).png",
+        "../images/table img.png",
+    }
+
+
+def test_extract_embeds_ignores_external_schemes_and_code() -> None:
+    body = (
+        "![ext1](http://example.com/a.png)\n"
+        "![ext2](HTTPS://example.com/b.png)\n"
+        "![data](data:image/png;base64,AAAA)\n"
+        "![mail](mailto:user@example.com)\n"
+        "Inline `![code](inline.png)` and `![[inline.png]]`\n"
+        "```\n![fenced](fenced.png)\n![[fenced.png]]\n```\n"
+        "![local](kept.png)\n"
+    )
+    assert extract_embeds(body) == {"kept.png"}

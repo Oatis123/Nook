@@ -1,7 +1,11 @@
+import base64
+import binascii
+import re
 import uuid
 from collections import Counter
 from collections.abc import Awaitable, Callable, Coroutine
 from datetime import date, time
+from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException
@@ -9,20 +13,24 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import BaseModel, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.core.db import async_session_factory
 from app.mcp.auth import current_user_id
 from app.mcp.instance import server
+from app.models.attachment import Attachment
 from app.models.folder import Folder
 from app.models.note import Note
 from app.models.tag import NoteTag, Tag
 from app.models.task import Task
 from app.models.task_list import TaskList, TaskListColor, TaskListIcon
 from app.models.user import User
+from app.schemas.attachment import AttachmentUpdate
 from app.schemas.folder import FolderCreate, FolderUpdate
 from app.schemas.note import NoteCreate, NoteUpdate
 from app.schemas.task import TaskCreate, TaskUpdate
 from app.schemas.task_list import TaskListCreate, TaskListUpdate
+from app.services import attachments as attachments_service
 from app.services import folders as folders_service
 from app.services import note_links as note_links_service
 from app.services import note_parsing
@@ -378,6 +386,188 @@ async def delete_folder(folder_id: str) -> dict[str, str]:
     async with async_session_factory() as session:
         await _run(folders_service.delete_folder(session, user_id, _uuid(folder_id, "folder")))
         return {"status": "trashed"}
+
+
+# --- Attachments --------------------------------------------------------------
+
+_MAX_INLINE_ATTACHMENT_BYTES = 1024 * 1024
+
+
+def _attachment_summary(
+    attachment: Attachment, used_by: list[str] | None = None
+) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "id": str(attachment.id),
+        "filename": attachment.filename,
+        "mime": attachment.mime,
+        "size": attachment.size,
+        "folder_id": str(attachment.folder_id) if attachment.folder_id else None,
+        "created_at": attachment.created_at.isoformat(),
+        "download_url": f"/api/v1/attachments/{attachment.id}/download",
+    }
+    if used_by is not None:
+        data["used_by"] = used_by
+    return data
+
+
+def _decode_base64(content_base64: str) -> bytes:
+    cleaned = re.sub(r"\s+", "", content_base64)
+    if not cleaned:
+        raise ToolError("Attachment content cannot be empty")
+    try:
+        data = base64.b64decode(cleaned, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ToolError("Invalid base64 attachment content") from exc
+    if not data:
+        raise ToolError("Attachment content cannot be empty")
+    return data
+
+
+async def _resolve_attachment_folder(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    folder_id: str | None,
+    folder_path: str | None,
+) -> uuid.UUID | None:
+    if folder_id is not None and folder_path is not None:
+        raise ToolError("Specify either folder_id or folder_path, not both")
+    if folder_id is not None:
+        return _uuid(folder_id, "folder") if folder_id else None
+    if folder_path is not None:
+        return await _run(attachments_service.ensure_folder_path(session, user_id, folder_path))
+    return None
+
+
+@server.tool()
+async def upload_attachment(
+    filename: str,
+    content_base64: str,
+    folder_id: str | None = None,
+    folder_path: str | None = None,
+) -> dict[str, Any]:
+    """Upload a binary or text attachment from base64 content. Optionally place it in
+    `folder_id` (from `list_folders`) or a slash-separated `folder_path` such as
+    `"Математический анализ 1/images"` (missing folders are created automatically). Do not
+    pass both `folder_id` and `folder_path`."""
+    user_id = current_user_id()
+    if not filename.strip():
+        raise ToolError("Filename cannot be empty")
+    data = _decode_base64(content_base64)
+    if len(data) > attachments_service.max_upload_bytes():
+        raise ToolError(str(attachments_service.file_too_large().detail))
+    async with async_session_factory() as session:
+        target_folder_id = await _resolve_attachment_folder(
+            session, user_id, folder_id, folder_path
+        )
+        attachment = await _run(
+            attachments_service.save_attachment(
+                session, user_id, filename, data, folder_id=target_folder_id
+            )
+        )
+        return _attachment_summary(attachment)
+
+
+@server.tool()
+async def list_attachments(
+    folder_id: str | None = None, root_only: bool = False
+) -> list[dict[str, Any]]:
+    """List the user's attachments (including `used_by` note titles). Pass `folder_id` to
+    scope to one folder, `root_only=true` for unfiled attachments at the root, or omit
+    both for all attachments."""
+    if root_only and folder_id is not None:
+        raise ToolError("Specify either folder_id or root_only=true, not both")
+    user_id = current_user_id()
+    target_folder_id = _uuid(folder_id, "folder") if folder_id else None
+    folder_filter = root_only or folder_id is not None
+    async with async_session_factory() as session:
+        pairs = await _run(
+            attachments_service.list_attachments_with_usage(
+                session, user_id, folder_id=target_folder_id, folder_filter=folder_filter
+            )
+        )
+        return [_attachment_summary(a, used_by) for a, used_by in pairs]
+
+
+@server.tool()
+async def get_attachment(
+    attachment_id: str, include_content_base64: bool = False
+) -> dict[str, Any]:
+    """Get an attachment's metadata and the titles of notes that embed it (`used_by`).
+    Set `include_content_base64=true` to also fetch its base64-encoded bytes (for files
+    up to 1 MiB)."""
+    user_id = current_user_id()
+    aid = _uuid(attachment_id, "attachment")
+    async with async_session_factory() as session:
+        attachment = await _run(attachments_service.get_attachment(session, user_id, aid))
+        used_by = await _run(attachments_service.get_attachment_used_by(session, user_id, aid))
+        result = _attachment_summary(attachment, used_by)
+        if include_content_base64:
+            if attachment.size > _MAX_INLINE_ATTACHMENT_BYTES:
+                raise ToolError(
+                    f"Attachment is too large ({attachment.size} bytes) to return inline; "
+                    f"max inline size is {_MAX_INLINE_ATTACHMENT_BYTES} bytes"
+                )
+            path = Path(attachment.storage_path)
+            if not path.is_file():
+                raise ToolError("Attachment file is missing from storage")
+            raw = await run_in_threadpool(path.read_bytes)
+            result["content_base64"] = base64.b64encode(raw).decode("ascii")
+        return result
+
+
+@server.tool()
+async def move_attachment(
+    attachment_id: str,
+    folder_id: str | None = None,
+    folder_path: str | None = None,
+    filename: str | None = None,
+    move_to_root: bool = False,
+) -> dict[str, Any]:
+    """Move an attachment to another folder and/or rename it. Pass `folder_id` or
+    `folder_path` to move into a folder (missing folders in `folder_path` are created).
+    Pass `move_to_root=true` (or omit `folder_id`, `folder_path`, and `filename`) to move
+    to root; pass only `filename` to rename in place."""
+    if move_to_root and (folder_id or folder_path):
+        raise ToolError("Cannot combine move_to_root=true with folder_id or folder_path")
+    user_id = current_user_id()
+    aid = _uuid(attachment_id, "attachment")
+    moving = (
+        move_to_root
+        or folder_id is not None
+        or folder_path is not None
+        or filename is None
+    )
+    async with async_session_factory() as session:
+        fields: dict[str, Any] = {}
+        if moving:
+            fields["folder_id"] = (
+                None
+                if move_to_root
+                else await _resolve_attachment_folder(session, user_id, folder_id, folder_path)
+            )
+        if filename is not None:
+            fields["filename"] = filename
+        data = _validated(AttachmentUpdate, **fields)
+        attachment = await _run(
+            attachments_service.update_attachment(session, user_id, aid, data)
+        )
+        used_by = await _run(
+            attachments_service.get_attachment_used_by(session, user_id, attachment.id)
+        )
+        return _attachment_summary(attachment, used_by)
+
+
+@server.tool()
+async def delete_attachment(attachment_id: str) -> dict[str, str]:
+    """Permanently delete an attachment from storage."""
+    user_id = current_user_id()
+    async with async_session_factory() as session:
+        await _run(
+            attachments_service.delete_attachment(
+                session, user_id, _uuid(attachment_id, "attachment")
+            )
+        )
+        return {"status": "deleted"}
 
 
 # --- Tasks --------------------------------------------------------------------

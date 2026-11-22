@@ -130,6 +130,7 @@ export interface SearchResult {
 
 export interface Attachment {
   id: string
+  folder_id: string | null
   filename: string
   mime: string
   size: number

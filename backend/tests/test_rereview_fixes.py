@@ -138,7 +138,7 @@ async def test_import_points_embeds_at_the_imported_file(
         headers={"x-csrf-token": csrf},
     )
 
-    vault = {"img/image.png": _PNG + b"new", "Vault note.md": b"See ![[image.png]]"}
+    vault = {"image.png": _PNG + b"new", "Vault note.md": b"See ![[image.png]]"}
     job = await _import(client, db_session, vault)
     assert job["status"] == "done", job
     note = await db_session.scalar(select(Note).where(Note.title == "Vault note"))
@@ -152,6 +152,15 @@ async def test_import_points_embeds_at_the_imported_file(
     await _import(client, db_session, vault)
     listing = (await client.get("/api/v1/attachments")).json()
     assert sorted(a["filename"] for a in listing) == ["image (2).png", "image.png"]
+
+    # Importing a same-named file inside a subfolder lands in that folder without colliding.
+    sub_vault = {"img/image.png": _PNG + b"sub"}
+    sub_job = await _import(client, db_session, sub_vault)
+    assert sub_job["status"] == "done", sub_job
+    listing = (await client.get("/api/v1/attachments")).json()
+    folder_scoped = [a for a in listing if a["folder_id"] is not None]
+    assert len(folder_scoped) == 1
+    assert folder_scoped[0]["filename"] == "image.png"
 
 
 async def test_ambiguous_embeds_keep_all_candidates_from_cleanup(

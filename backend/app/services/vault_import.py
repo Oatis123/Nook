@@ -13,11 +13,10 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.errors import CodedHTTPException
-from app.models.folder import Folder
 from app.models.import_job import ImportJob, ImportJobStatus
 from app.services import attachments as attachments_service
-from app.services import folders as folders_service
 from app.services import notes as notes_service
+from app.services.note_parsing import clean_markdown_image_target, iter_markdown_images
 
 log = structlog.get_logger()
 
@@ -155,20 +154,70 @@ async def fail_interrupted_import_jobs(
 _EMBED_TARGET_RE = re.compile(r"!\[\[([^\[\]|#]+)([|#][^\[\]]*)?\]\]")
 
 
-def rewrite_embeds(content: str, names: dict[str, str]) -> str:
-    """Points `![[file]]` / `![[path/file|alias]]` at the name the file was actually
-    stored under. Obsidian may reference an attachment by bare name or by vault path."""
+def _resolve_relative_vault_path(target: str, note_dir: tuple[str, ...]) -> str | None:
+    parts = list(note_dir)
+    for seg in target.split("/"):
+        if not seg or seg == ".":
+            continue
+        if seg == "..":
+            if not parts:
+                return None
+            parts.pop()
+        else:
+            parts.append(seg)
+    return "/".join(parts)
+
+
+def _lookup_rewrite_target(
+    target: str, names: dict[str, str], note_dir: tuple[str, ...]
+) -> str | None:
+    norm = target.replace("\\", "/").strip()
+    if norm in names:
+        return names[norm]
+    if "/" in norm and not norm.startswith("/"):
+        vault_rel = _resolve_relative_vault_path(norm, note_dir)
+        if vault_rel is not None and vault_rel in names:
+            new_filename = PurePosixPath(names[vault_rel]).name
+            dir_prefix = norm.rpartition("/")[0]
+            return f"{dir_prefix}/{new_filename}"
+    return names.get(PurePosixPath(norm).name)
+
+
+def rewrite_embeds(
+    content: str, names: dict[str, str], note_dir: tuple[str, ...] = ()
+) -> str:
+    """Points `![[file]]`, `![[path/file|alias]]`, and `![alt](path/file)` at the name
+    the file was actually stored under when deduplicated."""
     if not names:
         return content
 
-    def replace(match: re.Match[str]) -> str:
+    def replace_wikilink(match: re.Match[str]) -> str:
         target = match.group(1).strip()
-        new = names.get(target) or names.get(PurePosixPath(target).name)
+        new = _lookup_rewrite_target(target, names, note_dir)
         if new is None or new == target:
             return match.group(0)
         return f"![[{new}{match.group(2) or ''}]]"
 
-    return _EMBED_TARGET_RE.sub(replace, content)
+    content = _EMBED_TARGET_RE.sub(replace_wikilink, content)
+
+    parts: list[str] = []
+    last_end = 0
+    for span in iter_markdown_images(content):
+        cleaned = clean_markdown_image_target(span.dest)
+        if cleaned is None:
+            continue
+        new = _lookup_rewrite_target(cleaned, names, note_dir)
+        if new is None or new == cleaned:
+            continue
+        formatted_dest = f"<{new}>" if (" " in new or span.angle_bracketed) else new
+        parts.append(content[last_end : span.start])
+        parts.append(f"![{span.alt}]({formatted_dest}{span.title_part})")
+        last_end = span.end
+
+    if not parts:
+        return content
+    parts.append(content[last_end:])
+    return "".join(parts)
 
 
 def _is_safe_entry(name: str) -> bool:
@@ -189,25 +238,13 @@ async def _folder_id_for_path(
 ) -> uuid.UUID | None:
     if parts in cache:
         return cache[parts]
-
-    parent_id = await _folder_id_for_path(session, user_id, parts[:-1], cache)
-    name = parts[-1][:MAX_IMPORTED_NAME_LENGTH]
-
-    existing_folder = await session.scalar(
-        select(Folder).where(
-            Folder.user_id == user_id,
-            Folder.parent_id == parent_id,
-            Folder.name == name,
-            Folder.deleted_at.is_(None),
-        )
+    return await attachments_service.ensure_folder_path(
+        session,
+        user_id,
+        "/".join(parts),
+        cache=cache,
+        max_name_length=MAX_IMPORTED_NAME_LENGTH,
     )
-    if existing_folder is not None:
-        result = existing_folder.id
-    else:
-        created = await folders_service.create_folder(session, user_id, name, parent_id)
-        result = created.id
-    cache[parts] = result
-    return result
 
 
 async def _import_note(
@@ -273,6 +310,7 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
 
             note_entries: list[zipfile.ZipInfo] = []
             embed_names: dict[str, str] = {}
+            bare_candidates: dict[str, list[str]] = {}
             folder_cache: dict[tuple[str, ...], uuid.UUID | None] = {(): None}
 
             for info in infos:
@@ -281,7 +319,8 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                 if info.filename.lower().endswith(".md"):
                     note_entries.append(info)
                     continue
-                filename = PurePosixPath(info.filename).name
+                entry_path = PurePosixPath(info.filename)
+                filename = entry_path.name
                 if not filename:
                     continue
                 # Checked before reading: the entry is decompressed fully into memory,
@@ -295,8 +334,11 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                     continue
                 try:
                     data = zf.read(info)
+                    att_folder_id = await _folder_id_for_path(
+                        session, user_id, entry_path.parent.parts, folder_cache
+                    )
                     existing = await attachments_service.find_identical(
-                        session, user_id, filename, data
+                        session, user_id, filename, data, folder_id=att_folder_id
                     )
                     if existing is not None:
                         # Re-importing the same file (e.g. the same vault twice) reuses it
@@ -304,19 +346,27 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                         saved_name = existing.filename
                     else:
                         saved = await attachments_service.save_attachment(
-                            session, user_id, filename, data
+                            session, user_id, filename, data, folder_id=att_folder_id
                         )
                         saved_name = saved.filename
-                    # Notes embed attachments by name; if this one had to be renamed
-                    # (the user already has a different "image.png"), the vault's notes
-                    # are rewritten below to point at the renamed file, not the other one.
-                    embed_names.setdefault(filename, saved_name)
-                    embed_names.setdefault(info.filename, saved_name)
+                    bare_candidates.setdefault(filename, []).append(saved_name)
+                    if saved_name != filename:
+                        saved_rel = (
+                            f"{'/'.join(entry_path.parent.parts)}/{saved_name}"
+                            if entry_path.parent.parts
+                            else saved_name
+                        )
+                        embed_names[entry_path.as_posix()] = saved_rel
                     report["attachments_imported"] += 1
                 except HTTPException as exc:
                     report["errors"].append(f'"{info.filename}": {exc.detail}')
                 except Exception:  # noqa: BLE001 — one bad entry must not abort the import
+                    folder_cache = {(): None}
                     await _recover(session, info.filename, report)
+
+            for orig_name, saved_list in bare_candidates.items():
+                if len(saved_list) == 1 and saved_list[0] != orig_name:
+                    embed_names.setdefault(orig_name, saved_list[0])
 
             for info in note_entries:
                 path = PurePosixPath(info.filename)
@@ -328,7 +378,9 @@ async def process_import_job(session: AsyncSession, job: ImportJob) -> None:
                         session, user_id, path.parent.parts, folder_cache
                     )
                     content = zf.read(info).decode("utf-8", errors="replace")
-                    content = rewrite_embeds(content.replace("\x00", ""), embed_names)
+                    content = rewrite_embeds(
+                        content.replace("\x00", ""), embed_names, note_dir=path.parent.parts
+                    )
                     await _import_note(session, user_id, folder_id, path.stem, content, report)
                 except HTTPException as exc:
                     report["errors"].append(f'"{info.filename}": {exc.detail}')

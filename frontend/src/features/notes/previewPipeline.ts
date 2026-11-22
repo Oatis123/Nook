@@ -16,7 +16,8 @@ import { getHighlighter, loadLanguages } from '@/features/notes/shiki'
 import { remarkWikilinks } from '@/features/notes/remarkWikilinks'
 import { remarkCallouts } from '@/features/notes/remarkCallouts'
 import { buildWikilinkIndex } from '@/features/notes/wikilinkIndex'
-import { buildAttachmentIndex } from '@/features/notes/attachmentIndex'
+import { buildAttachmentIndex, type AttachmentIndex } from '@/features/notes/attachmentIndex'
+import { attachmentDownloadUrl } from '@/features/attachments/api'
 import type { Attachment, Folder } from '@/lib/types'
 import type { NoteLinkTarget } from '@/features/notes/hooks'
 
@@ -57,7 +58,7 @@ const sanitizeSchema = {
       'data-wikilink-target',
       'data-wikilink-heading',
     ],
-    img: [...allowAnyClassName(defaultSchema.attributes?.img), 'className', 'src', 'alt'],
+    img: [...allowAnyClassName(defaultSchema.attributes?.img), 'className', 'src', 'alt', 'title'],
   },
 }
 
@@ -110,8 +111,9 @@ const shikiThemes = {
 export interface PreviewContext {
   theme: 'light' | 'dark' | 'cyber'
   notes: NoteLinkTarget[]
-  folders: Pick<Folder, 'id' | 'name'>[]
-  attachments: Pick<Attachment, 'id' | 'filename' | 'mime'>[]
+  folders: Pick<Folder, 'id' | 'name' | 'parent_id'>[]
+  attachments: Pick<Attachment, 'id' | 'filename' | 'mime' | 'folder_id'>[]
+  noteFolderId?: string | null
 }
 
 /** A rendered note as its top-level blocks: `keys` in document order, and the trees of
@@ -275,6 +277,26 @@ function needs(tree: MdastRoot): { languages: Set<string>; math: boolean } {
   return { languages, math }
 }
 
+const EXTERNAL_IMAGE_URL_RE = /^(?:https?:|data:|mailto:|\/api\/)/i
+
+/** Rewrites local Markdown images (`![alt](path)`) — in paragraphs, lists, tables, etc. —
+ * to their attachment download URLs while preserving `alt` and `title`. */
+function remarkAttachmentImages(
+  attachmentIndex: AttachmentIndex,
+  noteFolderId?: string | null,
+) {
+  return (tree: MdastRoot) => {
+    visit(tree, 'image', (node) => {
+      const url = node.url.trim()
+      if (!url || EXTERNAL_IMAGE_URL_RE.test(url)) return
+      const resolved = attachmentIndex.resolve(url, noteFolderId)
+      if (resolved) {
+        node.url = attachmentDownloadUrl(resolved.id)
+      }
+    })
+  }
+}
+
 /** Without a highlighter, the pipeline for notes with no fenced code in a language —
  * Shiki only ever touches those blocks, so its WebAssembly engine and grammars aren't
  * fetched at all for them; likewise KaTeX for notes without formulas. */
@@ -284,12 +306,13 @@ function buildProcessor(
   renderMath: RenderMath | null,
 ): Processor {
   const wikilinkIndex = buildWikilinkIndex(context.notes, context.folders as Folder[])
-  const attachmentIndex = buildAttachmentIndex(context.attachments as Attachment[])
+  const attachmentIndex = buildAttachmentIndex(context.attachments, context.folders)
   return unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkMath)
-    .use(remarkWikilinks, wikilinkIndex, attachmentIndex)
+    .use(remarkWikilinks, wikilinkIndex, attachmentIndex, context.noteFolderId)
+    .use(remarkAttachmentImages, attachmentIndex, context.noteFolderId)
     .use(remarkCallouts)
     .use(remarkRehype)
     .use(renderMath ? [rehypeUnwrapDisplayMath] : [])

@@ -9,13 +9,27 @@ from tests.conftest import csrf_token, login, make_user
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
 
 
-async def _upload(client: AsyncClient, filename: str, data: bytes) -> dict:
+async def _upload(
+    client: AsyncClient, filename: str, data: bytes, folder_id: str | None = None
+) -> dict:
     csrf = await csrf_token(client)
+    params = {"folder_id": folder_id} if folder_id is not None else None
     response = await client.post(
         "/api/v1/attachments",
+        params=params,
         files={"file": (filename, data, "application/octet-stream")},
         headers={"x-csrf-token": csrf},
     )
+    assert response.status_code == 200
+    return response.json()
+
+
+async def _create_folder(client: AsyncClient, name: str, parent_id: str | None = None) -> dict:
+    csrf = await csrf_token(client)
+    body: dict = {"name": name}
+    if parent_id is not None:
+        body["parent_id"] = parent_id
+    response = await client.post("/api/v1/folders", json=body, headers={"x-csrf-token": csrf})
     assert response.status_code == 200
     return response.json()
 
@@ -183,3 +197,131 @@ async def test_overlong_filename_is_clipped_keeping_extension(
     uploaded = await _upload(client, "a" * 300 + ".png", _PNG_MAGIC)
     assert len(uploaded["filename"]) == 255
     assert uploaded["filename"].endswith(".png")
+
+
+async def test_attachment_folders_and_scoped_uniqueness(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+
+    images = await _create_folder(client, "images")
+    other = await _create_folder(client, "other")
+
+    root_att = await _upload(client, "foo.png", _PNG_MAGIC)
+    img_att = await _upload(client, "foo.png", _PNG_MAGIC + b"\x01", folder_id=images["id"])
+    img_dup = await _upload(client, "foo.png", _PNG_MAGIC + b"\x02", folder_id=images["id"])
+    other_att = await _upload(client, "foo.png", _PNG_MAGIC + b"\x03", folder_id=other["id"])
+
+    assert root_att["folder_id"] is None
+    assert root_att["filename"] == "foo.png"
+    assert img_att["folder_id"] == images["id"]
+    assert img_att["filename"] == "foo.png"
+    assert img_dup["folder_id"] == images["id"]
+    assert img_dup["filename"] == "foo (2).png"
+    assert other_att["folder_id"] == other["id"]
+    assert other_att["filename"] == "foo.png"
+
+    by_images = (await client.get("/api/v1/attachments", params={"folder_id": images["id"]})).json()
+    assert {a["id"] for a in by_images} == {img_att["id"], img_dup["id"]}
+
+    by_root = (await client.get("/api/v1/attachments", params={"root": True})).json()
+    assert [a["id"] for a in by_root] == [root_att["id"]]
+
+
+async def test_move_and_rename_attachment(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+
+    folder_a = await _create_folder(client, "A")
+    folder_b = await _create_folder(client, "B")
+    existing_in_b = await _upload(client, "pic.png", _PNG_MAGIC, folder_id=folder_b["id"])
+    movable = await _upload(client, "pic.png", _PNG_MAGIC + b"\x01")
+    assert existing_in_b["filename"] == "pic.png"
+    assert movable["folder_id"] is None
+
+    csrf = await csrf_token(client)
+    # Move into folder A (no collision)
+    moved_a = await client.patch(
+        f"/api/v1/attachments/{movable['id']}",
+        json={"folder_id": folder_a["id"]},
+        headers={"x-csrf-token": csrf},
+    )
+    assert moved_a.status_code == 200
+    assert moved_a.json()["folder_id"] == folder_a["id"]
+    assert moved_a.json()["filename"] == "pic.png"
+
+    # Rename in-place without specifying folder_id keeps folder_a
+    renamed = await client.patch(
+        f"/api/v1/attachments/{movable['id']}",
+        json={"filename": "diagram.png"},
+        headers={"x-csrf-token": csrf},
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["folder_id"] == folder_a["id"]
+    assert renamed.json()["filename"] == "diagram.png"
+
+    # Move + rename into folder B where pic.png already exists -> numbered
+    moved_b = await client.patch(
+        f"/api/v1/attachments/{movable['id']}",
+        json={"folder_id": folder_b["id"], "filename": "pic.png"},
+        headers={"x-csrf-token": csrf},
+    )
+    assert moved_b.status_code == 200
+    assert moved_b.json()["folder_id"] == folder_b["id"]
+    assert moved_b.json()["filename"] == "pic (2).png"
+
+    # Move back to root with explicit null
+    to_root = await client.patch(
+        f"/api/v1/attachments/{movable['id']}",
+        json={"folder_id": None},
+        headers={"x-csrf-token": csrf},
+    )
+    assert to_root.status_code == 200
+    assert to_root.json()["folder_id"] is None
+    assert to_root.json()["filename"] == "pic (2).png"
+
+
+async def test_attachment_folder_ownership_isolation(
+    client: AsyncClient, second_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await make_user(db_session, "bob")
+    await login(client, "alice")
+    await login(second_client, "bob")
+
+    bob_folder = await _create_folder(second_client, "BobPrivate")
+    alice_att = await _upload(client, "a.png", _PNG_MAGIC)
+
+    csrf = await csrf_token(client)
+    bad_upload = await client.post(
+        "/api/v1/attachments",
+        params={"folder_id": bob_folder["id"]},
+        files={"file": ("x.png", _PNG_MAGIC, "application/octet-stream")},
+        headers={"x-csrf-token": csrf},
+    )
+    assert bad_upload.status_code == 404
+
+    bad_move = await client.patch(
+        f"/api/v1/attachments/{alice_att['id']}",
+        json={"folder_id": bob_folder["id"]},
+        headers={"x-csrf-token": csrf},
+    )
+    assert bad_move.status_code == 404
+
+
+async def test_ensure_folder_path_helper(db_session: AsyncSession) -> None:
+    user = await make_user(db_session, "alice")
+    assert await attachments_service.ensure_folder_path(db_session, user.id, "") is None
+    assert await attachments_service.ensure_folder_path(db_session, user.id, "/") is None
+
+    fid1 = await attachments_service.ensure_folder_path(
+        db_session, user.id, "Математический анализ 1/images"
+    )
+    fid2 = await attachments_service.ensure_folder_path(
+        db_session, user.id, "Математический анализ 1/images/"
+    )
+    assert fid1 is not None
+    assert fid1 == fid2

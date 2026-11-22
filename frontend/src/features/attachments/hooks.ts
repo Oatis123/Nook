@@ -12,9 +12,29 @@ function useInvalidateAttachments() {
   return () => queryClient.invalidateQueries({ queryKey: attachmentsKey })
 }
 
+export type UploadAttachmentInput = File | { file: File; folderId?: string | null }
+
 export function useUploadAttachment() {
   const invalidate = useInvalidateAttachments()
-  return useMutation({ mutationFn: attachmentsApi.uploadAttachment, onSuccess: invalidate })
+  return useMutation({
+    mutationFn: (input: UploadAttachmentInput) =>
+      input instanceof File
+        ? attachmentsApi.uploadAttachment(input)
+        : attachmentsApi.uploadAttachment(input.file, input.folderId),
+    onSuccess: invalidate,
+  })
+}
+
+export function useUpdateAttachment() {
+  const invalidate = useInvalidateAttachments()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: { id: string } & Parameters<typeof attachmentsApi.updateAttachment>[1]) =>
+      attachmentsApi.updateAttachment(id, input),
+    onSuccess: invalidate,
+  })
 }
 
 export function useDeleteAttachment() {

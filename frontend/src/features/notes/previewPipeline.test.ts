@@ -115,4 +115,66 @@ describe('preview blocks', () => {
     expect(result.tasks[0]).toBe(source.indexOf('- [ ] One') + 2)
     expect(JSON.stringify(result.blocks)).not.toContain('disabled')
   })
+
+  it('resolves standard Markdown images and wikilink embeds in prose and tables', async () => {
+    const renderer = createPreviewRenderer()
+    renderer.setContext({
+      theme: 'light',
+      notes: [],
+      folders: [
+        { id: 'f-course', name: 'Математический анализ 1', parent_id: null },
+        { id: 'f-notes', name: 'Заметки', parent_id: 'f-course' },
+        { id: 'f-images', name: 'images', parent_id: 'f-course' },
+        { id: 'f-other', name: 'other', parent_id: null },
+      ],
+      attachments: [
+        {
+          id: 'att-gif',
+          filename: '8943ee10.gif',
+          mime: 'image/gif',
+          folder_id: 'f-images',
+        },
+        {
+          id: 'att-course-img',
+          filename: 'img.png',
+          mime: 'image/png',
+          folder_id: 'f-images',
+        },
+        {
+          id: 'att-other-img',
+          filename: 'img.png',
+          mime: 'image/png',
+          folder_id: 'f-other',
+        },
+      ],
+      noteFolderId: 'f-notes',
+    })
+
+    const source = [
+      '![Graph](../images/8943ee10.gif "Elementary function")',
+      '',
+      '| Функция | График |',
+      '| --- | --- |',
+      '| $y = x^2$ | ![](../images/8943ee10.gif) |',
+      '',
+      '![[images/8943ee10.gif]]',
+      '',
+      '![[8943ee10.gif]]',
+      '',
+      '![same in images](../images/img.png) and ![same in other](other/img.png)',
+      '',
+      '![ext](https://example.com/pic.png)',
+    ].join('\n')
+
+    const result = await renderer.render(source, new Set())
+    const html = JSON.stringify(result.blocks)
+
+    expect(html).toContain('"/api/v1/attachments/att-gif/download"')
+    expect(html).toContain('"alt":"Graph"')
+    expect(html).toContain('"title":"Elementary function"')
+    expect(html).toContain('"tagName":"table"')
+    expect(html).toContain('"/api/v1/attachments/att-course-img/download"')
+    expect(html).toContain('"/api/v1/attachments/att-other-img/download"')
+    expect(html).toContain('"src":"https://example.com/pic.png"')
+  })
 })

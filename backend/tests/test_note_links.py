@@ -177,3 +177,94 @@ async def test_tags_and_backlinks_isolated_between_users(
 
     bob_backlinks = await second_client.get(f"/api/v1/notes/{alice_note['id']}/backlinks")
     assert bob_backlinks.status_code == 404
+
+
+async def test_markdown_image_embeds_and_relative_paths_populate_note_attachments(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await make_user(db_session, "alice")
+    await login(client, "alice")
+    csrf = await csrf_token(client)
+
+    course = (
+        await client.post(
+            "/api/v1/folders",
+            json={"name": "Математический анализ 1"},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+    images = (
+        await client.post(
+            "/api/v1/folders",
+            json={"name": "images", "parent_id": course["id"]},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+    lectures = (
+        await client.post(
+            "/api/v1/folders",
+            json={"name": "lectures", "parent_id": course["id"]},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+    other = (
+        await client.post(
+            "/api/v1/folders",
+            json={"name": "other"},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    att_images = (
+        await client.post(
+            "/api/v1/attachments",
+            params={"folder_id": images["id"]},
+            files={"file": ("8943ee10.gif", png, "image/png")},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+    att_other = (
+        await client.post(
+            "/api/v1/attachments",
+            params={"folder_id": other["id"]},
+            files={"file": ("8943ee10.gif", png + b"\x01", "image/png")},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+    att_local = (
+        await client.post(
+            "/api/v1/attachments",
+            params={"folder_id": lectures["id"]},
+            files={"file": ("local.png", png + b"\x02", "image/png")},
+            headers={"x-csrf-token": csrf},
+        )
+    ).json()
+
+    note_content = (
+        "Intro ![ext](https://example.com/a.png)\n\n"
+        "| Graph | Description |\n"
+        "| --- | --- |\n"
+        "| ![](../images/8943ee10.gif) | Relative from table |\n"
+        "| ![local](./local.png) | Same folder |\n"
+    )
+    resp = await client.post(
+        "/api/v1/notes",
+        json={"title": "02 - Графики", "folder_id": lectures["id"], "content": note_content},
+        headers={"x-csrf-token": csrf},
+    )
+    assert resp.status_code == 200
+
+    listing = (await client.get("/api/v1/attachments")).json()
+    by_id = {a["id"]: a for a in listing}
+    assert by_id[att_images["id"]]["used_by"] == ["02 - Графики"]
+    assert by_id[att_local["id"]]["used_by"] == ["02 - Графики"]
+    assert by_id[att_other["id"]]["used_by"] == []
+
+    # Cleanup deletes only the unreferenced attachment in `other`, not the relative-embedded ones
+    cleanup = await client.post("/api/v1/attachments/cleanup", headers={"x-csrf-token": csrf})
+    assert cleanup.status_code == 200
+    assert cleanup.json() == {"deleted": 1}
+
+    remaining = {a["id"] for a in (await client.get("/api/v1/attachments")).json()}
+    assert remaining == {att_images["id"], att_local["id"]}

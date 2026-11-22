@@ -106,10 +106,12 @@ interface Rendered {
  * and the text on screen. */
 export const MarkdownPreview = memo(function MarkdownPreview({
   content,
+  noteFolderId = null,
   onToggleTask,
   onEditAt,
 }: {
   content: string
+  noteFolderId?: string | null
   onToggleTask?: (offset: number, checked: boolean, content: string) => boolean
   onEditAt?: (hint: CaretHint | null, shown: string) => void
 }) {
@@ -130,14 +132,20 @@ export const MarkdownPreview = memo(function MarkdownPreview({
     () => ({
       theme: resolvedTheme,
       notes: linkTargets,
-      folders: (foldersQuery.data ?? []).map(({ id, name }) => ({ id, name })),
-      attachments: (attachmentsQuery.data ?? []).map(({ id, filename, mime }) => ({
+      folders: (foldersQuery.data ?? []).map(({ id, name, parent_id }) => ({
+        id,
+        name,
+        parent_id,
+      })),
+      attachments: (attachmentsQuery.data ?? []).map(({ id, filename, mime, folder_id }) => ({
         id,
         filename,
         mime,
+        folder_id,
       })),
+      noteFolderId,
     }),
-    [resolvedTheme, linkTargets, foldersQuery.data, attachmentsQuery.data],
+    [resolvedTheme, linkTargets, foldersQuery.data, attachmentsQuery.data, noteFolderId],
   )
 
   useEffect(() => {

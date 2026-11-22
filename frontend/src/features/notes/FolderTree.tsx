@@ -53,12 +53,20 @@ import {
   useUpdateNote,
 } from '@/features/notes/hooks'
 import { QueryState } from '@/design/components/QueryState'
+import { useUploadAttachment } from '@/features/attachments/hooks'
 import { errorMessage } from '@/lib/errors'
 import { toast } from '@/lib/toast'
 import { confirmAction } from '@/lib/confirm'
 import { isClickDrag } from '@/lib/dragClick'
 
 type DragPayload = { type: 'note' | 'folder'; id: string }
+
+function isFileDrag(e: DragEvent): boolean {
+  return (
+    Array.from(e.dataTransfer?.types ?? []).includes('Files') ||
+    (e.dataTransfer?.files?.length ?? 0) > 0
+  )
+}
 
 /** Rows ask the tree to open the "Move to…" dialog — the touch- and keyboard-friendly
  * alternative to drag and drop (which phones don't support). */
@@ -90,8 +98,10 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
   const createNote = useCreateNote()
   const updateFolder = useUpdateFolder()
   const { mutate: deleteNote } = useDeleteNote()
+  const { mutateAsync: uploadAttachment } = useUploadAttachment()
   const { data: user } = useCurrentUser()
   const updateProfile = useUpdateProfile()
+  const [rootDragOver, setRootDragOver] = useState(false)
 
   // The Ideas note (quick ideas from the Telegram bot) is pinned above the tree, wherever
   // its folder, unless hidden in Settings.
@@ -172,8 +182,30 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
     }
   }
 
+  async function uploadDroppedFiles(files: File[], folderId: string | null) {
+    const folderName = folderId
+      ? (folders.find((f) => f.id === folderId)?.name ?? 'folder')
+      : 'Root'
+    try {
+      await Promise.all(files.map((file) => uploadAttachment({ file, folderId })))
+      toast.success(
+        files.length === 1
+          ? `Uploaded "${files[0].name}" to "${folderName}"`
+          : `Uploaded ${files.length} files to "${folderName}"`,
+      )
+    } catch {
+      // Global mutation error handler reports failed uploads.
+    }
+  }
+
   function handleDrop(e: DragEvent, folderId: string | null) {
     e.preventDefault()
+    setRootDragOver(false)
+    const files = Array.from(e.dataTransfer?.files ?? [])
+    if (files.length > 0) {
+      void uploadDroppedFiles(files, folderId)
+      return
+    }
     // A click that moved the pointer a little (see lib/dragClick), not a move.
     if (isClickDrag()) return
     const raw = e.dataTransfer.getData(DRAG_MIME)
@@ -195,8 +227,22 @@ function LoadedFolderTree({ folders, notes }: { folders: Folder[]; notes: NoteSu
   return (
     <MoveContext.Provider value={setMoving}>
       <div
-        className="flex flex-col gap-0.5 px-2"
-        onDragOver={(e) => e.preventDefault()}
+        className={clsx(
+          'flex flex-col gap-0.5 rounded-(--oatis-radius-sm) px-2 transition-colors',
+          rootDragOver && 'bg-surface-raised/50 ring-1 ring-accent',
+        )}
+        onDragOver={(e) => {
+          e.preventDefault()
+          if (isFileDrag(e)) {
+            e.dataTransfer.dropEffect = 'copy'
+            setRootDragOver(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setRootDragOver(false)
+          }
+        }}
         onDrop={(e) => handleDrop(e, null)}
       >
         <div className="mb-1 flex items-center justify-between px-1">
@@ -484,9 +530,14 @@ const FolderRow = memo(function FolderRow({
         onDragOver={(e) => {
           e.preventDefault()
           e.stopPropagation()
+          if (isFileDrag(e)) e.dataTransfer.dropEffect = 'copy'
           setDragOver(true)
         }}
-        onDragLeave={() => setDragOver(false)}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setDragOver(false)
+          }
+        }}
         onDrop={(e) => {
           e.stopPropagation()
           setDragOver(false)
@@ -638,6 +689,7 @@ const NoteRow = memo(function NoteRow({
       onDragOver={(e) => {
         e.preventDefault()
         e.stopPropagation()
+        if (isFileDrag(e)) e.dataTransfer.dropEffect = 'copy'
       }}
       onDrop={(e) => {
         e.stopPropagation()

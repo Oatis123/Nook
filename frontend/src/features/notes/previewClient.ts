@@ -37,9 +37,14 @@ async function renderOnMainThread(
   let loaded: Pipeline
   try {
     loaded = await pipeline
-  } catch {
+  } catch (error) {
+    console.error('[previewClient] Failed to load previewPipeline on main thread:', error)
     pipeline = null // a network blip: the next render tries again
-    return { status: 'error', error: 'render' }
+    return {
+      status: 'error',
+      error: 'render',
+      detail: error instanceof Error ? error.message : String(error),
+    }
   }
   mainThreadRenderer ??= loaded.createPreviewRenderer()
   if (mainThreadContext !== context) {
@@ -49,14 +54,20 @@ async function renderOnMainThread(
   try {
     return { status: 'done', ...(await mainThreadRenderer.render(content, have)) }
   } catch (error) {
+    const isHighlighter = error instanceof loaded.HighlighterUnavailableError
+    if (!isHighlighter) {
+      console.error('[previewClient] Main-thread preview render failed:', error)
+    }
     return {
       status: 'error',
-      error: error instanceof loaded.HighlighterUnavailableError ? 'highlighter' : 'render',
+      error: isHighlighter ? 'highlighter' : 'render',
+      detail: error instanceof Error ? error.message : String(error),
     }
   }
 }
 
-function failOver() {
+function failOver(event?: Event) {
+  console.warn('[previewClient] Preview worker failed; falling back to main thread:', event)
   worker?.terminate()
   worker = null
   const stranded = [...pending.values()]
@@ -70,7 +81,10 @@ function getWorker(): Worker | null {
   if (worker !== undefined) return worker
   try {
     worker = new Worker(new URL('./preview.worker.ts', import.meta.url), { type: 'module' })
-  } catch {
+  } catch (error) {
+    if (typeof Worker !== 'undefined') {
+      console.warn('[previewClient] Could not start preview worker; using main thread:', error)
+    }
     worker = null
     return null
   }
@@ -80,8 +94,8 @@ function getWorker(): Worker | null {
     pending.delete(id)
     request?.resolve(result)
   }
-  worker.onerror = failOver
-  worker.onmessageerror = failOver
+  worker.onerror = (event) => failOver(event)
+  worker.onmessageerror = (event) => failOver(event)
   return worker
 }
 

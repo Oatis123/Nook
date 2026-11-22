@@ -2,10 +2,16 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as attachmentsApi from '@/features/attachments/api'
 import * as authApi from '@/features/auth/api'
 import * as notesApi from '@/features/notes/api'
 import { FolderTree } from '@/features/notes/FolderTree'
-import type { Folder, NoteSummary, User } from '@/lib/types'
+import type { Attachment, Folder, NoteSummary, User } from '@/lib/types'
+
+vi.mock('@/features/attachments/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof attachmentsApi>()),
+  uploadAttachment: vi.fn(),
+}))
 
 vi.mock('@/features/auth/api', async (importOriginal) => ({
   ...(await importOriginal<typeof authApi>()),
@@ -95,6 +101,7 @@ describe('FolderTree', () => {
     vi.mocked(notesApi.updateNote).mockReset()
     vi.mocked(authApi.getMe).mockResolvedValue(user)
     vi.mocked(authApi.updateMe).mockReset()
+    vi.mocked(attachmentsApi.uploadAttachment).mockReset()
   })
 
   it('opens a note when the click wobbles into a tiny drag', async () => {
@@ -183,5 +190,65 @@ describe('FolderTree', () => {
     fireEvent.click(await screen.findByText('Projects'))
     await waitFor(() => expect(screen.queryByText('Идеи')).toBeNull())
     expect(screen.getByText('Root note')).toBeInTheDocument()
+  })
+
+  it('uploads OS files dropped onto a folder row without bubbling to root', async () => {
+    vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue({
+      id: 'att-1',
+      folder_id: 'f1',
+      filename: 'photo.png',
+      mime: 'image/png',
+      size: 128,
+      created_at: '2026-01-01T00:00:00Z',
+      used_by: [],
+    } satisfies Attachment)
+
+    renderTree()
+    const folderRow = rowOf(await screen.findByText('Projects').then((el) => el.textContent!))
+    const file = new File(['png'], 'photo.png', { type: 'image/png' })
+    const dataTransfer = {
+      files: [file],
+      types: ['Files'],
+      dropEffect: 'none',
+    }
+
+    fireEvent.dragOver(folderRow, { dataTransfer })
+    expect(folderRow.className).toContain('ring-accent')
+    fireEvent.drop(folderRow, { dataTransfer })
+
+    await waitFor(() => {
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledTimes(1)
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledWith(file, 'f1')
+    })
+  })
+
+  it('uploads OS files dropped onto the root container into root (null)', async () => {
+    vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue({
+      id: 'att-2',
+      folder_id: null,
+      filename: 'notes.pdf',
+      mime: 'application/pdf',
+      size: 256,
+      created_at: '2026-01-01T00:00:00Z',
+      used_by: [],
+    } satisfies Attachment)
+
+    renderTree()
+    const projects = await screen.findByText('Projects')
+    const treeRoot = projects.closest('.flex-col') as HTMLElement
+    const file = new File(['pdf'], 'notes.pdf', { type: 'application/pdf' })
+    const dataTransfer = {
+      files: [file],
+      types: ['Files'],
+      dropEffect: 'none',
+    }
+
+    fireEvent.dragOver(treeRoot, { dataTransfer })
+    fireEvent.drop(treeRoot, { dataTransfer })
+
+    await waitFor(() => {
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledTimes(1)
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledWith(file, null)
+    })
   })
 })

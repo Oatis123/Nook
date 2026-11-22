@@ -13,7 +13,7 @@ export type PreviewWorkerRequest =
 export type PreviewResult =
   | ({ status: 'done' } & PreviewBlocks)
   | { status: 'skipped' }
-  | { status: 'error'; error: 'highlighter' | 'render' }
+  | { status: 'error'; error: 'highlighter' | 'render'; detail?: string }
 
 export type PreviewWorkerResponse = { id: number } & PreviewResult
 
@@ -28,25 +28,38 @@ const latestBySession = new Map<number, number>()
 self.onmessage = (event: MessageEvent<PreviewWorkerRequest>) => {
   const message = event.data
   if (message.type === 'context') {
-    queue = queue.then(() => renderer.setContext(message.context))
+    queue = queue
+      .then(() => renderer.setContext(message.context))
+      .catch((error) => {
+        console.error('[preview.worker] Failed to set context:', error)
+      })
     return
   }
   latestBySession.set(message.session, message.id)
-  queue = queue.then(async () => {
-    let result: PreviewResult
-    if (latestBySession.get(message.session) !== message.id) {
-      result = { status: 'skipped' }
-    } else {
-      try {
-        const blocks = await renderer.render(message.content, new Set(message.have))
-        result = { status: 'done', ...blocks }
-      } catch (error) {
-        result = {
-          status: 'error',
-          error: error instanceof HighlighterUnavailableError ? 'highlighter' : 'render',
+  queue = queue
+    .then(async () => {
+      let result: PreviewResult
+      if (latestBySession.get(message.session) !== message.id) {
+        result = { status: 'skipped' }
+      } else {
+        try {
+          const blocks = await renderer.render(message.content, new Set(message.have))
+          result = { status: 'done', ...blocks }
+        } catch (error) {
+          const isHighlighter = error instanceof HighlighterUnavailableError
+          if (!isHighlighter) {
+            console.error('[preview.worker] Preview render failed:', error)
+          }
+          result = {
+            status: 'error',
+            error: isHighlighter ? 'highlighter' : 'render',
+            detail: error instanceof Error ? error.message : String(error),
+          }
         }
       }
-    }
-    self.postMessage({ id: message.id, ...result } satisfies PreviewWorkerResponse)
-  })
+      self.postMessage({ id: message.id, ...result } satisfies PreviewWorkerResponse)
+    })
+    .catch((error) => {
+      console.error('[preview.worker] Unhandled queue error:', error)
+    })
 }

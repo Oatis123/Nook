@@ -123,4 +123,66 @@ describe('AttachmentsPage', () => {
       expect(attachmentsApi.updateAttachment).toHaveBeenCalledWith('a-img', { folder_id: null })
     })
   })
+
+  it('uploads OS files dropped onto a folder row, Root button, and main dropzone', async () => {
+    vi.mocked(attachmentsApi.uploadAttachment).mockResolvedValue({
+      id: 'a-drop',
+      folder_id: 'f-images',
+      filename: 'dropped.png',
+      mime: 'image/png',
+      size: 128,
+      created_at: '2026-01-04T00:00:00Z',
+      used_by: [],
+    })
+
+    renderPage()
+    await screen.findByText('root-doc.pdf')
+
+    const nav = screen.getByRole('navigation', { name: 'Attachment folders' })
+    const buttons = Array.from(nav.querySelectorAll('button'))
+    const rootBtn = buttons.find((b) => b.textContent?.includes('Root'))!
+    const imagesBtn = buttons.find((b) => b.textContent?.includes('images'))!
+    const dropzone = screen.getByLabelText('Attachments dropzone')
+
+    const file1 = new File(['1'], 'one.png', { type: 'image/png' })
+    const file2 = new File(['2'], 'two.png', { type: 'image/png' })
+    const file3 = new File(['3'], 'three.png', { type: 'image/png' })
+
+    // 1. Drop onto `images` folder row
+    fireEvent.dragOver(imagesBtn, {
+      dataTransfer: { files: [file1], types: ['Files'], dropEffect: 'none' },
+    })
+    expect(imagesBtn.className).toContain('ring-accent')
+    fireEvent.drop(imagesBtn, {
+      dataTransfer: { files: [file1], types: ['Files'] },
+    })
+    await waitFor(() => {
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledWith(file1, 'f-images')
+    })
+
+    // 2. Drop onto Root button
+    fireEvent.drop(rootBtn, {
+      dataTransfer: { files: [file2], types: ['Files'] },
+    })
+    await waitFor(() => {
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledWith(file2, null)
+    })
+
+    // 3. Drop onto main dropzone when `All folders` is active -> uploads to Root (null)
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [file3], types: ['Files'] },
+    })
+    await waitFor(() => {
+      expect(attachmentsApi.uploadAttachment).toHaveBeenCalledWith(file3, null)
+    })
+
+    // 4. Filter to `images` and drop onto main dropzone -> uploads to `f-images`
+    fireEvent.click(imagesBtn)
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [file3], types: ['Files'] },
+    })
+    await waitFor(() => {
+      expect(attachmentsApi.uploadAttachment).toHaveBeenLastCalledWith(file3, 'f-images')
+    })
+  })
 })

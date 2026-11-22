@@ -155,13 +155,30 @@ export const MarkdownPreview = memo(function MarkdownPreview({
       const result = await session.render(context, content, new Set(blocks.keys()))
       if (cancelled || result.status === 'skipped') return
       if (result.status === 'error') {
-        if (result.error === 'highlighter') setHighlighterError(true)
-        else
+        if (result.error === 'highlighter') {
+          setHighlighterError(true)
+        } else {
+          console.error(
+            '[MarkdownPreview] Failed to render note preview:',
+            result.detail ?? result.error,
+          )
           setTree({
-            nodes: <p className="text-danger">Couldn't render this note.</p>,
+            nodes: (
+              <div className="space-y-2">
+                <p className="text-danger">Couldn't render this note.</p>
+                <button
+                  type="button"
+                  className="text-sm text-accent underline"
+                  onClick={() => setHighlighterAttempt((n) => n + 1)}
+                >
+                  Retry
+                </button>
+              </div>
+            ),
             content,
             tasks: [],
           })
+        }
         return
       }
       // Before showing the formulas, so they don't flash up unstyled.

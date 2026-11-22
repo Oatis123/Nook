@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type DragEvent, type FormEvent, useMemo, useRef, useState } from 'react'
 import { clsx } from 'clsx'
 import {
   File as FileIcon,
@@ -26,10 +26,19 @@ import {
 } from '@/features/attachments/hooks'
 import { useFolders } from '@/features/notes/hooks'
 import { confirmAction } from '@/lib/confirm'
+import { toast } from '@/lib/toast'
 import { useDocumentTitle } from '@/lib/useDocumentTitle'
 import type { Attachment, Folder } from '@/lib/types'
 
 type FolderFilter = 'all' | 'root' | string
+type DropTarget = 'list' | 'root' | string | null
+
+function hasDraggedFiles(e: DragEvent): boolean {
+  return (
+    Array.from(e.dataTransfer?.types ?? []).includes('Files') ||
+    (e.dataTransfer?.files?.length ?? 0) > 0
+  )
+}
 
 interface FlatFolder {
   id: string
@@ -72,6 +81,7 @@ export default function AttachmentsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [selectedFolder, setSelectedFolder] = useState<FolderFilter>('all')
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null)
   const [movingAttachment, setMovingAttachment] = useState<Attachment | null>(null)
   const [renamingAttachment, setRenamingAttachment] = useState<Attachment | null>(null)
 
@@ -106,10 +116,51 @@ export default function AttachmentsPage() {
     return list.filter((a) => a.folder_id === activeFilter)
   }, [attachments.data, activeFilter])
 
+  async function uploadFilesToFolder(files: File[], folderId: string | null, notify = false) {
+    if (files.length === 0) return
+    const targetName = folderId ? (folderPathById.get(folderId) ?? 'folder') : 'Root'
+    try {
+      await Promise.all(files.map((file) => upload.mutateAsync({ file, folderId })))
+      if (notify) {
+        toast.success(
+          files.length === 1
+            ? `Uploaded "${files[0].name}" to "${targetName}"`
+            : `Uploaded ${files.length} files to "${targetName}"`,
+        )
+      }
+    } catch {
+      // Global mutation error handler reports failed uploads.
+    }
+  }
+
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (file) upload.mutate({ file, folderId: uploadTargetFolderId })
+    const files = Array.from(e.target.files ?? [])
+    if (files.length > 0) void uploadFilesToFolder(files, uploadTargetFolderId)
     e.target.value = ''
+  }
+
+  function folderDropHandlers(target: DropTarget, folderId: string | null) {
+    return {
+      onDragOver: (e: DragEvent) => {
+        if (!hasDraggedFiles(e)) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.dataTransfer.dropEffect = 'copy'
+        setDropTarget(target)
+      },
+      onDragLeave: (e: DragEvent) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDropTarget((current) => (current === target ? null : current))
+        }
+      },
+      onDrop: (e: DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setDropTarget(null)
+        const files = Array.from(e.dataTransfer?.files ?? [])
+        void uploadFilesToFolder(files, folderId, true)
+      },
+    }
   }
 
   if (!attachments.data) return <QueryState query={attachments} />
@@ -173,6 +224,7 @@ export default function AttachmentsPage() {
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             className="hidden"
             onChange={handleFileChange}
             aria-label="Upload attachment"
@@ -210,7 +262,11 @@ export default function AttachmentsPage() {
                 type="button"
                 data-active={activeFilter === 'root' || undefined}
                 onClick={() => setSelectedFolder('root')}
-                className="ui-nav-item flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-sm"
+                {...folderDropHandlers('root', null)}
+                className={clsx(
+                  'ui-nav-item flex items-center justify-between gap-2 px-2.5 py-1.5 text-left text-sm transition-colors',
+                  dropTarget === 'root' && 'bg-surface-raised ring-1 ring-accent',
+                )}
               >
                 <span className="flex min-w-0 items-center gap-1.5">
                   <FolderIcon size={14} strokeWidth={1.5} className="shrink-0" />
@@ -226,8 +282,12 @@ export default function AttachmentsPage() {
                     type="button"
                     data-active={activeFilter === folder.id || undefined}
                     onClick={() => setSelectedFolder(folder.id)}
+                    {...folderDropHandlers(folder.id, folder.id)}
                     title={folder.path}
-                    className="ui-nav-item flex items-center justify-between gap-2 py-1.5 pr-2.5 text-left text-sm"
+                    className={clsx(
+                      'ui-nav-item flex items-center justify-between gap-2 py-1.5 pr-2.5 text-left text-sm transition-colors',
+                      dropTarget === folder.id && 'bg-surface-raised ring-1 ring-accent',
+                    )}
                     style={{ paddingLeft: folder.depth * 12 + 10 }}
                   >
                     <span className="flex min-w-0 items-center gap-1.5">
@@ -242,7 +302,14 @@ export default function AttachmentsPage() {
           </div>
         </aside>
 
-        <div className="min-w-0">
+        <div
+          aria-label="Attachments dropzone"
+          {...folderDropHandlers('list', uploadTargetFolderId)}
+          className={clsx(
+            'min-h-48 min-w-0 rounded-(--oatis-radius-md) transition-colors',
+            dropTarget === 'list' && 'bg-surface/70 p-2 ring-2 ring-accent',
+          )}
+        >
           {filteredAttachments.length === 0 ? (
             <EmptyState
               title={

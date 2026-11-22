@@ -229,9 +229,7 @@ async def test_attachment_folders_and_scoped_uniqueness(
     assert [a["id"] for a in by_root] == [root_att["id"]]
 
 
-async def test_move_and_rename_attachment(
-    client: AsyncClient, db_session: AsyncSession
-) -> None:
+async def test_move_and_rename_attachment(client: AsyncClient, db_session: AsyncSession) -> None:
     await make_user(db_session, "alice")
     await login(client, "alice")
 

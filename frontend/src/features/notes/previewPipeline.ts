@@ -281,10 +281,7 @@ const EXTERNAL_IMAGE_URL_RE = /^(?:https?:|data:|mailto:|\/api\/)/i
 
 /** Rewrites local Markdown images (`![alt](path)`) — in paragraphs, lists, tables, etc. —
  * to their attachment download URLs while preserving `alt` and `title`. */
-function remarkAttachmentImages(
-  attachmentIndex: AttachmentIndex,
-  noteFolderId?: string | null,
-) {
+function remarkAttachmentImages(attachmentIndex: AttachmentIndex, noteFolderId?: string | null) {
   return (tree: MdastRoot) => {
     visit(tree, 'image', (node) => {
       const url = node.url.trim()

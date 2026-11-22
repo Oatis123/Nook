@@ -77,7 +77,7 @@ def test_extract_embeds_obsidian_and_markdown() -> None:
     body = (
         "![[diagram.png]] and ![[images/pic.png|300]]\n"
         "![](../images/8943ee10.gif)\n"
-        "![alt](<./my%20photo.png> \"caption\")\n"
+        '![alt](<./my%20photo.png> "caption")\n'
         "![plot](charts/plot(1).png?w=200#center 'title')\n"
         "| ![](../images/table%20img.png) | cell |\n"
     )

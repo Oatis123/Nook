@@ -49,8 +49,18 @@ describe('buildAttachmentIndex', () => {
       folder({ id: 'f-images', name: 'images', parent_id: 'f-course' }),
     ]
     const attachments: Attachment[] = [
-      attachment({ id: 'a-gif', filename: '8943ee10.gif', mime: 'image/gif', folder_id: 'f-images' }),
-      attachment({ id: 'a-space', filename: 'my graph.png', mime: 'image/png', folder_id: 'f-images' }),
+      attachment({
+        id: 'a-gif',
+        filename: '8943ee10.gif',
+        mime: 'image/gif',
+        folder_id: 'f-images',
+      }),
+      attachment({
+        id: 'a-space',
+        filename: 'my graph.png',
+        mime: 'image/png',
+        folder_id: 'f-images',
+      }),
       attachment({ id: 'a-local', filename: 'local.png', mime: 'image/png', folder_id: 'f-notes' }),
     ]
     const index = buildAttachmentIndex(attachments, folders)

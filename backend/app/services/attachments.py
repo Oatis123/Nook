@@ -22,9 +22,7 @@ MAX_FILENAME_LENGTH = 255  # Attachment.filename is String(255)
 
 def _folder_condition(folder_id: uuid.UUID | None):
     return (
-        Attachment.folder_id.is_(None)
-        if folder_id is None
-        else Attachment.folder_id == folder_id
+        Attachment.folder_id.is_(None) if folder_id is None else Attachment.folder_id == folder_id
     )
 
 

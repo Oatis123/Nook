@@ -393,9 +393,7 @@ async def delete_folder(folder_id: str) -> dict[str, str]:
 _MAX_INLINE_ATTACHMENT_BYTES = 1024 * 1024
 
 
-def _attachment_summary(
-    attachment: Attachment, used_by: list[str] | None = None
-) -> dict[str, Any]:
+def _attachment_summary(attachment: Attachment, used_by: list[str] | None = None) -> dict[str, Any]:
     data: dict[str, Any] = {
         "id": str(attachment.id),
         "filename": attachment.filename,
@@ -531,12 +529,7 @@ async def move_attachment(
         raise ToolError("Cannot combine move_to_root=true with folder_id or folder_path")
     user_id = current_user_id()
     aid = _uuid(attachment_id, "attachment")
-    moving = (
-        move_to_root
-        or folder_id is not None
-        or folder_path is not None
-        or filename is None
-    )
+    moving = move_to_root or folder_id is not None or folder_path is not None or filename is None
     async with async_session_factory() as session:
         fields: dict[str, Any] = {}
         if moving:
@@ -548,9 +541,7 @@ async def move_attachment(
         if filename is not None:
             fields["filename"] = filename
         data = _validated(AttachmentUpdate, **fields)
-        attachment = await _run(
-            attachments_service.update_attachment(session, user_id, aid, data)
-        )
+        attachment = await _run(attachments_service.update_attachment(session, user_id, aid, data))
         used_by = await _run(
             attachments_service.get_attachment_used_by(session, user_id, attachment.id)
         )

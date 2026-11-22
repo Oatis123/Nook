@@ -183,9 +183,7 @@ def _lookup_rewrite_target(
     return names.get(PurePosixPath(norm).name)
 
 
-def rewrite_embeds(
-    content: str, names: dict[str, str], note_dir: tuple[str, ...] = ()
-) -> str:
+def rewrite_embeds(content: str, names: dict[str, str], note_dir: tuple[str, ...] = ()) -> str:
     """Points `![[file]]`, `![[path/file|alias]]`, and `![alt](path/file)` at the name
     the file was actually stored under when deduplicated."""
     if not names:

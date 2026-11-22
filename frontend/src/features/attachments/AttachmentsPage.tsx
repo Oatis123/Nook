@@ -75,10 +75,7 @@ export default function AttachmentsPage() {
   const [movingAttachment, setMovingAttachment] = useState<Attachment | null>(null)
   const [renamingAttachment, setRenamingAttachment] = useState<Attachment | null>(null)
 
-  const flatFolders = useMemo(
-    () => buildFlatFolders(foldersQuery.data ?? []),
-    [foldersQuery.data],
-  )
+  const flatFolders = useMemo(() => buildFlatFolders(foldersQuery.data ?? []), [foldersQuery.data])
   const folderPathById = useMemo(
     () => new Map(flatFolders.map((f) => [f.id, f.path])),
     [flatFolders],

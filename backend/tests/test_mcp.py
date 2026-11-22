@@ -621,8 +621,8 @@ async def test_mcp_attachments_validation_limits_and_isolation(
     )
     assert bad_list_filter["result"]["isError"] is True
 
-    # Oversized upload rejected via service limit
-    small_limit = get_settings().model_copy(update={"max_upload_mb": 1})
+    # Oversized upload rejected via service limit (preserve _isolated_attachments_dir's tmp_path)
+    small_limit = attachments_service.get_settings().model_copy(update={"max_upload_mb": 1})
     monkeypatch.setattr(attachments_service, "get_settings", lambda: small_limit)
     oversized_b64 = base64.b64encode(b"x" * (1024 * 1024 + 10)).decode("ascii")
     oversized = _call_tool(
